@@ -44,7 +44,7 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.symbolic import gensym
-from finchlite.tensor import BufferizedNDArray
+from finchlite.tensor import BufferizedNDArray, Scalar
 from finchlite.tensor.override_tensor import OverrideTensor
 
 
@@ -292,8 +292,6 @@ def asarray(
         raise ValueError(f"device argument is not supported; got {device!r}")
 
     if format is None:
-        from finchlite.tensor.scalar import Scalar
-
         if isinstance(obj, BufferizedNDArray):
             if copy is True:
                 return BufferizedNDArray.from_numpy(
