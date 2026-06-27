@@ -186,6 +186,13 @@ class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     def type(self):
         return builtins.bool
 
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            return ftype(self.type(False) + other.type(False))
+        if isinstance(other, FDTypeNumpy):
+            return other.__promote__(self)
+        return None
+
     def __repr__(self):
         return "finchlite.bool_"
 

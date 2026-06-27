@@ -385,7 +385,10 @@ def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.min(x, axis=axis, keepdims=keepdims))
 
 
-minimum = min
+def minimum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.minimum(x1, x2)
+    return compute(lazy.minimum(x1, x2))
 
 
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -394,7 +397,10 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
 
 
-maximum = max
+def maximum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.maximum(x1, x2)
+    return compute(lazy.maximum(x1, x2))
 
 
 def clip(x, /, *, min=None, max=None):
@@ -771,6 +777,22 @@ def copysign(x1, x2):
     return compute(lazy.copysign(x1, x2))
 
 
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonzero(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonzero(x, axis=axis, keepdims=keepdims))
+
+
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonfill(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonfill(x, axis=axis, keepdims=keepdims))
+
+
 def nextafter(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.nextafter(x1, x2)
@@ -855,10 +877,22 @@ def equal(x1, x2):
     return compute(lazy.equal(x1, x2))
 
 
+def same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.same(x1, x2)
+    return compute(lazy.same(x1, x2))
+
+
 def not_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.not_equal(x1, x2)
     return compute(lazy.not_equal(x1, x2))
+
+
+def not_same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.not_same(x1, x2)
+    return compute(lazy.not_same(x1, x2))
 
 
 def where(condition, x1, x2):

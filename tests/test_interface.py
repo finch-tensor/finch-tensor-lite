@@ -1,3 +1,4 @@
+import math
 import warnings
 
 import pytest
@@ -225,6 +226,8 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         ((finchlite.logical_and, np.logical_and), np.logical_and),
         ((finchlite.logical_or, np.logical_or), np.logical_or),
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
+        ((finchlite.minimum, np.minimum), np.minimum),
+        ((finchlite.maximum, np.maximum), np.maximum),
         ((ffuncs.eq, finchlite.equal, np.equal), np.equal),
         ((ffuncs.ne, finchlite.not_equal, np.not_equal), np.not_equal),
         ((ffuncs.lt, finchlite.less, np.less), np.less),
@@ -265,6 +268,95 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
                 result = finchlite.compute(result)
 
             finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_same_elementwise_nan(wrap):
+    a = np.array([1.0, np.nan, np.nan, 2.0])
+    b = np.array([1.0, np.nan, 0.0, np.nan])
+
+    same = finchlite.same(wrap(a), wrap(b))
+    not_same = finchlite.not_same(wrap(a), wrap(b))
+
+    if isinstance(same, finchlite.LazyTensor):
+        same = finchlite.compute(same)
+    if isinstance(not_same, finchlite.LazyTensor):
+        not_same = finchlite.compute(not_same)
+
+    expected = np.array([True, True, False, False])
+    finch_assert_equal(same, expected)
+    finch_assert_equal(not_same, np.logical_not(expected))
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_count_nonfill(wrap):
+    x = np.array([[0.0, 1.0, np.nan], [2.0, 0.0, 0.0]])
+
+    count = finchlite.count_nonfill(wrap(x))
+    axis_count = finchlite.count_nonfill(wrap(x), axis=1)
+
+    if isinstance(count, finchlite.LazyTensor):
+        count = finchlite.compute(count)
+    if isinstance(axis_count, finchlite.LazyTensor):
+        axis_count = finchlite.compute(axis_count)
+
+    finch_assert_equal(count, np.array(3))
+    finch_assert_equal(axis_count, np.array([2, 1]))
+
+
+def test_count_nonfill_nan_fill_value():
+    x = finchlite.full((2, 3), np.nan)
+    assert np.isnan(x.fill_value)
+    finch_assert_equal(finchlite.count_nonfill(x), np.array(0))
+
+
+def test_array_api_constants():
+    assert finchlite.e == math.e
+    assert finchlite.pi == math.pi
+    assert finchlite.inf == math.inf
+    assert math.isnan(finchlite.nan)
+    assert finchlite.nan != finchlite.nan
+    assert finchlite.newaxis is None
+
+    assert bool(finchlite.isinf(finchlite.asarray(finchlite.inf)))
+    assert bool(finchlite.isnan(finchlite.asarray(finchlite.nan)))
+
+
+def test_asarray_python_scalars_use_default_array_dtypes():
+    scalar = finchlite.asarray(1)
+
+    assert finchlite.__array_api_version__ == "2024.12"
+    assert finchlite.asarray(True).dtype == finchlite.bool
+    assert scalar.dtype == finchlite.int64
+    assert finchlite.asarray(1.0).dtype == finchlite.float64
+    assert finchlite.asarray(1j).dtype == finchlite.complex128
+    assert finchlite.asarray(1.0, dtype=finchlite.float32).dtype == finchlite.float32
+    assert scalar.__array_namespace__() is finchlite
+
+
+def test_lazy_python_scalars_keep_builtin_dtypes():
+    assert finchlite.lazy(True).dtype == finchlite.bool_
+    assert finchlite.lazy(1).dtype == finchlite.int_
+    assert finchlite.lazy(1.0).dtype == finchlite.float_
+    assert finchlite.lazy(1j).dtype == finchlite.complex_
+
+
+def test_nan_fill_value_ftype_equality():
+    x = finchlite.full((2, 3), np.nan)
+    y = finchlite.full((2, 3), np.nan)
+    assert finchlite.same(x.fill_value, y.fill_value)
+    assert x.ftype == y.ftype
+    assert hash(x.ftype) == hash(y.ftype)
+
+    lazy_x = finchlite.lazy(x)
+    lazy_y = finchlite.lazy(y)
+    assert lazy_x.ftype == lazy_y.ftype
+    assert hash(lazy_x.ftype) == hash(lazy_y.ftype)
+
+    scalar_x = finchlite.asarray(finchlite.nan)
+    scalar_y = finchlite.asarray(finchlite.nan)
+    assert scalar_x.ftype == scalar_y.ftype
+    assert hash(scalar_x.ftype) == hash(scalar_y.ftype)
 
 
 @pytest.mark.parametrize(
@@ -553,6 +645,30 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
     else:
         finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+@pytest.mark.parametrize(
+    "op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)]
+)
+@pytest.mark.parametrize("axis", [None, 0, 1])
+def test_min_max_nan_propagation(wrap, op, np_op, axis):
+    x = np.array([[1.0, np.nan], [3.0, 4.0]])
+    result = op(wrap(x), axis=axis)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    finch_assert_equal(result, np_op(x, axis=axis))
+
+
+@pytest.mark.parametrize("op", [finchlite.minimum, finchlite.maximum])
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_minimum_maximum_python_scalar_promotion(wrap, op):
+    x = np.array([1.0, 2.0], dtype=np.float32)
+    result = op(wrap(x), 1.0)
+    assert result.dtype == finchlite.float64
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    assert result.dtype == finchlite.float64
 
 
 @pytest.mark.parametrize(

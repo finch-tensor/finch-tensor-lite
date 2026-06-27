@@ -76,3 +76,52 @@ def test_algebra_selected():
     assert cansplitpush(ffuncs.add, ffuncs.add) is True
     assert cansplitpush(ffuncs.add, ffuncs.mul) is False
     assert cansplitpush(ffuncs.and_, ffuncs.and_) is False
+
+
+def test_same_ffunc():
+    assert ffuncs.same(1, 1)
+    assert not ffuncs.same(1, 2)
+    assert ffuncs.same(float("nan"), float("nan"))
+    assert ffuncs.same(np.float32(np.nan), np.float64(np.nan))
+    assert not ffuncs.same(float("nan"), 1.0)
+    assert ffuncs.same(None, None)
+    np.testing.assert_array_equal(
+        ffuncs.same(np.array([1.0, np.nan, 2.0]), np.array([1.0, np.nan, np.nan])),
+        np.array([True, True, False]),
+    )
+    assert not ffuncs.not_same(1, 1)
+    assert ffuncs.not_same(1, 2)
+    assert not ffuncs.not_same(float("nan"), float("nan"))
+    assert not ffuncs.not_same(None, None)
+    np.testing.assert_array_equal(
+        ffuncs.not_same(np.array([1.0, np.nan, 2.0]), np.array([1.0, np.nan, np.nan])),
+        np.array([False, False, True]),
+    )
+
+
+def test_same_ffunc_dunder_overload():
+    class LeftSame:
+        def __same__(self, other):
+            return np.False_
+
+    class RightSame:
+        def __rsame__(self, other):
+            return np.True_
+
+    class LeftDefers:
+        def __same__(self, other):
+            return NotImplemented
+
+    assert ffuncs.same(LeftSame(), RightSame()) is np.False_
+    assert ffuncs.same(LeftDefers(), RightSame()) is np.True_
+
+
+def test_samehash():
+    class SameHash:
+        def __samehash__(self):
+            return ("samehash", 1)
+
+    assert ffuncs.samehash(1) == 1
+    assert ffuncs.samehash(np.float64(np.nan)) == ("nan", finchlite.float64)
+    assert ffuncs.samehash(np.float32(np.nan)) == ("nan", finchlite.float32)
+    assert ffuncs.samehash(SameHash()) == ("samehash", 1)

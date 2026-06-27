@@ -31,10 +31,12 @@ class BufferizedNDArray(OverrideTensor):
         val: NumpyBuffer,
         shape: tuple[np.integer, ...],
         strides: tuple[np.integer, ...],
+        fill_value: Any = 0,
     ):
         self.val = val
         self._shape = shape
         self.strides = strides
+        self._fill_value = val.ftype.element_type(fill_value)
 
     def to_numpy(self):
         """
@@ -44,12 +46,13 @@ class BufferizedNDArray(OverrideTensor):
         return self.val.arr.reshape(self._shape, copy=False)
 
     @classmethod
-    def from_numpy(cls, arr: np.ndarray) -> "BufferizedNDArray":
+    def from_numpy(cls, arr: np.ndarray, fill_value: Any = 0) -> "BufferizedNDArray":
         itemsize = arr.dtype.itemsize
         strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
         shape = tuple(np.intp(s) for s in arr.shape)
         val = NumpyBuffer(arr.reshape(-1, copy=False))
-        return BufferizedNDArray(val, shape, strides)
+        fill_value = np.asarray(fill_value, dtype=arr.dtype).flat[0]
+        return BufferizedNDArray(val, shape, strides, fill_value)
 
     def __array__(self):
         return self.to_numpy()
@@ -63,6 +66,7 @@ class BufferizedNDArray(OverrideTensor):
             buffer_type=ftype(self.val),
             ndim=self.ndim,
             dimension_type=ftype(self.strides),
+            fill_value=self._fill_value,
         )
 
     @property
@@ -76,7 +80,7 @@ class BufferizedNDArray(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        return self.ftype.fill_value
+        return self._fill_value
 
     @property
     def element_type(self) -> FType:
@@ -114,7 +118,9 @@ class BufferizedNDArray(OverrideTensor):
         if isinstance(index, (slice, np.ndarray)) or (
             isinstance(index, tuple) and any(isinstance(i, slice) for i in index)
         ):
-            return BufferizedNDArray.from_numpy(self.to_numpy()[index])
+            return BufferizedNDArray.from_numpy(
+                self.to_numpy()[index], fill_value=self.fill_value
+            )
         if isinstance(index, tuple):
             index = tuple(i for i in index if i is not Ellipsis)
             index = 0 if index == () else np.dot(index, self.strides)
@@ -131,7 +137,9 @@ class BufferizedNDArray(OverrideTensor):
         self.val.store(index, value)
 
     def reshape(self, shape, /, *, copy=None):
-        return BufferizedNDArray.from_numpy(self.to_numpy().reshape(shape))
+        return BufferizedNDArray.from_numpy(
+            self.to_numpy().reshape(shape), fill_value=self.fill_value
+        )
 
     def __str__(self):
         return f"{self.ftype}(shape={self.shape})"
@@ -171,6 +179,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             buf,
             shape,
             strides,
+            self.fill_value,
         )
 
     def from_numpy(self, arr):
@@ -188,6 +197,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
                     strides, self.strides_t.struct_fieldtypes, strict=True
                 )
             ),
+            fill_value=self.fill_value,
         )
 
     def __init__(
@@ -196,6 +206,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         buffer_type: NumpyBufferFType,
         ndim: int,
         dimension_type: TupleFType | tuple[FType, ...],
+        fill_value: Any = 0,
     ):
         if not isinstance(dimension_type, TupleFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
@@ -209,12 +220,13 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self._ndim = ndim
         self.shape_t = dimension_type
         self.strides_t = dimension_type  # assuming strides is the same type as shape
+        self._fill_value = self.buf_t.element_type(fill_value)
 
     def construct(
         self,
         shape: tuple[int, ...],
     ) -> BufferizedNDArray:
-        arr = np.zeros(shape, dtype=to_numpy_type(self.element_type))
+        arr = np.full(shape, self.fill_value, dtype=to_numpy_type(self.element_type))
         return self.from_numpy(arr)
 
     def __call__(
@@ -236,10 +248,14 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def __eq__(self, other):
         if not isinstance(other, BufferizedNDArrayFType):
             return False
-        return self.buf_t == other.buf_t and self.ndim == other.ndim
+        return (
+            self.buf_t == other.buf_t
+            and self.ndim == other.ndim
+            and ffuncs.same(self.fill_value, other.fill_value)
+        )
 
     def __hash__(self):
-        return hash((self.buf_t, self.ndim))
+        return hash((self.buf_t, self.ndim, ffuncs.samehash(self.fill_value)))
 
     def __str__(self):
         return str(self.struct_name)
@@ -247,7 +263,8 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def __repr__(self):
         return (
             f"BufferizedNDArrayFType(buffer_type={repr(self.buf_t)},"
-            f" ndim = {self.ndim}, dimension_type ={repr(self.shape_t)})"
+            f" ndim = {self.ndim}, dimension_type ={repr(self.shape_t)},"
+            f" fill_value={self.fill_value!r})"
         )
 
     @property
@@ -260,7 +277,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     @property
     def fill_value(self) -> Any:
-        return np.zeros((), dtype=to_numpy_type(self.buf_t.element_type))[()]
+        return self._fill_value
 
     @property
     def element_type(self):
@@ -317,8 +334,12 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         new_strides = tuple(np.intp(s) for s in _get_default_strides(new_shape))
         default_strides = tuple(np.intp(s) for s in _get_default_strides(arr.shape))
         if arr.strides == default_strides:
-            return BufferizedNDArray(arr.val, new_shape, new_strides)
-        return BufferizedNDArray.from_numpy(arr.to_numpy().reshape(new_shape))
+            return BufferizedNDArray(
+                arr.val, new_shape, new_strides, fill_value=arr.fill_value
+            )
+        return BufferizedNDArray.from_numpy(
+            arr.to_numpy().reshape(new_shape), fill_value=arr.fill_value
+        )
 
     def lower_unwrap(self, ctx, obj): ...
 
