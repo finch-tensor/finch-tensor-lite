@@ -198,6 +198,12 @@ def multiply(x1, x2):
     return compute(lazy.multiply(x1, x2))
 
 
+def outer(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.outer(x1, x2)
+    return compute(lazy.outer(x1, x2))
+
+
 def divide(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.divide(x1, x2)

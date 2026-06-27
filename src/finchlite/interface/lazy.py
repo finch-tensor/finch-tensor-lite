@@ -2119,9 +2119,9 @@ def get_lazy_tensor_stats(
         return last_stats[0]
 
     return last_stats
-    
-def outer(x1, x2):
 
+
+def outer(x1, x2) -> LazyTensor:
     x1 = lazy(x1)
     x2 = lazy(x2)
 
@@ -2130,7 +2130,21 @@ def outer(x1, x2):
     if x2.ndim != 1:
         raise ValueError(f"x2 must be a 1D array, got {x2.ndim}D array")
 
-    # x1: (N,) -> (N, 1)
-    # x2: (M,) -> (1, M)
-    # multiply broadcasts elementwise to (N, M)
-    return multiply(expand_dims(x1, axis=-1), expand_dims(x2, axis=0))
+    i = Field(gensym("i"))
+    j = Field(gensym("j"))
+    expr = Reorder(
+        MapJoin(
+            Literal(ffuncs.mul),
+            (Table(x1.data, (i,)), Table(x2.data, (j,))),
+        ),
+        (i, j),
+    )
+    ctx = x1.ctx.join(x2.ctx)
+    data, ctx = ctx.eval(expr)
+    return LazyTensor(
+        data,
+        ctx,
+        (x1.shape[0], x2.shape[0]),
+        ffuncs.mul(x1.fill_value, x2.fill_value),
+        return_type(ffuncs.mul, x1.element_type, x2.element_type),
+    )

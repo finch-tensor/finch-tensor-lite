@@ -8,6 +8,7 @@ import numpy as np
 import finchlite
 from finchlite import ffuncs
 from finchlite.algebra import ftype
+from finchlite.finch_logic import MapJoin, Query, Reorder
 
 from .conftest import finch_assert_allclose, finch_assert_equal
 
@@ -789,6 +790,83 @@ def test_matmul(a, b, a_wrap, b_wrap):
     finch_assert_allclose(result, expected)
     finch_assert_allclose(result_with_op, expected)
     finch_assert_allclose(result_with_np, expected)
+
+
+def test_outer_default_scheduler():
+    a = np.array([1, 2])
+    b = np.array([3, 4, 5])
+
+    result = finchlite.outer(a, b)
+
+    finch_assert_equal(result, np.outer(a, b))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.array([1, 2, 3]), np.array([4, 5])),
+        (np.array([1.5, 2.0]), np.array([-1.0, 3.0, 4.0])),
+        (random_array((2,)), random_array((3,))),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_outer(a, b, a_wrap, b_wrap):
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+    expected = np.outer(a, b)
+
+    result = finchlite.outer(wa, wb)
+    result_with_np = np.outer(wa, wb)
+
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    if isinstance(result_with_np, finchlite.LazyTensor):
+        result_with_np = finchlite.compute(result_with_np)
+
+    finch_assert_allclose(result, expected)
+    finch_assert_allclose(result_with_np, expected)
+
+
+def test_outer_uses_single_logic_query():
+    a = finchlite.lazy(np.array([1, 2]))
+    b = finchlite.lazy(np.array([3, 4, 5]))
+
+    result = finchlite.outer(a, b)
+    queries = [stmt for stmt in result.ctx.trace() if isinstance(stmt, Query)]
+
+    assert result.shape == (2, 3)
+    assert len(queries) == 3
+    assert isinstance(queries[-1].rhs, Reorder)
+    assert isinstance(queries[-1].rhs.arg, MapJoin)
+    assert queries[-1].rhs.arg.op.val == ffuncs.mul
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.ones((2, 2)), np.ones(3)),
+        (np.ones(2), np.ones((3, 1))),
+    ],
+)
+def test_outer_requires_vectors(a, b):
+    with pytest.raises(ValueError):
+        finchlite.outer(a, b)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
