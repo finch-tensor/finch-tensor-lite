@@ -801,6 +801,16 @@ def test_outer_default_scheduler():
     finch_assert_equal(result, np.outer(a, b))
 
 
+def test_linalg_outer_eager():
+    a = finchlite.asarray(np.array([1, 2]))
+    b = finchlite.asarray(np.array([3, 4, 5]))
+
+    result = finchlite.linalg.outer(a, b)
+
+    assert not isinstance(result, finchlite.LazyTensor)
+    finch_assert_equal(result, np.outer(a.to_numpy(), b.to_numpy()))
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")
 @pytest.mark.parametrize(
     "a, b",
