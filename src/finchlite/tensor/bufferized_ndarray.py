@@ -36,7 +36,7 @@ class BufferizedNDArray(OverrideTensor):
         self.val = val
         self._shape = shape
         self.strides = strides
-        self._fill_value = fill_value
+        self._fill_value = val.dtype(fill_value)
 
     def to_numpy(self):
         """
