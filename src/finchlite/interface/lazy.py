@@ -403,8 +403,7 @@ def full(
         shape = (shape,)
     else:
         shape = tuple(shape)
-    fill_value = np.asarray(fill_value, dtype=_np_dtype(dtype)).flat[0]
-    return lazy(FillTensor(shape, fill_value))
+    return broadcast_to(asarray(fill_value, dtype=dtype), shape)
 
 
 def full_like(x, /, fill_value, *, dtype=None):
