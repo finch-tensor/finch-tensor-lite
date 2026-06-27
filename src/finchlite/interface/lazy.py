@@ -44,8 +44,9 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.symbolic import gensym
-from finchlite.tensor import BufferizedNDArray, Scalar
+from finchlite.tensor import BufferizedNDArray
 from finchlite.tensor.override_tensor import OverrideTensor
+from finchlite.tensor.scalar import Scalar
 
 
 class LazyTensorFType(TensorFType):
