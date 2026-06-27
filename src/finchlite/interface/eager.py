@@ -2,10 +2,7 @@ import builtins
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
-
-from finchlite.algebra import FinchOperator, ffuncs
-from finchlite.tensor import BufferizedNDArray
+from finchlite.algebra import FinchOperator
 
 from . import lazy
 from .fuse import compute
@@ -204,19 +201,6 @@ def multiply(x1, x2):
 def outer(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.outer(x1, x2)
-    x1_array = lazy.asarray(x1)
-    x2_array = lazy.asarray(x2)
-    if isinstance(x1_array, BufferizedNDArray) and isinstance(
-        x2_array, BufferizedNDArray
-    ):
-        if x1_array.ndim != 1:
-            raise ValueError(f"x1 must be a 1D array, got {x1_array.ndim}D array")
-        if x2_array.ndim != 1:
-            raise ValueError(f"x2 must be a 1D array, got {x2_array.ndim}D array")
-        return BufferizedNDArray.from_numpy(
-            np.multiply.outer(x1_array.to_numpy(), x2_array.to_numpy()),
-            fill_value=ffuncs.mul(x1_array.fill_value, x2_array.fill_value),
-        )
     return compute(lazy.outer(x1, x2))
 
 
