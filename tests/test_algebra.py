@@ -12,6 +12,7 @@ from finchlite.algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
+    promote_type,
     repeat_operator,
 )
 
@@ -76,6 +77,15 @@ def test_algebra_selected():
     assert cansplitpush(ffuncs.add, ffuncs.add) is True
     assert cansplitpush(ffuncs.add, ffuncs.mul) is False
     assert cansplitpush(ffuncs.and_, ffuncs.and_) is False
+
+
+def test_builtin_scalar_uses_numpy_weak_promotion_with_numpy_dtype():
+    assert promote_type(finchlite.float32, finchlite.float_) == finchlite.float32
+    assert promote_type(finchlite.float_, finchlite.float32) == finchlite.float32
+    assert promote_type(finchlite.int32, finchlite.int_) == finchlite.int32
+    assert promote_type(finchlite.int32, finchlite.float_) == finchlite.float64
+    assert promote_type(finchlite.float32, finchlite.complex_) == finchlite.complex64
+    assert promote_type(finchlite.bool, finchlite.bool_) == finchlite.bool
 
 
 def test_same_ffunc():

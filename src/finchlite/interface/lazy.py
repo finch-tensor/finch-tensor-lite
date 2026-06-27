@@ -306,8 +306,6 @@ def asarray(
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
-            elif obj is not None:
-                obj = np.asarray(obj).flat[0]
             return Scalar(obj)
         try:
             np_arr = np.asarray(obj)
@@ -876,6 +874,14 @@ def max(
     """
     x = lazy(x)
     return reduce(ffuncs.max, x, axis=axis, keepdims=keepdims, init=init)
+
+
+def minimum(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.min, lazy(x1), lazy(x2))
+
+
+def maximum(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.max, lazy(x1), lazy(x2))
 
 
 def clip(x, /, *, min=None, max=None) -> LazyTensor:

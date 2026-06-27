@@ -226,6 +226,8 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         ((finchlite.logical_and, np.logical_and), np.logical_and),
         ((finchlite.logical_or, np.logical_or), np.logical_or),
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
+        ((finchlite.minimum, np.minimum), np.minimum),
+        ((finchlite.maximum, np.maximum), np.maximum),
         ((ffuncs.eq, finchlite.equal, np.equal), np.equal),
         ((ffuncs.ne, finchlite.not_equal, np.not_equal), np.not_equal),
         ((ffuncs.lt, finchlite.less, np.less), np.less),
@@ -336,6 +338,18 @@ def test_nan_fill_value_ftype_equality():
     scalar_y = finchlite.asarray(finchlite.nan)
     assert scalar_x.ftype == scalar_y.ftype
     assert hash(scalar_x.ftype) == hash(scalar_y.ftype)
+
+
+def test_asarray_python_scalar_uses_builtin_element_type():
+    assert finchlite.asarray(True).element_type == finchlite.bool_
+    assert finchlite.asarray(True).dtype == finchlite.bool
+    assert finchlite.asarray(1).element_type == finchlite.int_
+    assert finchlite.asarray(1).dtype == ftype(np.intp(0))
+    assert finchlite.asarray(1.0).element_type == finchlite.float_
+    assert finchlite.asarray(1.0).dtype == finchlite.float64
+    assert finchlite.asarray(1j).element_type == finchlite.complex_
+    assert finchlite.asarray(1j).dtype == finchlite.complex64
+    assert finchlite.asarray(1.0, dtype=finchlite.float32).dtype == finchlite.float32
 
 
 @pytest.mark.parametrize(
@@ -624,6 +638,28 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_allclose(result, expected, rtol=1e-15, atol=0.0)
     else:
         finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+@pytest.mark.parametrize("op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)])
+@pytest.mark.parametrize("axis", [None, 0, 1])
+def test_min_max_nan_propagation(wrap, op, np_op, axis):
+    x = np.array([[1.0, np.nan], [3.0, 4.0]])
+    result = op(wrap(x), axis=axis)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    finch_assert_equal(result, np_op(x, axis=axis))
+
+
+@pytest.mark.parametrize("op", [finchlite.minimum, finchlite.maximum])
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_minimum_maximum_python_scalar_promotion(wrap, op):
+    x = np.array([1.0, 2.0], dtype=np.float32)
+    result = op(wrap(x), 1.0)
+    assert result.dtype == finchlite.float32
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    assert result.dtype == finchlite.float32
 
 
 @pytest.mark.parametrize(

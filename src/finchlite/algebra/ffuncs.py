@@ -570,7 +570,7 @@ class _Min(NAryFinchOperator):
             B = ftype(b)
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
-            return C(builtins.min(a, b))
+            return C(np.minimum(a, b))
 
         return reduce(op, args)
 
@@ -599,7 +599,7 @@ class _Max(NAryFinchOperator):
             B = ftype(b)
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
-            return C(builtins.max(a, b))
+            return C(np.maximum(a, b))
 
         return reduce(op, args)
 

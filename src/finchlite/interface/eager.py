@@ -385,7 +385,10 @@ def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.min(x, axis=axis, keepdims=keepdims))
 
 
-minimum = min
+def minimum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.minimum(x1, x2)
+    return compute(lazy.minimum(x1, x2))
 
 
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -394,7 +397,10 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
 
 
-maximum = max
+def maximum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.maximum(x1, x2)
+    return compute(lazy.maximum(x1, x2))
 
 
 def clip(x, /, *, min=None, max=None):
