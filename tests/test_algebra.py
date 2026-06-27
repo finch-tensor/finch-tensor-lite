@@ -76,3 +76,14 @@ def test_algebra_selected():
     assert cansplitpush(ffuncs.add, ffuncs.add) is True
     assert cansplitpush(ffuncs.add, ffuncs.mul) is False
     assert cansplitpush(ffuncs.and_, ffuncs.and_) is False
+
+
+def test_same_ffunc():
+    assert ffuncs.same(1, 1)
+    assert not ffuncs.same(1, 2)
+    assert ffuncs.same(float("nan"), float("nan"))
+    assert ffuncs.same(np.float32(np.nan), np.float64(np.nan))
+    assert not ffuncs.same(float("nan"), 1.0)
+    assert not ffuncs.not_same(1, 1)
+    assert ffuncs.not_same(1, 2)
+    assert not ffuncs.not_same(float("nan"), float("nan"))

@@ -784,6 +784,32 @@ class _Equal(BinaryFinchOperator):
 equal = _Equal()
 
 
+class _Same(BinaryFinchOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return np.bool_(np.array_equal(a, b, equal_nan=True))
+
+    def __repr__(self) -> str:
+        return "same"
+
+
+same = _Same()
+
+
+class _NotSame(BinaryFinchOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return np.bool_(not np.array_equal(a, b, equal_nan=True))
+
+    def __repr__(self) -> str:
+        return "not_same"
+
+
+not_same = _NotSame()
+
+
 class _NotEqual(BinaryFinchOperator):
     is_commutative = True
 
@@ -1441,6 +1467,7 @@ __all__ = [
     "neg",
     "nextafter",
     "not_equal",
+    "not_same",
     "or_",
     "overwrite",
     "pos",
@@ -1451,6 +1478,7 @@ __all__ = [
     "resize_if_smaller",
     "round",
     "rshift",
+    "same",
     "scansearch",
     "sign",
     "signbit",

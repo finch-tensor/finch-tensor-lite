@@ -26,7 +26,7 @@ from finchlite.algebra import (
     promote_type,
     return_type,
 )
-from finchlite.algebra.ftypes import FDType, FDTypeBuiltin, FDTypeNumpy
+from finchlite.algebra.ftypes import FDType, FDTypeBoolean, FDTypeBuiltin, FDTypeNumpy
 from finchlite.autoschedule.tensor_stats import StatsInterpreter
 from finchlite.finch_logic import (
     Aggregate,
@@ -397,10 +397,12 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    val = lazy(np.full((), fill_value, dtype=_np_dtype(dtype)))
     if isinstance(shape, int):
         shape = (shape,)
-    return broadcast_to(val, shape)
+    else:
+        shape = tuple(shape)
+    fill_value = np.asarray(fill_value, dtype=_np_dtype(dtype)).flat[0]
+    return lazy(FillTensor(shape, fill_value))
 
 
 def full_like(x, /, fill_value, *, dtype=None):
@@ -1087,8 +1089,28 @@ def count_nonzero(
     x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
 ) -> LazyTensor:
     x = lazy(x)
+    element_type = x.element_type
+    zero = element_type(False if isinstance(element_type, FDTypeBoolean) else 0)
     return reduce(
-        ffuncs.add, elementwise(ffuncs.truth, x), axis=axis, keepdims=keepdims, init=0
+        ffuncs.add,
+        elementwise(ffuncs.not_equal, x, lazy(zero)),
+        axis=axis,
+        keepdims=keepdims,
+        init=0,
+    )
+
+
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+) -> LazyTensor:
+    x = lazy(x)
+    fill = full(x.shape, x.fill_value, dtype=x.element_type)
+    return reduce(
+        ffuncs.add,
+        elementwise(ffuncs.not_same, x, fill),
+        axis=axis,
+        keepdims=keepdims,
+        init=0,
     )
 
 
@@ -1974,8 +1996,16 @@ def equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.equal, lazy(x1), lazy(x2))
 
 
+def same(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.same, lazy(x1), lazy(x2))
+
+
 def not_equal(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+
+
+def not_same(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.not_same, lazy(x1), lazy(x2))
 
 
 def where(condition, x1, x2) -> LazyTensor:

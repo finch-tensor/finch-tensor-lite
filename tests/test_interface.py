@@ -267,6 +267,46 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
             finch_assert_equal(result, expected)
 
 
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_same_elementwise_nan(wrap):
+    a = np.array([1.0, np.nan, np.nan, 2.0])
+    b = np.array([1.0, np.nan, 0.0, np.nan])
+
+    same = finchlite.same(wrap(a), wrap(b))
+    not_same = finchlite.not_same(wrap(a), wrap(b))
+
+    if isinstance(same, finchlite.LazyTensor):
+        same = finchlite.compute(same)
+    if isinstance(not_same, finchlite.LazyTensor):
+        not_same = finchlite.compute(not_same)
+
+    expected = np.array([True, True, False, False])
+    finch_assert_equal(same, expected)
+    finch_assert_equal(not_same, np.logical_not(expected))
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_count_nonfill(wrap):
+    x = np.array([[0.0, 1.0, np.nan], [2.0, 0.0, 0.0]])
+
+    count = finchlite.count_nonfill(wrap(x))
+    axis_count = finchlite.count_nonfill(wrap(x), axis=1)
+
+    if isinstance(count, finchlite.LazyTensor):
+        count = finchlite.compute(count)
+    if isinstance(axis_count, finchlite.LazyTensor):
+        axis_count = finchlite.compute(axis_count)
+
+    finch_assert_equal(count, np.array(3))
+    finch_assert_equal(axis_count, np.array([2, 1]))
+
+
+def test_count_nonfill_nan_fill_value():
+    x = finchlite.full((2, 3), np.nan)
+    assert np.isnan(x.fill_value)
+    finch_assert_equal(finchlite.count_nonfill(x), np.array(0))
+
+
 @pytest.mark.parametrize(
     "a",
     [

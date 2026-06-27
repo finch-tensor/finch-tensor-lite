@@ -779,6 +779,14 @@ def count_nonzero(
     return compute(lazy.count_nonzero(x, axis=axis, keepdims=keepdims))
 
 
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonfill(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonfill(x, axis=axis, keepdims=keepdims))
+
+
 def nextafter(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.nextafter(x1, x2)
@@ -863,10 +871,22 @@ def equal(x1, x2):
     return compute(lazy.equal(x1, x2))
 
 
+def same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.same(x1, x2)
+    return compute(lazy.same(x1, x2))
+
+
 def not_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.not_equal(x1, x2)
     return compute(lazy.not_equal(x1, x2))
+
+
+def not_same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.not_same(x1, x2)
+    return compute(lazy.not_same(x1, x2))
 
 
 def where(condition, x1, x2):
