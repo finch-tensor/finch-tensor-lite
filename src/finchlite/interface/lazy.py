@@ -356,10 +356,7 @@ def lazy(arr) -> LazyTensor:
 
     if isinstance(arr, LazyTensor):
         return arr
-    if isinstance(arr, bool | int | float | complex):
-        arr = Scalar(arr)
-    else:
-        arr = asarray(arr)
+    arr = Scalar(arr) if isinstance(arr, bool | int | float | complex) else asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

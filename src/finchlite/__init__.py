@@ -220,7 +220,6 @@ newaxis = None
 __array_api_version__ = "2024.12"
 
 __all__ = [
-    "__array_api_version__",
     "COMPILE_NUMBA",
     "DC",
     "INTERPRET_ASSEMBLY",
@@ -261,6 +260,7 @@ __all__ = [
     "TensorDef",
     "TensorFType",
     "UniformStats",
+    "__array_api_version__",
     "abs",
     "acos",
     "acosh",

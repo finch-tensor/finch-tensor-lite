@@ -12,7 +12,6 @@ from finchlite.algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
-    promote_type,
     repeat_operator,
 )
 
