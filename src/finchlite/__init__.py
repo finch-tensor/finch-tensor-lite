@@ -1,3 +1,5 @@
+import math
+
 from .algebra import (
     FTyped,
     Tensor,
@@ -66,6 +68,7 @@ from .interface import (
     NumPyFType,
     NumPyWrapper,
     Scalar,
+    ScalarFType,
     abs,
     acos,
     acosh,
@@ -96,6 +99,8 @@ from .interface import (
     copysign,
     cos,
     cosh,
+    count_nonfill,
+    count_nonzero,
     divide,
     einop,
     einsum,
@@ -122,6 +127,7 @@ from .interface import (
     lazy,
     less,
     less_equal,
+    linalg,
     linspace,
     log,
     log1p,
@@ -145,6 +151,7 @@ from .interface import (
     negative,
     nextafter,
     not_equal,
+    not_same,
     ones,
     ones_like,
     permute_dims,
@@ -158,6 +165,7 @@ from .interface import (
     remainder,
     reshape,
     round,
+    same,
     sign,
     signbit,
     sin,
@@ -183,6 +191,7 @@ from .interface import (
 )
 from .tensor import (
     BufferizedNDArray,
+    BufferizedNDArrayFType,
     FiberTensor,
     FiberTensorFType,
     OverrideTensor,
@@ -203,6 +212,13 @@ from .tensor.masks import (
     tril,
 )
 
+e = math.e
+pi = math.pi
+inf = math.inf
+nan = math.nan
+newaxis = None
+__array_api_version__ = "2024.12"
+
 __all__ = [
     "COMPILE_NUMBA",
     "DC",
@@ -214,6 +230,7 @@ __all__ = [
     "AssemblyContext",
     "BlockedStats",
     "BufferizedNDArray",
+    "BufferizedNDArrayFType",
     "DCStats",
     "DenseLevel",
     "DenseLevelFType",
@@ -236,12 +253,14 @@ __all__ = [
     "OverrideTensor",
     "Reflector",
     "Scalar",
+    "ScalarFType",
     "SparseListLevel",
     "SparseListLevelFType",
     "Tensor",
     "TensorDef",
     "TensorFType",
     "UniformStats",
+    "__array_api_version__",
     "abs",
     "acos",
     "acosh",
@@ -277,6 +296,8 @@ __all__ = [
     "copysign",
     "cos",
     "cosh",
+    "count_nonfill",
+    "count_nonzero",
     "dense",
     "dimension",
     "divide",
@@ -332,6 +353,7 @@ __all__ = [
     "lazy",
     "less",
     "less_equal",
+    "linalg",
     "linspace",
     "log",
     "log1p",
@@ -358,9 +380,11 @@ __all__ = [
     "nextafter",
     "none_",
     "not_equal",
+    "not_same",
     "ones",
     "ones_like",
     "permute_dims",
+    "pi",
     "positive",
     "pow",
     "power",
@@ -371,6 +395,7 @@ __all__ = [
     "remainder",
     "reshape",
     "round",
+    "same",
     "set_default_scheduler",
     "shape_type",
     "sign",

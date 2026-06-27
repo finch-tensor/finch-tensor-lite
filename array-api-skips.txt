@@ -36,7 +36,6 @@ array_api_tests/test_signatures.py::test_func_signature[repeat]
 array_api_tests/test_signatures.py::test_func_signature[tile]
 array_api_tests/test_signatures.py::test_func_signature[unstack]
 array_api_tests/test_signatures.py::test_func_signature[clip]
-array_api_tests/test_signatures.py::test_func_signature[count_nonzero]
 array_api_tests/test_signatures.py::test_func_signature[take_along_axis]
 array_api_tests/test_signatures.py::test_func_signature[astype]
 array_api_tests/test_signatures.py::test_func_signature[cumulative_prod]
@@ -46,6 +45,7 @@ array_api_tests/test_signatures.py::test_extension_func_signature[linalg.cross]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matmul]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.cholesky]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matrix_norm]
+array_api_tests/test_signatures.py::test_extension_func_signature[linalg.vector_norm]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matrix_rank]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.matrix_transpose]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.outer]
@@ -91,13 +91,9 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_acosh
 # not implemented
 array_api_tests/test_operators_and_elementwise_functions.py::test_logical_not
 array_api_tests/test_operators_and_elementwise_functions.py::test_binary_with_scalars_real[logaddexp]
-array_api_tests/test_operators_and_elementwise_functions.py::test_binary_with_scalars_real[maximum]
-array_api_tests/test_operators_and_elementwise_functions.py::test_binary_with_scalars_real[minimum]
 array_api_tests/test_operators_and_elementwise_functions.py::test_copysign
 array_api_tests/test_operators_and_elementwise_functions.py::test_clip
 array_api_tests/test_operators_and_elementwise_functions.py::test_hypot
-array_api_tests/test_operators_and_elementwise_functions.py::test_maximum
-array_api_tests/test_operators_and_elementwise_functions.py::test_minimum
 # NumPy 2.3 exposes that zero-dimensional Finch arrays currently produce NumPy
 # scalars via [()], which array-api-tests does not treat as Array API scalars.
 # Long-term fix: make scalar extraction consistent, likely with item() for raw
@@ -189,8 +185,6 @@ array_api_tests/test_has_names.py::test_has_names[elementwise-clip]
 array_api_tests/test_has_names.py::test_has_names[elementwise-copysign]
 array_api_tests/test_has_names.py::test_has_names[elementwise-hypot]
 array_api_tests/test_has_names.py::test_has_names[elementwise-logical_not]
-array_api_tests/test_has_names.py::test_has_names[elementwise-maximum]
-array_api_tests/test_has_names.py::test_has_names[elementwise-minimum]
 array_api_tests/test_has_names.py::test_has_names[elementwise-signbit]
 array_api_tests/test_has_names.py::test_has_names[linear_algebra-matrix_transpose]
 array_api_tests/test_has_names.py::test_has_names[linear_algebra-vecdot]
@@ -217,7 +211,6 @@ array_api_tests/test_has_names.py::test_has_names[fft-rfft]
 array_api_tests/test_has_names.py::test_has_names[elementwise-reciprocal]
 array_api_tests/test_has_names.py::test_has_names[utility-diff]
 array_api_tests/test_has_names.py::test_has_names[statistical-cumulative_prod]
-array_api_tests/test_has_names.py::test_has_names[searching-count_nonzero]
 array_api_tests/test_has_names.py::test_has_names[indexing-take_along_axis]
 
 # test_indexing_functions
@@ -230,6 +223,7 @@ array_api_tests/test_indexing_functions.py::test_take
 # not implemented
 array_api_tests/test_linalg.py::test_matrix_transpose
 array_api_tests/test_linalg.py::test_vecdot
+array_api_tests/test_linalg.py::test_cross
 array_api_tests/test_linalg.py::test_eigh
 array_api_tests/test_linalg.py::test_eigvalsh
 array_api_tests/test_linalg.py::test_inv
@@ -272,7 +266,6 @@ array_api_tests/test_manipulation_functions.py::test_tile
 # not implemented
 array_api_tests/test_searching_functions.py::test_argmax
 array_api_tests/test_searching_functions.py::test_argmin
-array_api_tests/test_searching_functions.py::test_count_nonzero
 # 0D issue
 array_api_tests/test_searching_functions.py::test_nonzero
 
@@ -323,8 +316,6 @@ array_api_tests/test_special_cases.py::test_binary[copysign(x2_i < 0) -> NaN]
 array_api_tests/test_special_cases.py::test_binary[copysign(x2_i is -0) -> NaN]
 array_api_tests/test_special_cases.py::test_binary[copysign(x2_i is +0) -> NaN]
 array_api_tests/test_special_cases.py::test_binary[copysign(x2_i > 0) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[maximum(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[minimum(x1_i is NaN or x2_i is NaN) -> NaN]
 array_api_tests/test_special_cases.py::test_binary[pow(x1_i is -infinity and x2_i > 0 and not (x2_i.is_integer() and x2_i % 2 == 1)) -> +infinity]
 array_api_tests/test_special_cases.py::test_binary[pow(x1_i is -infinity and x2_i < 0 and x2_i.is_integer() and x2_i % 2 == 1) -> -0]
 array_api_tests/test_special_cases.py::test_binary[pow(x1_i is -0 and x2_i > 0 and x2_i.is_integer() and x2_i % 2 == 1) -> -0]
@@ -424,9 +415,7 @@ array_api_tests/test_special_cases.py::test_empty_arrays[mean]
 array_api_tests/test_special_cases.py::test_empty_arrays[std]
 array_api_tests/test_special_cases.py::test_empty_arrays[var]
 array_api_tests/test_special_cases.py::test_nan_propagation[cumulative_sum]
-array_api_tests/test_special_cases.py::test_nan_propagation[max]
 array_api_tests/test_special_cases.py::test_nan_propagation[mean]
-array_api_tests/test_special_cases.py::test_nan_propagation[min]
 array_api_tests/test_special_cases.py::test_nan_propagation[prod]
 array_api_tests/test_special_cases.py::test_nan_propagation[std]
 array_api_tests/test_special_cases.py::test_nan_propagation[sum]
@@ -445,13 +434,6 @@ array_api_tests/test_statistical_functions.py::test_mean
 array_api_tests/test_statistical_functions.py::test_cumulative_prod
 array_api_tests/test_statistical_functions.py::test_cumulative_sum
 
-# constants not yet exposed
-array_api_tests/test_constants.py::test_irrational_numbers[e-2.718281828459045]
-array_api_tests/test_constants.py::test_irrational_numbers[pi-3.141592653589793]
-array_api_tests/test_constants.py::test_inf
-array_api_tests/test_constants.py::test_nan
-array_api_tests/test_constants.py::test_newaxis
-
 # issue: array-api-tests-mypy — mypy errors in the array-api-tests suite itself
 array_api_tests/__init__.py::mypy
 array_api_tests/__init__.py::mypy-status
@@ -469,49 +451,6 @@ array_api_tests/test_manipulation_functions.py::mypy
 array_api_tests/test_operators_and_elementwise_functions.py::mypy
 array_api_tests/test_signatures.py::mypy
 array_api_tests/test_special_cases.py::mypy
-
-# issue: missing-nan — finchlite.nan constant not exposed; NaN special cases fail
-array_api_tests/test_special_cases.py::test_unary[abs(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[__abs__(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[acos(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[asin(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[asinh(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[atan(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[atanh(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[cos(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[cosh(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[exp(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[expm1(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[isfinite(x_i is NaN) -> False]
-array_api_tests/test_special_cases.py::test_unary[isnan(x_i is NaN) -> True]
-array_api_tests/test_special_cases.py::test_unary[log(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[log1p(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[log2(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[log10(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[round(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[sign(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[sin(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[sinh(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[sqrt(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[tan(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_unary[tanh(x_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[add(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[__add__(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[atan2(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[divide(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[__truediv__(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[logaddexp(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[multiply(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[__mul__(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[pow(not x1_i == 1 and x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[pow(x1_i is NaN and not x2_i == 0) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[__pow__(not x1_i == 1 and x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_binary[__pow__(x1_i is NaN and not x2_i == 0) -> NaN]
-array_api_tests/test_special_cases.py::test_iop[__iadd__(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_iop[__itruediv__(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_iop[__imul__(x1_i is NaN or x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_iop[__ipow__(not x1_i == 1 and x2_i is NaN) -> NaN]
-array_api_tests/test_special_cases.py::test_iop[__ipow__(x1_i is NaN and not x2_i == 0) -> NaN]
 
 # issue: missing-can_cast — can_cast not implemented
 array_api_tests/test_data_type_functions.py::test_can_cast

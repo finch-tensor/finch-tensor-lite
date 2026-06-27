@@ -48,6 +48,10 @@ class FType(ABC):
 
 
 class FDType(FType):
+    @property
+    def np_type_bot(self):
+        return self
+
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -186,6 +190,17 @@ class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     def type(self):
         return builtins.bool
 
+    @property
+    def np_type_bot(self):
+        return bool
+
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            return ftype(self.type(False) + other.type(False))
+        if isinstance(other, FDTypeNumpy):
+            return other.__promote__(self)
+        return None
+
     def __repr__(self):
         return "finchlite.bool_"
 
@@ -214,6 +229,10 @@ class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
     @property
     def type(self):
         return builtins.int
+
+    @property
+    def np_type_bot(self):
+        return int8
 
     def __repr__(self):
         return "finchlite.int_"
@@ -245,6 +264,10 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
     def type(self):
         return builtins.float
 
+    @property
+    def np_type_bot(self):
+        return float32
+
     def __repr__(self):
         return "finchlite.float_"
 
@@ -271,6 +294,10 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
         return builtins.complex
+
+    @property
+    def np_type_bot(self):
+        return complex64
 
     def __repr__(self):
         return "finchlite.complex_"
@@ -317,7 +344,10 @@ class FDTypeNumpy(FDType):
             promoted_dtype = np.promote_types(self.dtype, other.dtype)
             return ftype(promoted_dtype.type)
         if isinstance(other, FDTypeBuiltin):
-            promoted_dtype = np.promote_types(self.dtype, other.type)
+            other = other.np_type_bot
+            if not isinstance(other, FDTypeNumpy):
+                return None
+            promoted_dtype = np.promote_types(self.dtype, other.dtype)
             return ftype(promoted_dtype.type)
         return None
 

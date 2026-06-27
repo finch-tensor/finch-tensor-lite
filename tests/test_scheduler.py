@@ -7,9 +7,9 @@ from finchlite.autoschedule import (
     DefaultLogicOptimizer,
     DefaultLoopOrderer,
     LogicCapture,
-    LogicStandardizer,
     normalize_names,
 )
+from finchlite.autoschedule.formatter import DefaultLogicFormatter
 from finchlite.autoschedule.loop_ordering import set_loop_order
 from finchlite.autoschedule.optimize import (
     lift_fields,
@@ -313,7 +313,7 @@ def test_propagate_copy_queries():
         )
     )
 
-    result = propagate_copy_queries(plan)
+    result = propagate_copy_queries(plan, {})
     assert result == expected
 
 
@@ -527,57 +527,67 @@ def test_concordize():
 
 
 def test_set_loop_order():
-    plan = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(ffuncs.add),
-            Literal(0),
-            Reorder(
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Reorder(
-                            Table(Alias("A"), (Field("i0"), Field("i1"))),
-                            (Field("i0"), Field("i1")),
+    plan = Plan(
+        (
+            Query(
+                Alias("C"),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Reorder(
+                        MapJoin(
+                            Literal(ffuncs.mul),
+                            (
+                                Reorder(
+                                    Table(Alias("A"), (Field("i0"), Field("i1"))),
+                                    (Field("i0"), Field("i1")),
+                                ),
+                                Reorder(
+                                    Table(Alias("B"), (Field("i1"), Field("i2"))),
+                                    (Field("i1"), Field("i2")),
+                                ),
+                            ),
                         ),
-                        Reorder(
-                            Table(Alias("B"), (Field("i1"), Field("i2"))),
-                            (Field("i1"), Field("i2")),
-                        ),
+                        (Field("i0"), Field("i2"), Field("i1")),
                     ),
+                    (Field("i1"),),
                 ),
-                (Field("i0"), Field("i2"), Field("i1")),
             ),
-            (Field("i1"),),
-        ),
+            Produces((Alias("C"),)),
+        )
     )
 
-    expected = Query(
-        Alias("C"),
-        Aggregate(
-            Literal(ffuncs.add),
-            Literal(0),
-            Reorder(
-                Reorder(
-                    MapJoin(
-                        Literal(ffuncs.mul),
-                        (
-                            Reorder(
-                                Table(Alias("A"), (Field("i0"), Field("i1"))),
-                                (Field("i0"), Field("i1")),
+    expected = Plan(
+        (
+            Query(
+                Alias("C"),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Reorder(
+                        Reorder(
+                            MapJoin(
+                                Literal(ffuncs.mul),
+                                (
+                                    Reorder(
+                                        Table(Alias("A"), (Field("i0"), Field("i1"))),
+                                        (Field("i0"), Field("i1")),
+                                    ),
+                                    Reorder(
+                                        Table(Alias("B"), (Field("i1"), Field("i2"))),
+                                        (Field("i1"), Field("i2")),
+                                    ),
+                                ),
                             ),
-                            Reorder(
-                                Table(Alias("B"), (Field("i1"), Field("i2"))),
-                                (Field("i1"), Field("i2")),
-                            ),
+                            (Field("i0"), Field("i2"), Field("i1")),
                         ),
+                        (Field("i0"), Field("i1"), Field("i2")),
                     ),
-                    (Field("i0"), Field("i2"), Field("i1")),
+                    (Field("i1"),),
                 ),
-                (Field("i0"), Field("i1"), Field("i2")),
             ),
-            (Field("i1"),),
-        ),
+            Produces((Alias("C"),)),
+        )
     )
 
     result = set_loop_order(plan)
@@ -696,7 +706,9 @@ def test_scheduler_e2e_sddmm(file_regression):
     )
 
     capture = LogicCapture()
-    scheduler = DefaultLogicOptimizer(DefaultLoopOrderer(LogicStandardizer(capture)))
+    scheduler = DefaultLogicOptimizer(
+        DefaultLoopOrderer(DefaultLogicFormatter(capture))
+    )
     bindings = {
         Alias("S"): finchlite.asarray(s),
         Alias("A"): finchlite.asarray(a),

@@ -23,7 +23,7 @@ from finchlite.finch_assembly import (
     AssemblyLoader,
     AssemblyTransform,
 )
-from finchlite.finch_notation import NotationLoader
+from finchlite.finch_notation import LoopletSimplify, NotationLoader
 from finchlite.symbolic import (
     Context,
     PostOrderDFS,
@@ -566,18 +566,20 @@ class AssemblyContext(Context):
                 op_e = self(op)
                 return tns.result_type.lower_thaw(self, tns, op_e)
             case ntn.If(cond, body):
-                ctx = self.block()
-                ctx_2 = ctx.scope()
+                cond_e = self(cond)
+                ctx_2 = self.scope()
                 ctx_2(body)
-                ctx.exec(asm.If(ctx(cond), ctx_2.emit()))
+                self.exec(asm.If(cond_e, asm.Block(ctx_2.emit())))
                 return None
             case ntn.IfElse(cond, body, else_body):
-                ctx = self.block()
-                ctx_2 = ctx.scope()
+                cond_e = self(cond)
+                ctx_2 = self.scope()
                 ctx_2(body)
-                ctx_3 = ctx.scope()
+                ctx_3 = self.scope()
                 ctx_3(else_body)
-                ctx.exec(asm.IfElse(ctx(cond), ctx_2.emit(), ctx_3.emit()))
+                self.exec(
+                    asm.IfElse(cond_e, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit()))
+                )
                 return None
             case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
                 ctx = self.scope()
@@ -672,6 +674,9 @@ class LoopletPass(ABC):
     @property
     @abstractmethod
     def priority(self): ...
+
+    def __init__(self):
+        self.looplet_simplify = LoopletSimplify()
 
     def __lt__(self, other):
         assert isinstance(other, LoopletPass)

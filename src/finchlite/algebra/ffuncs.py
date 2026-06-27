@@ -570,7 +570,7 @@ class _Min(NAryFinchOperator):
             B = ftype(b)
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
-            return C(builtins.min(a, b))
+            return C(np.minimum(a, b))
 
         return reduce(op, args)
 
@@ -599,7 +599,7 @@ class _Max(NAryFinchOperator):
             B = ftype(b)
             assert isinstance(A, FDType) and isinstance(B, FDType)
             C = promote_type(A, B)
-            return C(builtins.max(a, b))
+            return C(np.maximum(a, b))
 
         return reduce(op, args)
 
@@ -782,6 +782,58 @@ class _Equal(BinaryFinchOperator):
 
 
 equal = _Equal()
+
+
+class _Same(BinaryFinchOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        same_method = getattr(a, "__same__", None)
+        if same_method is not None:
+            res = same_method(b)
+            if res is not NotImplemented:
+                return res
+        rsame_method = getattr(b, "__rsame__", None)
+        if rsame_method is not None:
+            res = rsame_method(a)
+            if res is not NotImplemented:
+                return res
+        try:
+            return np.logical_or(
+                np.equal(a, b), np.logical_and(np.isnan(a), np.isnan(b))
+            )
+        except TypeError:
+            return np.equal(a, b)
+
+    def __repr__(self) -> str:
+        return "same"
+
+
+same = _Same()
+
+
+def samehash(a: Any):
+    samehash_method = getattr(a, "__samehash__", None)
+    if samehash_method is not None:
+        res = samehash_method()
+        if res is not NotImplemented:
+            return res
+    if np.all(same(a, a)) and not np.array_equal(a, a):
+        return ("nan", ftype(a))
+    return a
+
+
+class _NotSame(BinaryFinchOperator):
+    is_commutative = True
+
+    def __call__(self, a: Any, b: Any):
+        return np.logical_not(same(a, b))
+
+    def __repr__(self) -> str:
+        return "not_same"
+
+
+not_same = _NotSame()
 
 
 class _NotEqual(BinaryFinchOperator):
@@ -1441,6 +1493,7 @@ __all__ = [
     "neg",
     "nextafter",
     "not_equal",
+    "not_same",
     "or_",
     "overwrite",
     "pos",
@@ -1451,6 +1504,8 @@ __all__ = [
     "resize_if_smaller",
     "round",
     "rshift",
+    "same",
+    "samehash",
     "scansearch",
     "sign",
     "signbit",
