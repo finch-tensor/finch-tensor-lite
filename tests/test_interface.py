@@ -322,6 +322,25 @@ def test_array_api_constants():
     assert bool(finchlite.isnan(finchlite.asarray(finchlite.nan)))
 
 
+def test_asarray_python_scalars_use_default_array_dtypes():
+    scalar = finchlite.asarray(1)
+
+    assert finchlite.__array_api_version__ == "2024.12"
+    assert finchlite.asarray(True).dtype == finchlite.bool
+    assert scalar.dtype == finchlite.int64
+    assert finchlite.asarray(1.0).dtype == finchlite.float64
+    assert finchlite.asarray(1j).dtype == finchlite.complex128
+    assert finchlite.asarray(1.0, dtype=finchlite.float32).dtype == finchlite.float32
+    assert scalar.__array_namespace__() is finchlite
+
+
+def test_lazy_python_scalars_keep_builtin_dtypes():
+    assert finchlite.lazy(True).dtype == finchlite.bool_
+    assert finchlite.lazy(1).dtype == finchlite.int_
+    assert finchlite.lazy(1.0).dtype == finchlite.float_
+    assert finchlite.lazy(1j).dtype == finchlite.complex_
+
+
 def test_nan_fill_value_ftype_equality():
     x = finchlite.full((2, 3), np.nan)
     y = finchlite.full((2, 3), np.nan)
@@ -338,18 +357,6 @@ def test_nan_fill_value_ftype_equality():
     scalar_y = finchlite.asarray(finchlite.nan)
     assert scalar_x.ftype == scalar_y.ftype
     assert hash(scalar_x.ftype) == hash(scalar_y.ftype)
-
-
-def test_asarray_python_scalar_uses_builtin_element_type():
-    assert finchlite.asarray(True).element_type == finchlite.bool_
-    assert finchlite.asarray(True).dtype == finchlite.bool
-    assert finchlite.asarray(1).element_type == finchlite.int_
-    assert finchlite.asarray(1).dtype == ftype(np.intp(0))
-    assert finchlite.asarray(1.0).element_type == finchlite.float_
-    assert finchlite.asarray(1.0).dtype == finchlite.float64
-    assert finchlite.asarray(1j).element_type == finchlite.complex_
-    assert finchlite.asarray(1j).dtype == finchlite.complex64
-    assert finchlite.asarray(1.0, dtype=finchlite.float32).dtype == finchlite.float32
 
 
 @pytest.mark.parametrize(
@@ -641,7 +648,9 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
 
 
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
-@pytest.mark.parametrize("op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)])
+@pytest.mark.parametrize(
+    "op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)]
+)
 @pytest.mark.parametrize("axis", [None, 0, 1])
 def test_min_max_nan_propagation(wrap, op, np_op, axis):
     x = np.array([[1.0, np.nan], [3.0, 4.0]])
@@ -656,10 +665,10 @@ def test_min_max_nan_propagation(wrap, op, np_op, axis):
 def test_minimum_maximum_python_scalar_promotion(wrap, op):
     x = np.array([1.0, 2.0], dtype=np.float32)
     result = op(wrap(x), 1.0)
-    assert result.dtype == finchlite.float32
+    assert result.dtype == finchlite.float64
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
-    assert result.dtype == finchlite.float32
+    assert result.dtype == finchlite.float64
 
 
 @pytest.mark.parametrize(

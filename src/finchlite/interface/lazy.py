@@ -306,6 +306,8 @@ def asarray(
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
+            elif isinstance(obj, bool | int | float | complex):
+                obj = np.asarray(obj)[()]
             return Scalar(obj)
         try:
             np_arr = np.asarray(obj)
@@ -354,7 +356,10 @@ def lazy(arr) -> LazyTensor:
 
     if isinstance(arr, LazyTensor):
         return arr
-    arr = asarray(arr)
+    if isinstance(arr, bool | int | float | complex):
+        arr = Scalar(arr)
+    else:
+        arr = asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)

@@ -217,8 +217,10 @@ pi = math.pi
 inf = math.inf
 nan = math.nan
 newaxis = None
+__array_api_version__ = "2024.12"
 
 __all__ = [
+    "__array_api_version__",
     "COMPILE_NUMBA",
     "DC",
     "INTERPRET_ASSEMBLY",
@@ -382,6 +384,7 @@ __all__ = [
     "ones",
     "ones_like",
     "permute_dims",
+    "pi",
     "positive",
     "pow",
     "power",

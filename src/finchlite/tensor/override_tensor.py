@@ -129,7 +129,7 @@ class OverrideTensor(Tensor):
         if api_version not in {"2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
 
-        return self.mod
+        return sys.modules["finchlite"]
 
     def __add__(self, other):
         return self.mod.add(self, other)
