@@ -75,7 +75,7 @@ class BufferizedNDArray(OverrideTensor):
 
     @property
     def ndim(self):
-        return np.intp(len(self._shape))
+        return len(self._shape)
 
     @property
     def fill_value(self) -> Any:

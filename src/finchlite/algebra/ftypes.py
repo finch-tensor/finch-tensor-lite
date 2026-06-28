@@ -589,6 +589,14 @@ def iinfo(T: FDTypeInteger):
     return T.iinfo
 
 
+def can_cast(from_, to, /) -> builtins.bool:
+    from_type = from_.dtype if hasattr(from_, "dtype") else from_
+    try:
+        return promote_type(ftype(from_type), ftype(to)) == ftype(to)
+    except TypeError:
+        return False
+
+
 class FTyped:
     """
     Abstract base class for objects that can be formatted.

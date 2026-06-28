@@ -1833,6 +1833,8 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     """
     Moves axes of an array to new positions.
     """
+    x = lazy(x)
+
     # argument validation
     # handles uniqueness, int -> tuple, and bound check
     source = normalize_axis_tuple(source, x.ndim, "source")
@@ -1840,8 +1842,6 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
 
     if len(source) != len(destination):
         raise ValueError("Source and Destination indices must have the same length")
-
-    x = lazy(x)
 
     final_order = [i for i in range(x.ndim) if i not in source]
     for dest, src in sorted(zip(destination, source, strict=True)):

@@ -1,11 +1,13 @@
 import math
 
 from .algebra import (
+    FType,
     FTyped,
     Tensor,
     TensorFType,
     bool,
     bool_,
+    can_cast,
     complex64,
     complex128,
     complex_,
@@ -283,6 +285,7 @@ __all__ = [
     "bitwise_xor",
     "bool",
     "bool_",
+    "can_cast",
     "broadcast_arrays",
     "broadcast_to",
     "ceil",
