@@ -135,7 +135,7 @@ class _TrueDiv(BinaryFinchOperator):
         return "truediv"
 
     def __call__(self, a: Any, b: Any):
-        return operator.truediv(a, b)
+        return np.true_divide(a, b)
 
     def is_identity(self, arg):
         return arg == 1
@@ -149,7 +149,7 @@ class _FloorDiv(BinaryFinchOperator):
         return "floor_divide"
 
     def __call__(self, a: Any, b: Any):
-        return operator.floordiv(a, b)
+        return np.floor_divide(a, b)
 
 
 floordiv = _FloorDiv()
@@ -160,7 +160,7 @@ class _Mod(BinaryFinchOperator):
         return "mod"
 
     def __call__(self, a: Any, b: Any):
-        return operator.mod(a, b)
+        return np.mod(a, b)
 
 
 mod = _Mod()
