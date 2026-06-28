@@ -784,6 +784,12 @@ def ceil(x) -> LazyTensor:
     return elementwise(ffuncs.ceil, lazy(x))
 
 
+def astype(x, dtype, /, *, copy=True, device=None) -> LazyTensor:
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    return elementwise(ffuncs.astype(ftype(dtype)), lazy(x))
+
+
 def trunc(x) -> LazyTensor:
     return elementwise(ffuncs.trunc, lazy(x))
 

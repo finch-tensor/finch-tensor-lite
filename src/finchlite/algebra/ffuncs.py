@@ -779,7 +779,32 @@ class _Clip(FinchOperator):
 clip = _Clip()
 
 
-class _Equal(BinaryFinchOperator):
+class _Cast(FinchOperator):
+    def __init__(self, dtype: FType):
+        self.dtype = dtype
+
+    def __call__(self, a: Any):
+        assert isinstance(self.dtype, FDType)
+        return self.dtype(a)
+
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return self.dtype
+
+    def __eq__(self, other):
+        return isinstance(other, _Cast) and self.dtype == other.dtype
+
+    def __hash__(self):
+        return hash((type(self), self.dtype))
+
+    def __repr__(self) -> str:
+        return "astype"
+
+
+def astype(dtype: FType):
+    return _Cast(dtype)
+
+
+class _Equal(ComparisonFinchOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
@@ -844,7 +869,7 @@ class _NotSame(BinaryFinchOperator):
 not_same = _NotSame()
 
 
-class _NotEqual(BinaryFinchOperator):
+class _NotEqual(ComparisonFinchOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
@@ -857,7 +882,7 @@ class _NotEqual(BinaryFinchOperator):
 not_equal = _NotEqual()
 
 
-class _Less(BinaryFinchOperator):
+class _Less(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.less(a, b)
 
@@ -868,7 +893,7 @@ class _Less(BinaryFinchOperator):
 less = _Less()
 
 
-class _LessEqual(BinaryFinchOperator):
+class _LessEqual(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.less_equal(a, b)
 
@@ -879,7 +904,7 @@ class _LessEqual(BinaryFinchOperator):
 less_equal = _LessEqual()
 
 
-class _Greater(BinaryFinchOperator):
+class _Greater(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater(a, b)
 
@@ -890,7 +915,7 @@ class _Greater(BinaryFinchOperator):
 greater = _Greater()
 
 
-class _GreaterEqual(BinaryFinchOperator):
+class _GreaterEqual(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater_equal(a, b)
 
@@ -1447,6 +1472,7 @@ __all__ = [
     "arctanh",
     "asin",
     "asinh",
+    "astype",
     "atan",
     "atan2",
     "atanh",

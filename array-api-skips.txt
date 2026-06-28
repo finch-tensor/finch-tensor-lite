@@ -37,7 +37,6 @@ array_api_tests/test_signatures.py::test_func_signature[tile]
 array_api_tests/test_signatures.py::test_func_signature[unstack]
 array_api_tests/test_signatures.py::test_func_signature[clip]
 array_api_tests/test_signatures.py::test_func_signature[take_along_axis]
-array_api_tests/test_signatures.py::test_func_signature[astype]
 array_api_tests/test_signatures.py::test_func_signature[cumulative_prod]
 array_api_tests/test_signatures.py::test_func_signature[diff]
 # linalg namespace
@@ -96,7 +95,6 @@ array_api_tests/test_data_type_functions.py::TestResultType::test_with_scalars
 array_api_tests/test_data_type_functions.py::TestResultType::test_result_type
 array_api_tests/test_data_type_functions.py::TestResultType::test_shuffled
 array_api_tests/test_searching_functions.py::test_searchsorted
-array_api_tests/test_data_type_functions.py::test_astype
 array_api_tests/test_data_type_functions.py::TestResultType::test_arrays_and_dtypes
 
 # test_has_names
@@ -329,9 +327,6 @@ array_api_tests/test_operators_and_elementwise_functions.py::mypy
 array_api_tests/test_signatures.py::mypy
 array_api_tests/test_special_cases.py::mypy
 
-# issue: missing-astype — astype not implemented
-array_api_tests/test_has_names.py::test_has_names[data_type-astype]
-
 # issue: finfo-dtype0 — finfo does not handle finchlite dtype objects (only string names)
 array_api_tests/test_data_type_functions.py::test_finfo[dtype0]
 
@@ -367,17 +362,3 @@ array_api_tests/test_signatures.py::test_func_signature[eye]
 
 # issue: missing-empty_like-signature — empty_like exists in skips but signature test also fails
 array_api_tests/test_signatures.py::test_func_signature[empty_like]
-
-# issue: dtype-return-type — x.dtype returns numpy dtype instead of finchlite dtype; comparison ops fail
-array_api_tests/test_operators_and_elementwise_functions.py::test_equal[equal(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_equal[__eq__(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_greater[greater(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_greater[__gt__(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_greater_equal[greater_equal(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_greater_equal[__ge__(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_less[less(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_less[__lt__(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_less_equal[less_equal(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_less_equal[__le__(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_not_equal[not_equal(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_not_equal[__ne__(x1, x2)]

@@ -101,6 +101,12 @@ def squeeze(
     return compute(lazy.squeeze(x, axis=axis))
 
 
+def astype(x, dtype, /, *, copy=True, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.astype(x, dtype, copy=copy, device=device)
+    return compute(lazy.astype(x, dtype, copy=copy, device=device))
+
+
 def reduce(
     op: FinchOperator,
     x,
