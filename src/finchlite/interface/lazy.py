@@ -342,7 +342,6 @@ def asarray(
     return format(obj)
 
 
-
 def lazy(arr) -> LazyTensor | tuple:
     """
     - lazy(arr) -> LazyTensor:

@@ -590,7 +590,11 @@ def iinfo(T: FDTypeInteger):
 
 
 def can_cast(from_, to, /) -> builtins.bool:
-    from_ = from_.dtype if not isinstance(from_, FDType) and hasattr(from_, "dtype") else from_
+    from_ = (
+        from_.dtype
+        if not isinstance(from_, FDType) and hasattr(from_, "dtype")
+        else from_
+    )
     try:
         return promote_type(from_, to) == to
     except TypeError:

@@ -915,7 +915,6 @@ def test_matrix_transpose(a, a_wrap):
     finch_assert_equal(result, expected)
 
 
-
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a, b, axes",
