@@ -197,8 +197,12 @@ array_api_tests/test_linalg.py::test_vecdot_conj
 # test_manipulation_functions
 
 # not implemented
+array_api_tests/test_manipulation_functions.py::test_concat
+array_api_tests/test_manipulation_functions.py::test_expand_dims
+array_api_tests/test_manipulation_functions.py::test_squeeze
 array_api_tests/test_manipulation_functions.py::test_flip
 array_api_tests/test_manipulation_functions.py::test_roll
+array_api_tests/test_manipulation_functions.py::test_stack
 array_api_tests/test_manipulation_functions.py::test_unstack
 array_api_tests/test_manipulation_functions.py::test_repeat
 array_api_tests/test_manipulation_functions.py::test_tile
