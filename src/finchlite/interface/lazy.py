@@ -798,23 +798,6 @@ def prod(
     return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
-def _arg_indices(x: LazyTensor, axis: int | None) -> LazyTensor:
-    if axis is None:
-        size = builtins.int(np.prod(x.shape, dtype=np.intp))
-        return lazy(np.arange(size, dtype=np.intp).reshape(x.shape))
-
-    axis = normalize_axis_index(axis, x.ndim)
-    idxs = arange(x.shape[axis], dtype=np.intp)
-    if x.ndim > 1:
-        idxs = expand_dims(idxs, axis=tuple(i for i in range(x.ndim) if i != axis))
-    return broadcast_to(idxs, x.shape)
-
-
-def _restore_reduced_dims(result: LazyTensor, ndim: int, axis: int | None) -> LazyTensor:
-    result = elementwise(ffuncs.first_arg, result, result)
-    return expand_dims(result, axis=tuple(range(ndim)) if axis is None else axis)
-
-
 def argmin(
     x,
     /,
@@ -825,17 +808,28 @@ def argmin(
     x = lazy(x)
     if axis is not None:
         axis = normalize_axis_index(axis, x.ndim)
-    best = _restore_reduced_dims(min(x, axis=axis), x.ndim, axis)
-    sentinel = np.intp(np.prod(x.shape) if axis is None else x.shape[axis])
-    candidates = where(
-        equal(x, best),
-        _arg_indices(x, axis),
-        sentinel,
+        indices = arange(x.shape[axis], dtype=np.intp)
+        if x.ndim > 1:
+            indices = expand_dims(
+                indices, axis=tuple(i for i in range(x.ndim) if i != axis)
+            )
+        indices = broadcast_to(indices, x.shape)
+        sentinel = np.intp(x.shape[axis])
+    else:
+        sentinel = np.intp(np.prod(x.shape))
+        indices = lazy(np.arange(sentinel, dtype=np.intp).reshape(x.shape))
+
+    return reduce(
+        ffuncs.min,
+        where(
+            equal(x, reduce(ffuncs.min, x, axis=axis, keepdims=True)),
+            indices,
+            sentinel,
+        ),
+        axis=axis,
+        keepdims=keepdims,
+        init=sentinel,
     )
-    result = min(candidates, axis=axis)
-    if keepdims:
-        return _restore_reduced_dims(result, x.ndim, axis)
-    return result
 
 
 def argmax(
@@ -848,17 +842,28 @@ def argmax(
     x = lazy(x)
     if axis is not None:
         axis = normalize_axis_index(axis, x.ndim)
-    best = _restore_reduced_dims(max(x, axis=axis), x.ndim, axis)
-    sentinel = np.intp(np.prod(x.shape) if axis is None else x.shape[axis])
-    candidates = where(
-        equal(x, best),
-        _arg_indices(x, axis),
-        sentinel,
+        indices = arange(x.shape[axis], dtype=np.intp)
+        if x.ndim > 1:
+            indices = expand_dims(
+                indices, axis=tuple(i for i in range(x.ndim) if i != axis)
+            )
+        indices = broadcast_to(indices, x.shape)
+        sentinel = np.intp(x.shape[axis])
+    else:
+        sentinel = np.intp(np.prod(x.shape))
+        indices = lazy(np.arange(sentinel, dtype=np.intp).reshape(x.shape))
+
+    return reduce(
+        ffuncs.min,
+        where(
+            equal(x, reduce(ffuncs.max, x, axis=axis, keepdims=True)),
+            indices,
+            sentinel,
+        ),
+        axis=axis,
+        keepdims=keepdims,
+        init=sentinel,
     )
-    result = min(candidates, axis=axis)
-    if keepdims:
-        return _restore_reduced_dims(result, x.ndim, axis)
-    return result
 
 
 def any(
