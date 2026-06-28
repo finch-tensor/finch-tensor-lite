@@ -338,6 +338,15 @@ def test_asarray_python_scalars_use_default_array_dtypes():
     assert scalar.__array_namespace__() is finchlite
 
 
+def test_asarray_existing_finch_tensors_pass_through():
+    scalar = finchlite.asarray(1)
+    lazy = finchlite.lazy(1)
+
+    assert finchlite.asarray(scalar) is scalar
+    assert finchlite.asarray(lazy) is lazy
+    assert scalar.dtype == finchlite.int64
+
+
 def test_lazy_python_scalars_keep_builtin_dtypes():
     assert finchlite.lazy(True).dtype == finchlite.bool_
     assert finchlite.lazy(1).dtype == finchlite.int_

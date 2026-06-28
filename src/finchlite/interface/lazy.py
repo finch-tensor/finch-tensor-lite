@@ -301,11 +301,17 @@ def asarray(
         raise ValueError(f"device argument is not supported; got {device!r}")
 
     if format is None:
+        if isinstance(obj, Scalar):
+            if copy is True:
+                return Scalar(obj.val, fill_value=obj.fill_value)
+            return obj
         if isinstance(obj, BufferizedNDArray):
             if copy is True:
                 return BufferizedNDArray.from_numpy(
                     obj.to_numpy().copy(), fill_value=obj.fill_value
                 )
+            return obj
+        if isinstance(obj, Tensor) and copy is not True:
             return obj
         if isinstance(obj, np.ndarray):
             if copy is True:
