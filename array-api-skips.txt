@@ -19,7 +19,6 @@ array_api_tests/test_signatures.py::test_func_signature[unique_values]
 array_api_tests/test_signatures.py::test_func_signature[meshgrid]
 array_api_tests/test_signatures.py::test_func_signature[triu]
 # inspection functions
-array_api_tests/test_signatures.py::test_func_signature[isdtype]
 array_api_tests/test_signatures.py::test_func_signature[result_type]
 # other functions
 array_api_tests/test_signatures.py::test_func_signature[argsort]
@@ -35,7 +34,6 @@ array_api_tests/test_signatures.py::test_func_signature[searchsorted]
 array_api_tests/test_signatures.py::test_func_signature[repeat]
 array_api_tests/test_signatures.py::test_func_signature[tile]
 array_api_tests/test_signatures.py::test_func_signature[unstack]
-array_api_tests/test_signatures.py::test_func_signature[clip]
 array_api_tests/test_signatures.py::test_func_signature[take_along_axis]
 array_api_tests/test_signatures.py::test_func_signature[cumulative_prod]
 array_api_tests/test_signatures.py::test_func_signature[diff]
@@ -88,7 +86,6 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[f
 # test_data_type_functions
 
 # not implemented
-array_api_tests/test_data_type_functions.py::test_isdtype
 array_api_tests/test_data_type_functions.py::test_result_type
 array_api_tests/test_data_type_functions.py::test_finfo[Float32]
 array_api_tests/test_data_type_functions.py::TestResultType::test_with_scalars
@@ -308,24 +305,6 @@ array_api_tests/test_statistical_functions.py::test_sum
 # not implemented
 array_api_tests/test_statistical_functions.py::test_cumulative_prod
 array_api_tests/test_statistical_functions.py::test_cumulative_sum
-
-# issue: array-api-tests-mypy — mypy errors in the array-api-tests suite itself
-array_api_tests/__init__.py::mypy
-array_api_tests/__init__.py::mypy-status
-array_api_tests/algos.py::mypy
-array_api_tests/array_helpers.py::mypy
-array_api_tests/dtype_helpers.py::mypy
-array_api_tests/hypothesis_helpers.py::mypy
-array_api_tests/pytest_helpers.py::mypy
-array_api_tests/shape_helpers.py::mypy
-array_api_tests/test_array_object.py::mypy
-array_api_tests/test_creation_functions.py::mypy
-array_api_tests/test_fft.py::mypy
-array_api_tests/test_linalg.py::mypy
-array_api_tests/test_manipulation_functions.py::mypy
-array_api_tests/test_operators_and_elementwise_functions.py::mypy
-array_api_tests/test_signatures.py::mypy
-array_api_tests/test_special_cases.py::mypy
 
 # issue: finfo-dtype0 — finfo does not handle finchlite dtype objects (only string names)
 array_api_tests/test_data_type_functions.py::test_finfo[dtype0]

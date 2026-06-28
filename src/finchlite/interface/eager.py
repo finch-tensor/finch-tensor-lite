@@ -415,7 +415,7 @@ def maximum(x1, x2):
     return compute(lazy.maximum(x1, x2))
 
 
-def clip(x, /, *, min=None, max=None):
+def clip(x, /, min=None, max=None):
     if (
         isinstance(x, lazy.LazyTensor)
         or isinstance(min, lazy.LazyTensor)

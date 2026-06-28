@@ -906,7 +906,7 @@ def maximum(x1, x2) -> LazyTensor:
     return elementwise(ffuncs.max, lazy(x1), lazy(x2))
 
 
-def clip(x, /, *, min=None, max=None) -> LazyTensor:
+def clip(x, /, min=None, max=None) -> LazyTensor:
     return elementwise(ffuncs.clip, lazy(x), lazy(min), lazy(max))
 
 
@@ -1289,7 +1289,7 @@ class FillTensor(Tensor):
         self._fill_value = fill_value
 
     def __getitem__(self, idxs):
-        return self._fill_value
+        return Scalar(self._fill_value, fill_value=self._fill_value)
 
     def item(self):
         if self.ndim != 0:

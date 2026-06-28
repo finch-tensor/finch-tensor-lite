@@ -767,10 +767,10 @@ conj = _Conj()
 
 class _Clip(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
-        return np.clip(a, b, c)
+        return ftype(a)(np.clip(a, b, c))
 
     def return_type(self, a: FType, b: FType, c: FType) -> FType:  # type: ignore[override]
-        return ftype(float)
+        return a
 
     def __repr__(self) -> str:
         return "clip"

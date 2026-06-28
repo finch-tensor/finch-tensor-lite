@@ -824,11 +824,41 @@ def fisinstance(x, f: FType):
     return f.fisinstance(x)
 
 
-def isdtype(x, T: FType):
+def isdtype(dtype, kind):
     """
-    Check if `x` is an instance of `T`.
+    Check if a dtype belongs to an Array API dtype kind.
     """
-    return fisinstance(x, T)
+    dtype = ftype(dtype)
+    if isinstance(kind, tuple):
+        return any(isdtype(dtype, k) for k in kind)
+    if isinstance(kind, str):
+        match kind:
+            case "bool":
+                return builtins.bool(dtype == bool)
+            case "signed integer":
+                return builtins.bool(
+                    isinstance(dtype, FDTypeInteger)
+                    and getattr(dtype, "type_min", 0) < 0
+                )
+            case "unsigned integer":
+                return builtins.bool(
+                    isinstance(dtype, FDTypeInteger)
+                    and getattr(dtype, "type_min", -1) >= 0
+                    and not isinstance(dtype, FDTypeBoolean)
+                )
+            case "integral":
+                return isinstance(dtype, FDTypeInteger)
+            case "real floating":
+                return isinstance(dtype, FDTypeFloat) and not isinstance(
+                    dtype, FDTypeComplex
+                )
+            case "complex floating":
+                return isinstance(dtype, FDTypeComplex)
+            case "numeric":
+                return isinstance(dtype, FDTypeNumeric)
+            case _:
+                raise ValueError(f"Unrecognized dtype kind: {kind!r}")
+    return builtins.bool(dtype == ftype(kind))
 
 
 def ftype(x) -> FType:
