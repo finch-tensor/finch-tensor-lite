@@ -19,6 +19,7 @@ from finchlite.compile import looplets as lplt
 from finchlite.compile.lower import AssemblyContext, FinchTensorFType
 
 from .override_tensor import OverrideTensor
+from .scalar import Scalar
 
 
 def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
@@ -110,6 +111,12 @@ class BufferizedNDArray(OverrideTensor):
     def access(self, indices, op):
         return BufferizedNDArrayAccessor(self).access(indices, op)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        val = self.val.load(0)
+        return val.item() if hasattr(val, "item") else val
+
     def __getitem__(self, index):
         """
         Get an item from the bufferized NDArray.
@@ -118,13 +125,25 @@ class BufferizedNDArray(OverrideTensor):
         if isinstance(index, (slice, np.ndarray)) or (
             isinstance(index, tuple) and any(isinstance(i, slice) for i in index)
         ):
-            return BufferizedNDArray.from_numpy(
-                self.to_numpy()[index], fill_value=self.fill_value
-            )
+            result = self.to_numpy()[index]
+            if isinstance(result, np.ndarray):
+                return BufferizedNDArray.from_numpy(result, fill_value=self.fill_value)
+            return Scalar(result, fill_value=self.fill_value)
+        if not isinstance(index, tuple) and self.ndim != 1:
+            result = self.to_numpy()[index]
+            if isinstance(result, np.ndarray):
+                return BufferizedNDArray.from_numpy(result, fill_value=self.fill_value)
+            return Scalar(result, fill_value=self.fill_value)
         if isinstance(index, tuple):
             index = tuple(i for i in index if i is not Ellipsis)
+            if index == () and self.ndim == 0:
+                return Scalar(self.val.load(0), fill_value=self.fill_value)
+            if len(index) < self.ndim:
+                return BufferizedNDArray.from_numpy(
+                    self.to_numpy()[index], fill_value=self.fill_value
+                )
             index = 0 if index == () else np.dot(index, self.strides)
-        return self.val.load(index)
+        return Scalar(self.val.load(index), fill_value=self.fill_value)
 
     def __setitem__(self, index, value):
         """
@@ -440,6 +459,11 @@ class BufferizedNDArrayAccessor(Tensor):
         assert self.ndim == 0, "Cannot unwrap a tensor view with non-zero dimension."
         return self.tns.val.load(self.pos)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.unwrap()
+
     def increment(self, val):
         """
         Increment the tensor view with a value.
@@ -448,6 +472,8 @@ class BufferizedNDArrayAccessor(Tensor):
         if self.op is None:
             raise ValueError("No operation defined for increment.")
         assert self.ndim == 0, "Cannot unwrap a tensor view with non-zero dimension."
+        if isinstance(val, Scalar):
+            val = val.item()
         self.tns.val.store(self.pos, self.op(self.tns.val.load(self.pos), val))
         return self
 

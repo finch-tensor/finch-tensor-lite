@@ -12,12 +12,16 @@ from .algebra import (
 )
 from .ftypes import (
     FDType,
+    FDTypeBoolean,
+    FDTypeInteger,
     FDTypeOrdered,
     FType,
     TupleFType,
     bool,
     ftype,
+    int64,
     promote_type,
+    uint64,
 )
 
 
@@ -105,7 +109,11 @@ class _Mul(NAryFinchOperator):
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        return self(type_(1), type_(1))
+        if isinstance(type_, FDTypeInteger) and not isinstance(type_, FDTypeBoolean):
+            if type_.type_min >= 0:
+                return self(type_(1), uint64(1))
+            return self(type_(1), int64(1))
+        return type_(1)
 
 
 mul = _Mul()

@@ -93,8 +93,13 @@ class Scalar(OverrideTensor):
         """Shape type of the scalar."""
         return self.ftype.shape_type
 
+    def item(self):
+        return self.val.item() if hasattr(self.val, "item") else self.val
+
     def __getitem__(self, idx):
-        return self.val
+        if idx == () or idx is Ellipsis or idx == (...,):
+            return self
+        raise IndexError("Too many indices for scalar tensor.")
 
     def __str__(self):
         return str(self.val)

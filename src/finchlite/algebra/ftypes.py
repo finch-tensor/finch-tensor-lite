@@ -365,14 +365,14 @@ class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
         """
         The minimum value for this type.
         """
-        return self.iinfo.min
+        return self.dtype(self.iinfo.min)
 
     @property
     def type_max(self):
         """
         The maximum value for this type.
         """
-        return self.iinfo.max
+        return self.dtype(self.iinfo.max)
 
 
 class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):

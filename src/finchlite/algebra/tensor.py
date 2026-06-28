@@ -109,3 +109,15 @@ class Tensor(FTyped, ABC):
     def shape(self) -> tuple:
         """Shape of the tensor."""
         ...
+
+    @abstractmethod
+    def item(self):
+        """
+        Return the Python scalar stored in a zero-dimensional tensor.
+
+        Indexing tensor objects must keep returning tensor-like values, including for
+        zero-dimensional results. `item()` is the explicit escape hatch for code that
+        needs the underlying Python scalar value. Implementations should raise
+        `ValueError` when called on a non-scalar tensor.
+        """
+        ...

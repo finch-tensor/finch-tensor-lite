@@ -83,16 +83,8 @@ array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_1[1]
 
 # throws for x < 1 instead of NaN
 array_api_tests/test_operators_and_elementwise_functions.py::test_acosh
-# not implemented
-# NumPy 2.3 exposes that zero-dimensional Finch arrays currently produce NumPy
-# scalars via [()], which array-api-tests does not treat as Array API scalars.
-# Long-term fix: make scalar extraction consistent, likely with item() for raw
-# values and [()] staying in Finch/array-scalar space.
-array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__floordiv__(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__ifloordiv__(x1, x2)]
+# signed Python scalar with unsigned zero-dimensional RHS can overflow
 array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[floor_divide(x1, x2)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__ifloordiv__(x, s)]
-array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__floordiv__(x, s)]
 
 # test_data_type_functions
 
@@ -180,7 +172,6 @@ array_api_tests/test_indexing_functions.py::test_take
 # test_linalg
 
 # not implemented
-array_api_tests/test_linalg.py::test_vecdot
 array_api_tests/test_linalg.py::test_cross
 array_api_tests/test_linalg.py::test_eigh
 array_api_tests/test_linalg.py::test_eigvalsh
@@ -202,16 +193,12 @@ array_api_tests/test_linalg.py::test_trace
 array_api_tests/test_linalg.py::test_linalg_vecdot
 array_api_tests/test_linalg.py::test_linalg_tensordot
 array_api_tests/test_linalg.py::test_vecdot_conj
-array_api_tests/test_linalg.py::test_tensordot
 
 # test_manipulation_functions
 
 # not implemented
-array_api_tests/test_manipulation_functions.py::test_concat
-array_api_tests/test_manipulation_functions.py::test_expand_dims
 array_api_tests/test_manipulation_functions.py::test_flip
 array_api_tests/test_manipulation_functions.py::test_roll
-array_api_tests/test_manipulation_functions.py::test_stack
 array_api_tests/test_manipulation_functions.py::test_unstack
 array_api_tests/test_manipulation_functions.py::test_repeat
 array_api_tests/test_manipulation_functions.py::test_tile
@@ -395,8 +382,3 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_less_equal[les
 array_api_tests/test_operators_and_elementwise_functions.py::test_less_equal[__le__(x1, x2)]
 array_api_tests/test_operators_and_elementwise_functions.py::test_not_equal[not_equal(x1, x2)]
 array_api_tests/test_operators_and_elementwise_functions.py::test_not_equal[__ne__(x1, x2)]
-
-# issue: missing-statistical — max, min, prod not implemented
-array_api_tests/test_statistical_functions.py::test_max
-array_api_tests/test_statistical_functions.py::test_min
-array_api_tests/test_statistical_functions.py::test_prod
