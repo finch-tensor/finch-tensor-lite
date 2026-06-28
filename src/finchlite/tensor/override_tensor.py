@@ -299,7 +299,7 @@ class OverrideTensor(Tensor):
     def __index__(self) -> int:
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to index.")
-        return operator.index(self.__int__())
+        return operator.index(self.item())
 
     def __log__(self):
         return self.mod.log(self)
