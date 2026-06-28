@@ -14,6 +14,8 @@ from .algebra import (
     return_type,
 )
 from .ftypes import (
+    FDTypeSignedInteger,
+    FDTypeUnsignedInteger,
     FType,
     FTyped,
     ImmutableStructFType,
@@ -58,6 +60,8 @@ from .tensor import (
 __all__ = [
     "FType",
     "FTyped",
+    "FDTypeSignedInteger",
+    "FDTypeUnsignedInteger",
     "FinchOperator",
     "ImmutableStructFType",
     "MutableStructFType",

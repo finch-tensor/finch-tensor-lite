@@ -15,6 +15,7 @@ from .ftypes import (
     FDTypeBoolean,
     FDTypeInteger,
     FDTypeOrdered,
+    FDTypeUnsignedInteger,
     FType,
     TupleFType,
     bool,
@@ -110,7 +111,7 @@ class _Mul(NAryFinchOperator):
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
         if isinstance(type_, FDTypeInteger) and not isinstance(type_, FDTypeBoolean):
-            if type_.type_min >= 0:
+            if isinstance(type_, FDTypeUnsignedInteger):
                 return self(type_(1), uint64(1))
             return self(type_(1), int64(1))
         return type_(1)

@@ -1,6 +1,8 @@
 import math
 
 from .algebra import (
+    FDTypeSignedInteger,
+    FDTypeUnsignedInteger,
     FType,
     FTyped,
     Tensor,
@@ -238,6 +240,8 @@ __all__ = [
     "ElementLevelFType",
     "Extent",
     "ExtentFType",
+    "FDTypeSignedInteger",
+    "FDTypeUnsignedInteger",
     "FType",
     "FTyped",
     "FTyped",

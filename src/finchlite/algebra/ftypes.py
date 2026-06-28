@@ -119,6 +119,12 @@ class FDTypeInteger(FDTypeNumeric):
         ...
 
 
+class FDTypeSignedInteger(FDTypeInteger): ...
+
+
+class FDTypeUnsignedInteger(FDTypeInteger): ...
+
+
 class FDTypeFloat(FDTypeNumeric):
     @property
     @abstractmethod
@@ -225,7 +231,7 @@ class FDTypeNumericBuiltin(FDTypeBuiltin, FDTypeNumeric):
         return None
 
 
-class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
+class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeSignedInteger, FDTypeReal):
     @property
     def type(self):
         return builtins.int
@@ -419,7 +425,7 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
 bool = _FDTypeBool()
 
 
-class _FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt8(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int8
@@ -431,7 +437,7 @@ class _FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
 int8 = _FDTypeInt8()
 
 
-class _FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt16(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int16
@@ -443,7 +449,7 @@ class _FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
 int16 = _FDTypeInt16()
 
 
-class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt32(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int32
@@ -455,7 +461,7 @@ class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
 int32 = _FDTypeInt32()
 
 
-class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt64(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int64
@@ -467,7 +473,7 @@ class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
 int64 = _FDTypeInt64()
 
 
-class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint8
@@ -479,7 +485,7 @@ class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
 uint8 = _FDTypeUInt8()
 
 
-class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint16
@@ -491,7 +497,7 @@ class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
 uint16 = _FDTypeUInt16()
 
 
-class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint32
@@ -503,7 +509,7 @@ class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
 uint32 = _FDTypeUInt32()
 
 
-class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint64
@@ -840,16 +846,9 @@ def isdtype(dtype, kind):
             case "bool":
                 return builtins.bool(dtype == bool)
             case "signed integer":
-                return builtins.bool(
-                    isinstance(dtype, FDTypeInteger)
-                    and getattr(dtype, "type_min", 0) < 0
-                )
+                return isinstance(dtype, FDTypeSignedInteger)
             case "unsigned integer":
-                return builtins.bool(
-                    isinstance(dtype, FDTypeInteger)
-                    and getattr(dtype, "type_min", -1) >= 0
-                    and not isinstance(dtype, FDTypeBoolean)
-                )
+                return isinstance(dtype, FDTypeUnsignedInteger)
             case "integral":
                 return isinstance(dtype, FDTypeInteger)
             case "real floating":
