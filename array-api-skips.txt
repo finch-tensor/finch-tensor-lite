@@ -28,6 +28,10 @@ array_api_tests/test_signatures.py::test_func_signature[roll]
 array_api_tests/test_signatures.py::test_func_signature[take]
 array_api_tests/test_signatures.py::test_func_signature[argmax]
 array_api_tests/test_signatures.py::test_func_signature[argmin]
+array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
+array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
+array_api_tests/test_signatures.py::test_func_signature[concat]
+array_api_tests/test_signatures.py::test_func_signature[stack]
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
 array_api_tests/test_signatures.py::test_func_signature[cumulative_sum]
 array_api_tests/test_signatures.py::test_func_signature[searchsorted]
@@ -336,9 +340,6 @@ array_api_tests/test_has_names.py::test_has_names[array_attribute-size]
 # issue: nonzero-signature — nonzero signature mismatch
 array_api_tests/test_has_names.py::test_has_names[searching-nonzero]
 array_api_tests/test_signatures.py::test_func_signature[nonzero]
-
-array-api-tests/array_api_tests/test_signatures.py::test_func_signature[concat]
-array-api-tests/array_api_tests/test_signatures.py::test_func_signature[stack]
 
 # issue: missing-eye-signature — eye exists but signature does not match spec
 array_api_tests/test_signatures.py::test_func_signature[eye]
