@@ -183,7 +183,7 @@ class _Pow(BinaryFinchOperator):
         return "pow"
 
     def __call__(self, a: Any, b: Any):
-        return operator.pow(a, b)
+        return np.power(a, b)
 
     def is_identity(self, arg):
         return arg == 1

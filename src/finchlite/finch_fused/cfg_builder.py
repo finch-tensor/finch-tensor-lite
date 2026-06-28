@@ -218,6 +218,7 @@ class FusedCFGBuilder:
                 self.current_block = after_block
             case For(_, iter, body):
                 before_block = self.current_block
+                self.emit(iter)
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
 
@@ -227,7 +228,6 @@ class FusedCFGBuilder:
 
                 # fill in the loop body
                 self.current_block = body_block
-                self.emit(iter)
                 self(body, after_block, return_block)
 
                 # connect the end of loop body back to the beginning to form the loop
