@@ -1,121 +1,216 @@
+from __future__ import annotations
+
 import bisect
 import builtins
-import operator
 import sys
-from collections.abc import Callable, Sequence
+import threading
+from collections import OrderedDict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
-from ..algebra import (
+from finchlite import finch_einsum as ein
+from finchlite.algebra import (
+    FinchOperator,
+    FType,
     Tensor,
     TensorFType,
-    element_type,
-    fill_value,
-    first_arg,
+    ffuncs,
     fixpoint_type,
-    identity,
+    ftype,
     init_value,
-    last,
-    maxby,
-    minby,
-    pair,
-    promote_max,
-    promote_min,
     promote_type,
-    query_property,
-    register_property,
     return_type,
 )
-from ..algebra import (
-    conjugate as conj,
-)
-from ..compile import BufferizedNDArray
-from ..finch_logic import (
+from finchlite.algebra.ftypes import FDType, FDTypeBoolean, FDTypeBuiltin, FDTypeNumpy
+from finchlite.autoschedule.tensor_stats import StatsInterpreter
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
     Literal,
-    LogicNode,
+    LogicExpression,
+    LogicStatement,
     MapJoin,
-    Relabel,
+    Plan,
+    Query,
     Reorder,
-    Subquery,
+    StatsFactory,
     Table,
+    TensorStats,
 )
-from ..symbolic import ftype, gensym
-from .overrides import OverrideTensor
-
-
-def identify(data):
-    lhs = Alias(gensym("A"))
-    return Subquery(lhs, data)
+from finchlite.symbolic import gensym
+from finchlite.tensor import BufferizedNDArray
+from finchlite.tensor.override_tensor import OverrideTensor
+from finchlite.tensor.scalar import Scalar
 
 
 class LazyTensorFType(TensorFType):
     _fill_value: Any
-    _element_type: Any
-    _shape_type: Any
+    _element_type: FType
+    _shape_type: tuple[FType, ...]
 
-    def __init__(self, _fill_value: Any, _element_type: Any, _shape_type: tuple):
+    def __init__(
+        self,
+        _fill_value: Any,
+        _element_type: FType | type,
+        _shape_type: tuple[FType | type, ...],
+    ):
         self._fill_value = _fill_value
-        self._element_type = _element_type
-        self._shape_type = _shape_type
+        self._element_type = ftype(_element_type)
+        self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
 
     def __eq__(self, other):
         if not isinstance(other, LazyTensorFType):
             return False
         return (
-            self._fill_value == other._fill_value
+            ffuncs.same(self._fill_value, other._fill_value)
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
-        return hash((self._fill_value, self._element_type, self._shape_type))
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
+
+    def construct(self, shape: tuple) -> LazyTensor:
+        idxs = tuple(Field(gensym("i")) for _ in shape)
+        ctx = EffectBlob()
+        expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
+        data, ctx = ctx.eval(expr)
+        return LazyTensor(
+            data=data,
+            ctx=ctx,
+            shape=shape,
+            fill_value=self._fill_value,
+            element_type=self._element_type,
+        )
+
+    def __call__(self, val: Any) -> LazyTensor:
+        """
+        Convert a tensor to this tensor type.
+
+        Args:
+            val: A tensor to convert to this tensor type.
+        Returns:
+            A LazyTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     @property
     def fill_value(self):
         return self._fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         return self._element_type
 
     @property
     def shape_type(self):
         return self._shape_type
 
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
-"""
-# Added to solve error associated with no iscomplxobj in lazy.py
-def iscomplexobj(x):
 
-    try:
-        return np.issubdtype(x.element_type, np.complexfloating)
-    except AttributeError:
-        return False
-"""
+effect_stamp = threading.local()
+
+
+class EffectBlob:
+    """
+    The EffectBlob class represents a collection of prior queries in a lazy
+    evaluation context, which can be extracted into a linear trace of
+    LogicStatements (in the order they were issued). Note that the global
+    `effect_stamp` counter is required to maintain the relative ordering of
+    effect blobs in the face of in-place mutations to tensors.  Each effect blob
+    contains a logic statement and references to other effect blobs. The
+    datastructure is designed to be immutable, mergeable in O(1) time, and
+    support linear time extraction. To achieve linear time, we use a hash table
+    to avoid re-extracting already seen blobs.
+    """
+
+    stamp: int
+    stmt: LogicStatement
+    blobs: tuple[EffectBlob, ...]
+
+    def __init__(
+        self,
+        stmt: LogicStatement | None = None,
+        blobs: tuple[EffectBlob, ...] | None = None,
+    ):
+        global effect_stamp
+        if stmt is None:
+            stmt = Plan()
+        if blobs is None:
+            blobs = ()
+        self.stmt = stmt
+        self.blobs = blobs
+
+        try:
+            curr_stamp = effect_stamp.value
+        except AttributeError:
+            effect_stamp.value = 0
+            curr_stamp = 0
+
+        self.stamp = curr_stamp
+        effect_stamp.value += 1
+
+    def exec(self, stmt: LogicStatement) -> EffectBlob:
+        return EffectBlob(stmt=stmt, blobs=(self,))
+
+    def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
+        var = Alias(gensym("A"))
+        return var, self.exec(Query(var, ex))
+
+    def join(self, *blobs: EffectBlob) -> EffectBlob:
+        return EffectBlob(blobs=(self, *blobs))
+
+    def trace(self) -> tuple[LogicStatement, ...]:
+        stmts = list[tuple[int, LogicStatement]]()
+        seen = set[int]()
+        self._trace(seen, stmts)
+        stmts.sort()
+        return tuple(stmt for _, stmt in stmts)
+
+    def _trace(self, seen: set[int], stmts: list[tuple[int, LogicStatement]]) -> None:
+        if id(self) not in seen:
+            seen.add(id(self))
+            stmts.append((self.stamp, self.stmt))
+            for blob in self.blobs:
+                blob._trace(seen, stmts)
 
 
 class LazyTensor(OverrideTensor):
     def __init__(
-        self, data: LogicNode, shape: tuple, fill_value: Any, element_type: Any
+        self,
+        data: Alias,
+        ctx: EffectBlob,
+        shape: tuple,
+        fill_value: Any,
+        element_type: FType,
     ):
-        self.data = data
+        self.data: Alias = data
+        self.ctx = ctx
         self._shape = shape
         self._fill_value = fill_value
         self._element_type = element_type
+
+    def override_module(self):
+        return sys.modules[__name__]
 
     @property
     def ftype(self):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=tuple(type(dim) for dim in self.shape),
+            _shape_type=tuple(ftype(dim) for dim in self._shape),
         )
 
     @property
@@ -126,137 +221,20 @@ class LazyTensor(OverrideTensor):
         """
         return self._shape
 
-    def override_module(self):
-        return sys.modules[__name__]
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
 
-    def __add__(self, other):
-        return add(self, other)
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
 
-    def __radd__(self, other):
-        return add(other, self)
-
-    def __sub__(self, other):
-        return subtract(self, other)
-
-    def __rsub__(self, other):
-        return subtract(other, self)
-
-    def __mul__(self, other):
-        return multiply(self, other)
-
-    def __rmul__(self, other):
-        return multiply(other, self)
-
-    def __abs__(self):
-        return abs(self)
-
-    def __pos__(self):
-        return positive(self)
-
-    def __neg__(self):
-        return negative(self)
-
-    def __and__(self, other):
-        return bitwise_and(self, other)
-
-    def __rand__(self, other):
-        return bitwise_and(other, self)
-
-    def __lshift__(self, other):
-        return bitwise_left_shift(self, other)
-
-    def __rlshift__(self, other):
-        return bitwise_left_shift(other, self)
-
-    def __or__(self, other):
-        return bitwise_or(self, other)
-
-    def __ror__(self, other):
-        return bitwise_or(other, self)
-
-    def __rshift__(self, other):
-        return bitwise_right_shift(self, other)
-
-    def __rrshift__(self, other):
-        return bitwise_right_shift(other, self)
-
-    def __xor__(self, other):
-        return bitwise_xor(self, other)
-
-    def __rxor__(self, other):
-        return bitwise_xor(other, self)
-
-    def __invert__(self):
-        return bitwise_inverse(self)
-
-    def __truediv__(self, other):
-        return truediv(self, other)
-
-    def __rtruediv__(self, other):
-        return truediv(other, self)
-
-    def __floordiv__(self, other):
-        return floordiv(self, other)
-
-    def __rfloordiv__(self, other):
-        return floordiv(other, self)
-
-    def __mod__(self, other):
-        return mod(self, other)
-
-    def __rmod__(self, other):
-        return mod(other, self)
-
-    def __pow__(self, other):
-        return pow(self, other)
-
-    def __rpow__(self, other):
-        return pow(other, self)
-
-    def __matmul__(self, other):
-        return matmul(self, other)
-
-    def __rmatmul__(self, other):
-        return matmul(other, self)
-
-    def __sin__(self):
-        return sin(self)
-
-    def __sinh__(self):
-        return sinh(self)
-
-    def __cos__(self):
-        return cos(self)
-
-    def __cosh__(self):
-        return cosh(self)
-
-    def __tan__(self):
-        return tan(self)
-
-    def __tanh__(self):
-        return tanh(self)
-
-    def __asin__(self):
-        return asin(self)
-
-    def __asinh__(self):
-        return asinh(self)
-
-    def __acos__(self):
-        return acos(self)
-
-    def __acosh__(self):
-        return acosh(self)
-
-    def __atan__(self):
-        return atan(self)
-
-    def __atanh__(self):
-        return atanh(self)
-
-    def __atan2__(self, other):
-        return atan2(self, other)
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -296,79 +274,73 @@ class LazyTensor(OverrideTensor):
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
 
-    def __log__(self):
-        return log(self)
 
-    def __log1p__(self):
-        return log1p(self)
-
-    def __log2__(self):
-        return log2(self)
-
-    def __log10__(self):
-        return log10(self)
-
-    def __logaddexp__(self, other):
-        return logaddexp(self, other)
-
-    def __logical_and__(self, other):
-        return logical_and(self, other)
-
-    def __logical_or__(self, other):
-        return logical_or(self, other)
-
-    def __logical_xor__(self, other):
-        return logical_xor(self, other)
-
-    def __logical_not__(self):
-        return logical_not(self)
-
-    def __lt__(self, other):
-        return less(self, other)
-
-    def __le__(self, other):
-        return less_equal(self, other)
-
-    def __gt__(self, other):
-        return greater(self, other)
-
-    def __ge__(self, other):
-        return greater_equal(self, other)
-
-    def __eq__(self, other):
-        return equal(self, other)
-
-    def __ne__(self, other):
-        return not_equal(self, other)
-
-
-register_property(np.ndarray, "asarray", "__attr__", lambda x: BufferizedNDArray(x))
-register_property(LazyTensor, "asarray", "__attr__", lambda x: x)
-
-
-def asarray(arg: Any, format="bufferized") -> Any:
+def asarray(
+    obj: Any,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: TensorFType | None = None,
+) -> Any:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
-
-    Args:
-        arg: The object to be converted.
-
-    Returns:
-        The array type result of the given object.
+    https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html
     """
-    if format != "bufferized":
-        raise Exception(f"Only bufferized format is now supported, got: {format}")
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
 
-    if hasattr(arg, "asarray"):
-        return arg.asarray()
+    if format is None:
+        if isinstance(obj, BufferizedNDArray):
+            if copy is True:
+                return BufferizedNDArray.from_numpy(
+                    obj.to_numpy().copy(), fill_value=obj.fill_value
+                )
+            return obj
+        if isinstance(obj, np.ndarray):
+            if copy is True:
+                obj = obj.copy()
+            return BufferizedNDArray.from_numpy(obj)
+        if np.isscalar(obj) or obj is None:
+            if dtype is not None:
+                obj = ftype(dtype)(obj)
+            elif isinstance(obj, bool | int | float | complex):
+                obj = np.asarray(obj)[()]
+            return Scalar(obj)
+        try:
+            np_arr = np.asarray(obj)
+            if np_arr.dtype != object:
+                if dtype is not None:
+                    ft = ftype(dtype)
+                    np_dtype = (
+                        ft.dtype
+                        if hasattr(ft, "dtype")
+                        else ft.type
+                        if hasattr(ft, "type")
+                        else dtype
+                    )
+                    np_arr = np_arr.astype(np_dtype)
+                elif copy is True:
+                    np_arr = np_arr.copy()
+                return BufferizedNDArray.from_numpy(np_arr)
+        except (TypeError, ValueError):
+            pass
+        return obj
 
-    return query_property(arg, "asarray", "__attr__")
+    if isinstance(obj, np.ndarray):
+        return format.from_numpy(obj)
+    return format(obj)
 
 
-def defer(arr) -> LazyTensor:
+def _is_convertible_to_array(arg: Any) -> bool:
+    return isinstance(arg, np.ndarray) or np.isscalar(arg) or arg is None
+
+
+def lazy(arr) -> LazyTensor:
     """
-    - defer(arr) -> LazyTensor:
+    - lazy(arr) -> LazyTensor:
     Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
     returned as-is.
     Otherwise, it creates a LazyTensor representation of the input array.
@@ -379,17 +351,108 @@ def defer(arr) -> LazyTensor:
     Returns:
     - LazyTensor: A lazy representation of the input array.
     """
+    if not isinstance(arr, Tensor) and not _is_convertible_to_array(arr):
+        return arr
+
     if isinstance(arr, LazyTensor):
         return arr
-    arr = asarray(arr)
-    name = Alias(gensym("A"))
+    arr = Scalar(arr) if isinstance(arr, bool | int | float | complex) else asarray(arr)
+    tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    tns = Subquery(name, Table(Literal(arr), idxs))
-    return LazyTensor(tns, shape, fill_value(arr), element_type(arr))
+    ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
+    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
+def _np_dtype(dtype):
+    if isinstance(dtype, FDTypeNumpy):
+        return dtype.dtype
+    if isinstance(dtype, FDTypeBuiltin):
+        return dtype.type
+    return dtype
+
+
+def full(
+    shape: int | tuple[int, ...],
+    fill_value: bool | complex,
+    *,
+    dtype: Any | None = None,
+):
+    """
+    Returns a new array having a specified shape and filled with fill_value.
+
+    Parameters:
+    - shape (Union[int, Tuple[int, ...]]): output array shape.
+    - fill_value (Union[bool, int, float, complex]): fill value.
+    - dtype (Optional[dtype]): output array data type. If dtype is None, the
+    output array data type must be inferred from fill_value according to the
+    following rules:
+        * If the fill value is an int, the output array data type must be the
+            default integer data type.
+        * If the fill value is a float, the output array data type must be the
+            default real-valued floating-point data type.
+        * If the fill value is a complex number, the output array data type must
+            be the default complex floating-point data type.
+        * If the fill value is a bool, the output array must have a boolean data
+            type. Default: None.
+
+    Returns:
+
+    - out (array): an array where every element is equal to fill_value.
+    """
+    shape = (shape,) if isinstance(shape, int) else tuple(shape)
+    return broadcast_to(asarray(fill_value, dtype=dtype), shape)
+
+
+def full_like(x, /, fill_value, *, dtype=None):
+    x = lazy(x)
+    return full(
+        x.shape, fill_value, dtype=dtype if dtype is not None else x.element_type
+    )
+
+
+def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
+    return broadcast_to(
+        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype))),
+        (num,),
+    )
+
+
+def zeros(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+
+
+def ones(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 1, dtype=dtype if dtype is not None else np.float64)
+
+
+def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
+    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+
+
+def zeros_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype=None) -> LazyTensor:
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype=None,
+) -> LazyTensor:
+    if stop is None:
+        start, stop = 0, start
+    arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
+    return broadcast_to(lazy(arr), (len(arr),))
+
+
+def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -407,11 +470,14 @@ def permute_dims(arg, /, axis: tuple[int, ...]) -> LazyTensor:
         an array containing the axes permutation. The returned array must have the same
         data type as ``x``.
     """
-    arg = defer(arg)
-    axis = normalize_axis_tuple(axis, arg.ndim + len(axis))
+    arg = lazy(arg)
+    axis = normalize_axis_tuple(axes, arg.ndim + len(axes))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
+    expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
+    data, ctx = arg.ctx.eval(expr)
     return LazyTensor(
-        Reorder(Relabel(arg.data, idxs), tuple(idxs[i] for i in axis)),
+        data,
+        ctx,
         tuple(arg.shape[i] for i in axis),
         arg.fill_value,
         arg.element_type,
@@ -450,7 +516,7 @@ def expand_dims(
     IndexError
         If provided an invalid ``axis`` position, an ``IndexError`` should be raised.
     """
-    x = defer(x)
+    x = lazy(x)
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
@@ -474,11 +540,12 @@ def expand_dims(
         Field(gensym("i")) if n in axis else idxs_1[n - offset[n]]
         for n in range(x.ndim + len(axis))
     )
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
-    return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def squeeze(
@@ -507,7 +574,7 @@ def squeeze(
         If a specified axis has a size greater than one (i.e., it is not a
         singleton dimension), a ``ValueError`` should be raised.
     """
-    x = defer(x)
+    x = lazy(x)
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
@@ -522,13 +589,14 @@ def squeeze(
     newaxis = [n for n in range(x.ndim) if n not in axis]
     idxs_1 = tuple(Field(gensym("i")) for _ in range(x.ndim))
     idxs_2 = tuple(idxs_1[n] for n in newaxis)
-    data_2 = Reorder(Relabel(x.data, idxs_1), idxs_2)
+    expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
-    return LazyTensor(data_2, shape_2, x.fill_value, x.element_type)
+    data_2, ctx = x.ctx.eval(expr)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
 
 
 def reduce(
-    op: Callable,
+    op: FinchOperator,
     x,
     /,
     *,
@@ -574,7 +642,8 @@ def reduce(
         reduction. The returned array must have a data type as described by the
         ``dtype`` parameter above.
     """
-    x = defer(x)
+    x = lazy(x)
+    assert isinstance(op, FinchOperator)
     if init is None:
         init = init_value(op, x.element_type)
     if axis is None:
@@ -585,10 +654,10 @@ def reduce(
 
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
-    data: LogicNode = Aggregate(
+    data: LogicExpression = Aggregate(
         Literal(op),
         Literal(init),
-        Relabel(x.data, fields),
+        Table(x.data, fields),
         tuple(fields[i] for i in axis),
     )
     if keepdims:
@@ -599,7 +668,8 @@ def reduce(
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
-    return LazyTensor(identify(data), shape, init, dtype)
+    expr, ctx = x.ctx.eval(data)
+    return LazyTensor(expr, ctx, shape, init, dtype)
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -640,7 +710,7 @@ def _broadcast_shape(*args: tuple) -> tuple:
     return shape
 
 
-def elementwise(f: Callable, *args) -> LazyTensor:
+def elementwise(f: FinchOperator, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
 
@@ -650,7 +720,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     as the number of tensors passed to `elementwise`.
 
     The function will automatically handle broadcasting of the input tensors to
-    ensure they have compatible shapes.  For example, `elementwise(operator.add,
+    ensure they have compatible shapes.  For example, `elementwise(ffunc.add,
     x, y)` is equivalent to `x + y`.
 
     Parameters:
@@ -663,7 +733,7 @@ def elementwise(f: Callable, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    args = tuple(defer(a) for a in args)
+    args = tuple(lazy(a) for a in args)
     shape = _broadcast_shape(*(arg.shape for arg in args))
     ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
@@ -679,11 +749,29 @@ def elementwise(f: Callable, *args) -> LazyTensor:
                 if arg.shape[i - ndim + arg.ndim] != 1:
                     raise ValueError("Invalid shape for broadcasting")
                 idims.append(Field(gensym("j")))
-        bargs.append(Reorder(Relabel(arg.data, tuple(idims)), tuple(odims)))
-    data = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
+        bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
+    expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = f(*[x.fill_value for x in args])
     new_element_type = return_type(f, *[x.element_type for x in args])
-    return LazyTensor(identify(data), shape, new_fill_value, new_element_type)
+    ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
+    data, ctx = ctx.eval(expr)
+    return LazyTensor(data, ctx, shape, new_fill_value, new_element_type)
+
+
+def round(x) -> LazyTensor:
+    return elementwise(ffuncs.round, lazy(x))
+
+
+def floor(x) -> LazyTensor:
+    return elementwise(ffuncs.floor, lazy(x))
+
+
+def ceil(x) -> LazyTensor:
+    return elementwise(ffuncs.ceil, lazy(x))
+
+
+def trunc(x) -> LazyTensor:
+    return elementwise(ffuncs.trunc, lazy(x))
 
 
 def sum(
@@ -694,8 +782,8 @@ def sum(
     dtype=None,
     keepdims: bool = False,
 ):
-    x = defer(x)
-    return reduce(operator.add, x, axis=axis, dtype=dtype, keepdims=keepdims)
+    x = lazy(x)
+    return reduce(ffuncs.add, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
 def prod(
@@ -706,108 +794,71 @@ def prod(
     dtype=None,
     keepdims: bool = False,
 ):
-    x = defer(x)
-    return reduce(operator.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
+    x = lazy(x)
+    return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
-#######################################
-@dataclass(frozen=True)
-class LinearIndicesTensorFType(TensorFType):
-    _shape_type: tuple[type, ...]
-    _element_type: Any = int
-    _fill_value: Any = 0
+def _arg_indices(x: LazyTensor, axis: int | None) -> LazyTensor:
+    if axis is None:
+        size = builtins.int(np.prod(x.shape, dtype=np.intp))
+        return lazy(np.arange(size, dtype=np.intp).reshape(x.shape))
 
-    @property
-    def shape_type(self) -> tuple[type, ...]:
-        return self._shape_type
-
-    @property
-    def element_type(self):
-        return self._element_type
-
-    @property
-    def fill_value(self):
-        return self._fill_value
+    axis = normalize_axis_index(axis, x.ndim)
+    idxs = arange(x.shape[axis], dtype=np.intp)
+    if x.ndim > 1:
+        idxs = expand_dims(idxs, axis=tuple(i for i in range(x.ndim) if i != axis))
+    return broadcast_to(idxs, x.shape)
 
 
-class LinearIndicesTensor(Tensor):
-    def __init__(self, shape):
-        self.shape_ = shape
-
-    def __getitem__(self, idxs):
-        flat_index = idxs[0]
-        for i in range(1, self.ndim):
-            flat_index = flat_index * self.shape_[i] + idxs[i]
-        return flat_index
-
-    @property
-    def shape(self):
-        return self.shape_
-
-    @property
-    def ftype(self):
-        shape_type = tuple(type(dim) for dim in self.shape)
-        return LinearIndicesTensorFType(shape_type, int, 0)
-
-
-register_property(LinearIndicesTensor, "promote_type", "__attr__", lambda x: int)
+def _restore_reduced_dims(result: LazyTensor, ndim: int, axis: int | None) -> LazyTensor:
+    result = elementwise(ffuncs.first_arg, result, result)
+    return expand_dims(result, axis=tuple(range(ndim)) if axis is None else axis)
 
 
 def argmin(
     x,
     /,
     *,
-    axis: int | tuple[int, ...] | None = None,
-    dtype=None,
+    axis: int | None = None,
     keepdims: bool = False,
 ):
-    x = defer(x)
-    shape = x.shape
-
-    if axis is None:
-        indices = defer(LinearIndicesTensor(shape))
-
-    else:
-        broadcast_indices = LazyTensor(
-            "i",
-            shape=(x.shape[axis],),
-            fill_value=x.fill_value,
-            element_type=x.element_type,
-        )
-        indices = expand_dims(
-            broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
-        )
-
-    paired = elementwise(pair, x, indices)
-    reduced = reduce(
-        minby, paired, axis=axis, init=(float("inf"), 0), keepdims=keepdims
+    x = lazy(x)
+    if axis is not None:
+        axis = normalize_axis_index(axis, x.ndim)
+    best = _restore_reduced_dims(min(x, axis=axis), x.ndim, axis)
+    sentinel = np.intp(np.prod(x.shape) if axis is None else x.shape[axis])
+    candidates = where(
+        equal(x, best),
+        _arg_indices(x, axis),
+        sentinel,
     )
+    result = min(candidates, axis=axis)
+    if keepdims:
+        return _restore_reduced_dims(result, x.ndim, axis)
+    return result
 
-    return elementwise(last, reduced)
 
-
-def argmax(x, axis=None):
-    x = defer(x)
-    shape = x.shape
-
-    if axis is None:
-        indices = LinearIndicesTensor(shape)
-
-    else:
-        broadcast_indices = LazyTensor(
-            "i",
-            shape=(x.shape[axis],),
-            fill_value=x.fill_value,
-            element_type=x.element_type,
-        )
-        indices = expand_dims(
-            broadcast_indices, axis=[j for j in range(x.ndim) if j != axis]
-        )
-
-    paired = elementwise(pair, x, indices)
-    reduced = reduce(maxby, paired, axis=axis, init=(float("inf"), 0))
-
-    return elementwise(last, reduced)
+def argmax(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    x = lazy(x)
+    if axis is not None:
+        axis = normalize_axis_index(axis, x.ndim)
+    best = _restore_reduced_dims(max(x, axis=axis), x.ndim, axis)
+    sentinel = np.intp(np.prod(x.shape) if axis is None else x.shape[axis])
+    candidates = where(
+        equal(x, best),
+        _arg_indices(x, axis),
+        sentinel,
+    )
+    result = min(candidates, axis=axis)
+    if keepdims:
+        return _restore_reduced_dims(result, x.ndim, axis)
+    return result
 
 
 def any(
@@ -821,10 +872,10 @@ def any(
     """
     Test whether any element of input array ``x`` along given axis is True.
     """
-    x = defer(x)
+    x = lazy(x)
     return reduce(
-        operator.or_,
-        elementwise(operator.truth, x),
+        ffuncs.or_,
+        elementwise(ffuncs.truth, x),
         axis=axis,
         keepdims=keepdims,
         init=init,
@@ -842,14 +893,22 @@ def all(
     """
     Test whether all elements of input array ``x`` along given axis are True.
     """
-    x = defer(x)
+    x = lazy(x)
     return reduce(
-        operator.and_,
-        elementwise(operator.truth, x),
+        ffuncs.and_,
+        elementwise(ffuncs.truth, x),
         axis=axis,
         keepdims=keepdims,
         init=init,
     )
+
+
+def real(x) -> LazyTensor:
+    return elementwise(ffuncs.real, lazy(x))
+
+
+def imag(x) -> LazyTensor:
+    return elementwise(ffuncs.imag, lazy(x))
 
 
 def min(
@@ -863,8 +922,8 @@ def min(
     """
     Return the minimum of input array ``arr`` along given axis.
     """
-    x = defer(x)
-    return reduce(promote_min, x, axis=axis, keepdims=keepdims, init=init)
+    x = lazy(x)
+    return reduce(ffuncs.min, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def max(
@@ -878,32 +937,64 @@ def max(
     """
     Return the maximum of input array ``arr`` along given axis.
     """
-    x = defer(x)
-    return reduce(promote_max, x, axis=axis, keepdims=keepdims, init=init)
+    x = lazy(x)
+    return reduce(ffuncs.max, x, axis=axis, keepdims=keepdims, init=init)
+
+
+def minimum(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.min, lazy(x1), lazy(x2))
+
+
+def maximum(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.max, lazy(x1), lazy(x2))
+
+
+def clip(x, /, *, min=None, max=None) -> LazyTensor:
+    return elementwise(ffuncs.clip, lazy(x), lazy(min), lazy(max))
+
+
+def sqrt(x) -> LazyTensor:
+    return elementwise(ffuncs.sqrt, lazy(x))
+
+
+def square(x) -> LazyTensor:
+    return elementwise(ffuncs.square, lazy(x))
+
+
+def sign(x) -> LazyTensor:
+    return elementwise(ffuncs.sign, lazy(x))
 
 
 def add(x1, x2) -> LazyTensor:
-    return elementwise(operator.add, defer(x1), defer(x2))
+    return elementwise(ffuncs.add, lazy(x1), lazy(x2))
+
+
+def reciprocal(x) -> LazyTensor:
+    return elementwise(ffuncs.reciprocal, lazy(x))
 
 
 def subtract(x1, x2) -> LazyTensor:
-    return elementwise(operator.sub, defer(x1), defer(x2))
+    return elementwise(ffuncs.sub, lazy(x1), lazy(x2))
 
 
 def multiply(x1, x2) -> LazyTensor:
-    return elementwise(operator.mul, defer(x1), defer(x2))
+    return elementwise(ffuncs.mul, lazy(x1), lazy(x2))
+
+
+def divide(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
 
 
 def abs(x) -> LazyTensor:
-    return elementwise(operator.abs, defer(x))
+    return elementwise(ffuncs.abs, lazy(x))
 
 
 def positive(x) -> LazyTensor:
-    return elementwise(operator.pos, defer(x))
+    return elementwise(ffuncs.pos, lazy(x))
 
 
 def negative(x) -> LazyTensor:
-    return elementwise(operator.neg, defer(x))
+    return elementwise(ffuncs.neg, lazy(x))
 
 
 def is_broadcastable(shape_a, shape_b):
@@ -947,19 +1038,19 @@ def matmul(x1, x2) -> LazyTensor:
                 "Batch dimensions are not broadcastable for matrix multiplication"
             )
         return reduce(
-            operator.add,
+            ffuncs.add,
             multiply(expand_dims(a, axis=-1), expand_dims(b, axis=-3)),
             axis=-2,
         )
 
-    x1 = defer(x1)
-    x2 = defer(x2)
+    x1 = lazy(x1)
+    x2 = lazy(x2)
 
     if x1.ndim < 1 or x2.ndim < 1:
         raise ValueError("Both inputs must be at least 1D arrays")
 
     if x1.ndim == 1 and x2.ndim == 1:
-        return reduce(operator.add, multiply(x1, x2), axis=0)
+        return reduce(ffuncs.add, multiply(x1, x2), axis=0)
 
     if x1.ndim == 1:
         x1 = expand_dims(x1, axis=0)  # make it a row vector
@@ -988,7 +1079,7 @@ def matrix_transpose(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the axes of `x` transposed.
     """
-    x = defer(x)
+    x = lazy(x)
     if x.ndim < 2:
         # this is following numpy's behavior.
         # data-apis specification assumes that input is atleast 2D
@@ -996,50 +1087,58 @@ def matrix_transpose(x) -> LazyTensor:
             "Input tensor must have at least 2 dimensions for transposition"
         )
     # swap the last two axes
-    return permute_dims(x, axis=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
+    return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
-def bitwise_inverse(x) -> LazyTensor:
-    return elementwise(operator.invert, defer(x))
+def bitwise_invert(x) -> LazyTensor:
+    return elementwise(ffuncs.invert, lazy(x))
 
 
 def bitwise_and(x1, x2) -> LazyTensor:
-    return elementwise(operator.and_, defer(x1), defer(x2))
+    return elementwise(ffuncs.and_, lazy(x1), lazy(x2))
 
 
 def bitwise_left_shift(x1, x2) -> LazyTensor:
-    return elementwise(operator.lshift, defer(x1), defer(x2))
+    return elementwise(ffuncs.lshift, lazy(x1), lazy(x2))
 
 
 def bitwise_or(x1, x2) -> LazyTensor:
-    return elementwise(operator.or_, defer(x1), defer(x2))
+    return elementwise(ffuncs.or_, lazy(x1), lazy(x2))
 
 
 def bitwise_right_shift(x1, x2) -> LazyTensor:
-    return elementwise(operator.rshift, defer(x1), defer(x2))
+    return elementwise(ffuncs.rshift, lazy(x1), lazy(x2))
 
 
 def bitwise_xor(x1, x2) -> LazyTensor:
-    return elementwise(operator.xor, defer(x1), defer(x2))
+    return elementwise(ffuncs.xor, lazy(x1), lazy(x2))
 
 
 def truediv(x1, x2) -> LazyTensor:
-    return elementwise(operator.truediv, defer(x1), defer(x2))
+    return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
 
 
-def floordiv(x1, x2) -> LazyTensor:
-    return elementwise(operator.floordiv, defer(x1), defer(x2))
+def floor_divide(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.floordiv, lazy(x1), lazy(x2))
 
 
 def mod(x1, x2) -> LazyTensor:
-    return elementwise(operator.mod, defer(x1), defer(x2))
+    return elementwise(ffuncs.mod, lazy(x1), lazy(x2))
 
 
 def pow(x1, x2) -> LazyTensor:
-    return elementwise(operator.pow, defer(x1), defer(x2))
+    return power(x1, x2)
 
 
-def conjugate(x) -> LazyTensor:
+def power(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.pow, lazy(x1), lazy(x2))
+
+
+def remainder(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.remainder, lazy(x1), lazy(x2))
+
+
+def conj(x) -> LazyTensor:
     """
     Computes the complex conjugate of the input tensor `x`.
 
@@ -1053,7 +1152,36 @@ def conjugate(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the complex conjugate of `x`.
     """
-    return elementwise(conj, defer(x))
+    return elementwise(ffuncs.conjugate, lazy(x))
+
+
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+) -> LazyTensor:
+    x = lazy(x)
+    element_type = x.element_type
+    zero = element_type(False if isinstance(element_type, FDTypeBoolean) else 0)
+    return reduce(
+        ffuncs.add,
+        elementwise(ffuncs.not_equal, x, lazy(zero)),
+        axis=axis,
+        keepdims=keepdims,
+        init=0,
+    )
+
+
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+) -> LazyTensor:
+    x = lazy(x)
+    fill = full(x.shape, x.fill_value, dtype=x.element_type)
+    return reduce(
+        ffuncs.add,
+        elementwise(ffuncs.not_same, x, fill),
+        axis=axis,
+        keepdims=keepdims,
+        init=0,
+    )
 
 
 def tensordot(
@@ -1065,8 +1193,8 @@ def tensordot(
     Returns a LazyTensor if either x1 or x2 is a LazyTensor.
     Otherwise, computes the result eagerly.
     """
-    x1 = defer(x1)
-    x2 = defer(x2)
+    x1 = lazy(x1)
+    x2 = lazy(x2)
 
     # Parse axes
     if not isinstance(axes, tuple):
@@ -1120,8 +1248,8 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
     """
     Computes the vector dot product along the specified axis.
     """
-    x1 = defer(x1)
-    x2 = defer(x2)
+    x1 = lazy(x1)
+    x2 = lazy(x2)
 
     # check broadcastability
     if not is_broadcastable(x1.shape, x2.shape):
@@ -1134,8 +1262,8 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         )
 
     return reduce(
-        operator.add,
-        multiply(conjugate(x1), x2),
+        ffuncs.add,
+        multiply(conj(x1), x2),
         axis=axis,
     )
 
@@ -1148,7 +1276,7 @@ class DefaultTensorFType(TensorFType):
     """
 
     _fill_value: Any
-    _element_type: Any
+    _element_type: FType
     _shape_type: tuple
 
     @property
@@ -1156,12 +1284,15 @@ class DefaultTensorFType(TensorFType):
         return self._fill_value
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         return self._element_type
 
     @property
     def shape_type(self):
         return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
@@ -1176,46 +1307,96 @@ class WrapperTensorFType(TensorFType):
         return self._child_formats[0].fill_value
 
     @property
-    def element_type(self) -> Any:
+    def element_type(self) -> FType:
         """Promotes the element type to be compatible with all constituent formats."""
         etype = self._child_formats[0].element_type
+        if not isinstance(etype, FDType):
+            raise TypeError(f"Expected scalar dtype in wrapper, got {etype}")
+        etype_fd = cast(FDType, etype)
         for t in self._child_formats:
-            etype = promote_type(etype, t.element_type)
-        return etype
+            t_etype = t.element_type
+            if not isinstance(t_etype, FDType):
+                raise TypeError(f"Expected scalar dtype in wrapper, got {t_etype}")
+            etype_fd = promote_type(etype_fd, t_etype)
+        return etype_fd
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class NoneTensorFType(DefaultTensorFType):
-    pass
+@dataclass(frozen=True, eq=False)
+class FillTensorFType(DefaultTensorFType):
+    def __eq__(self, other):
+        if not isinstance(other, FillTensorFType):
+            return False
+        return (
+            ffuncs.same(self._fill_value, other._fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
+
+    def construct(self, shape: tuple) -> FillTensor:
+        return FillTensor(shape, self.fill_value)
+
+    def __call__(self, val: Any) -> FillTensor:
+        """
+        Convert a tensor to this fill tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A FillTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
-class NoneTensor(Tensor):
+class FillTensor(Tensor):
     """
     A tensor that has a specific shape but contains no actual data.
     Used primarily for broadcasting operations where a tensor of a specific
     shape is needed but the values are irrelevant.
     """
 
-    def __init__(self, shape):
+    def __init__(self, shape, fill_value):
         self._shape = shape
+        self._fill_value = fill_value
 
     def __getitem__(self, idxs):
-        return None
+        return self._fill_value
 
     @property
     def shape(self):
         return self._shape
 
     @property
-    def ftype(self):
-        return NoneTensorFType(
-            None,
-            None,
-            tuple(type(dim) for dim in self.shape),
-        )
+    def fill_value(self) -> Any:
+        """Default fill value."""
+        return self.ftype.fill_value
 
-    def asarray(self):
-        return self
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor's elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return FillTensorFType(
+            self._fill_value,
+            ftype(self._fill_value),
+            tuple(ftype(dim) for dim in self.shape),
+        )
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
@@ -1229,14 +1410,14 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     Returns:
         A new lazy tensor with the specified shape.
     """
-    tensor = defer(tensor)
+    tensor = lazy(tensor)
 
     if not is_broadcastable_directional(tensor.shape, shape):
         raise ValueError(
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(first_arg, tensor, NoneTensor(shape))
+    return elementwise(ffuncs.first_arg, tensor, FillTensor(shape, np.False_))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
@@ -1262,6 +1443,28 @@ class ConcatTensorFType(WrapperTensorFType):
     def shape_type(self):
         return self._shape_type
 
+    def __call__(self, val: Any) -> Any:
+        """
+        Convert a tensor to this concatenated tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A concatenated tensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+    def construct(self, shape: tuple) -> ConcatTensor:
+        tns = self._child_formats[0].construct(shape)
+        shape2 = tuple(
+            dim if i != self.concat_axis else self._shape_type[i](0)
+            for i, dim in enumerate(shape)
+        )
+        tnss = (tns,) + tuple(fmt.construct(shape2) for fmt in self._child_formats[1:])
+        return ConcatTensor(*tnss, axis=self.concat_axis)
+
 
 class ConcatTensor(Tensor):
     """
@@ -1279,7 +1482,6 @@ class ConcatTensor(Tensor):
         `fill_value` is taken from the first tensor.
         `element_type` is casted according to array_api specification.
         """
-
         self._ndim = len(tensor.shape)
 
         shape_without_axis = tensor.shape[:axis] + tensor.shape[axis + 1 :]
@@ -1331,7 +1533,7 @@ class ConcatTensor(Tensor):
                 )
         return ConcatTensorFType(
             tuple(formats),
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
             self.concat_axis,
         )
 
@@ -1339,8 +1541,20 @@ class ConcatTensor(Tensor):
     def shape(self):
         return self._shape
 
-    def asarray(self):
-        return self
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
 
 def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
@@ -1354,7 +1568,7 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     Returns:
         Concatenated tensor as LazyTensor
     """
-    arrays = [defer(arr) for arr in arrays]
+    arrays = [lazy(arr) for arr in arrays]
 
     if axis is None:
         # flatten all tensors
@@ -1368,7 +1582,7 @@ def concat(arrays: tuple | list, /, axis: int | None = 0) -> LazyTensor:
     computed_arrays = tuple(_compute(arr) for arr in arrays)
     concat_tensor = ConcatTensor(*computed_arrays, axis=axis)
     # Create a LazyTensor that represents the concatenation
-    return elementwise(identity, defer(concat_tensor))
+    return elementwise(ffuncs.identity, lazy(concat_tensor))
 
 
 @dataclass(frozen=True)
@@ -1381,9 +1595,27 @@ class SplitDimsTensorFType(WrapperTensorFType):
         parent_shape_type = self._child_formats[0].shape_type
         shape_type_list = list(parent_shape_type)
         shape_type_list[self.split_axis : self.split_axis + 1] = [
-            type(dim) for dim in self.split_shape
+            ftype(dim) for dim in self.split_shape
         ]
         return tuple(shape_type_list)
+
+    def construct(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError(
+            "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
+
+    def __call__(self, val: Any) -> SplitDimsTensor:
+        """
+        Convert a tensor to this split dimensions tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A split dimensions tensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
 class SplitDimsTensor(Tensor):
@@ -1414,8 +1646,7 @@ class SplitDimsTensor(Tensor):
         self._shape = tensor.shape[: self.axis] + shape + tensor.shape[self.axis + 1 :]
         self.split_shape = shape
         self._ndim = len(self._shape)
-        self._element_type = element_type(tensor)
-        self.dtype = self._element_type
+        self._element_type = tensor.element_type
 
     def __getitem__(self, idxs: tuple):
         """
@@ -1458,8 +1689,20 @@ class SplitDimsTensor(Tensor):
     def shape(self):
         return self._shape
 
-    def asarray(self):
-        return self
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
 
 @dataclass(frozen=True)
@@ -1470,6 +1713,24 @@ class CombineDimsTensorFType(WrapperTensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    def construct(self, shape: tuple) -> SplitDimsTensor:
+        raise NotImplementedError(
+            "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
+
+    def __call__(self, val: Any) -> SplitDimsTensor:
+        """
+        Convert a tensor to this combined dimensions tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A combined dimensions tensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
 class CombineDimsTensor(Tensor):
@@ -1512,8 +1773,7 @@ class CombineDimsTensor(Tensor):
             + tensor.shape[self.end_axis + 1 :]
         )
         self._ndim = len(self._shape)
-        self._element_type = element_type(tensor)
-        self.dtype = self._element_type
+        self._element_type = tensor.element_type
 
         # Store original dimensions for reconstruction. For ease of access
         self.original_dims = [tensor.shape[i] for i in axes]
@@ -1554,15 +1814,27 @@ class CombineDimsTensor(Tensor):
         return CombineDimsTensorFType(
             (child_format,),
             self.axes,
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
         )
 
     @property
     def shape(self):
         return self._shape
 
-    def asarray(self):
-        return self
+    @property
+    def fill_value(self) -> Any:
+        """Default value to fill the tensor."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
 
 
 def _compute(arg, ctx=None):
@@ -1577,10 +1849,10 @@ def split_dims(x, axis: int, shape: tuple) -> LazyTensor:
     of the sizes in the `shape` tuple must equal the size
     of the dimension being split.
     """
-    x = defer(x)
+    x = lazy(x)
     computed_x = _compute(x)
     split_tensor = SplitDimsTensor(computed_x, axis, shape)
-    return elementwise(identity, defer(split_tensor))
+    return elementwise(ffuncs.identity, lazy(split_tensor))
 
 
 def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
@@ -1589,10 +1861,10 @@ def combine_dims(x, axes: tuple[int, ...]) -> LazyTensor:
     The resulting axis will have a size equal to the product of the
     sizes of the combined axes.
     """
-    x = defer(x)
+    x = lazy(x)
     computed_x = _compute(x)
     combine_tensor = CombineDimsTensor(computed_x, axes)
-    return elementwise(identity, defer(combine_tensor))
+    return elementwise(ffuncs.identity, lazy(combine_tensor))
 
 
 def flatten(x) -> LazyTensor:
@@ -1608,14 +1880,14 @@ def flatten(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor that is a flattened version of `x`.
     """
-    x = defer(x)
+    x = lazy(x)
     if x.ndim == 0:
         # If x is a scalar, expand to 1D
         return expand_dims(x, axis=0)
     if x.ndim == 1:
         # we need it to pass through the elementwise
         # it may be benficial to optimize these cases
-        return elementwise(identity, x)
+        return elementwise(ffuncs.identity, x)
     # Combine all dimensions into one
     return combine_dims(x, tuple(range(x.ndim)))
 
@@ -1632,13 +1904,13 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     if len(source) != len(destination):
         raise ValueError("Source and Destination indices must have the same length")
 
-    x = defer(x)
+    x = lazy(x)
 
     final_order = [i for i in range(x.ndim) if i not in source]
     for dest, src in sorted(zip(destination, source, strict=True)):
         final_order.insert(dest, src)
 
-    return permute_dims(x, axis=tuple(final_order))
+    return permute_dims(x, axes=tuple(final_order))
 
 
 def stack(arrays, /, axis: int = 0) -> LazyTensor:
@@ -1653,7 +1925,7 @@ def stack(arrays, /, axis: int = 0) -> LazyTensor:
     """
     if not isinstance(arrays, tuple | list):
         raise TypeError("arrays must be a tuple or list of LazyTensors")
-    arrays = [defer(arr) for arr in arrays]
+    arrays = [lazy(arr) for arr in arrays]
     # add 1-dim at the axis position for stacking
     arrays = tuple(expand_dims(x, axis=axis) for x in arrays)
     # concat, this will also do the shape verification
@@ -1661,122 +1933,174 @@ def stack(arrays, /, axis: int = 0) -> LazyTensor:
 
 
 def sin(x) -> LazyTensor:
-    return elementwise(np.sin, defer(x))
+    return elementwise(ffuncs.sin, lazy(x))
 
 
 def sinh(x) -> LazyTensor:
-    return elementwise(np.sinh, defer(x))
+    return elementwise(ffuncs.sinh, lazy(x))
 
 
 def cos(x) -> LazyTensor:
-    return elementwise(np.cos, defer(x))
+    return elementwise(ffuncs.cos, lazy(x))
 
 
 def cosh(x) -> LazyTensor:
-    return elementwise(np.cosh, defer(x))
+    return elementwise(ffuncs.cosh, lazy(x))
 
 
 def tan(x) -> LazyTensor:
-    return elementwise(np.tan, defer(x))
+    return elementwise(ffuncs.tan, lazy(x))
 
 
 def tanh(x) -> LazyTensor:
-    return elementwise(np.tanh, defer(x))
+    return elementwise(ffuncs.tanh, lazy(x))
 
 
 def asin(x) -> LazyTensor:
-    return elementwise(np.asin, defer(x))
+    return elementwise(ffuncs.asin, lazy(x))
 
 
 def asinh(x) -> LazyTensor:
-    return elementwise(np.asinh, defer(x))
+    return elementwise(ffuncs.asinh, lazy(x))
 
 
 def acos(x) -> LazyTensor:
-    return elementwise(np.acos, defer(x))
+    return elementwise(ffuncs.acos, lazy(x))
 
 
 def acosh(x) -> LazyTensor:
-    return elementwise(np.acosh, defer(x))
+    return elementwise(ffuncs.acosh, lazy(x))
 
 
 def atan(x) -> LazyTensor:
-    return elementwise(np.atan, defer(x))
+    return elementwise(ffuncs.atan, lazy(x))
+
+
+def hypot(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.hypot, lazy(x1), lazy(x2))
 
 
 def atanh(x) -> LazyTensor:
-    return elementwise(np.atanh, defer(x))
+    return elementwise(ffuncs.atanh, lazy(x))
 
 
 def atan2(x1, x2) -> LazyTensor:
-    return elementwise(np.atan2, defer(x1), defer(x2))
+    return elementwise(ffuncs.atan2, lazy(x1), lazy(x2))
+
+
+def exp(x) -> LazyTensor:
+    return elementwise(ffuncs.exp, lazy(x))
+
+
+def expm1(x) -> LazyTensor:
+    return elementwise(ffuncs.expm1, lazy(x))
 
 
 def log(x) -> LazyTensor:
-    return elementwise(np.log, defer(x))
+    return elementwise(ffuncs.log, lazy(x))
 
 
 def log1p(x) -> LazyTensor:
-    return elementwise(np.log1p, defer(x))
+    return elementwise(ffuncs.log1p, lazy(x))
 
 
 def log2(x) -> LazyTensor:
-    return elementwise(np.log2, defer(x))
+    return elementwise(ffuncs.log2, lazy(x))
 
 
 def log10(x) -> LazyTensor:
-    return elementwise(np.log10, defer(x))
+    return elementwise(ffuncs.log10, lazy(x))
 
 
 def logaddexp(x1, x2) -> LazyTensor:
-    return elementwise(np.logaddexp, defer(x1), defer(x2))
+    return elementwise(ffuncs.logaddexp, lazy(x1), lazy(x2))
+
+
+def signbit(x) -> LazyTensor:
+    return elementwise(ffuncs.signbit, lazy(x))
+
+
+def copysign(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.copysign, lazy(x1), lazy(x2))
+
+
+def nextafter(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.nextafter, lazy(x1), lazy(x2))
+
+
+def isfinite(x) -> LazyTensor:
+    return elementwise(ffuncs.isfinite, lazy(x))
+
+
+def isinf(x) -> LazyTensor:
+    return elementwise(ffuncs.isinf, lazy(x))
+
+
+def isnan(x) -> LazyTensor:
+    return elementwise(ffuncs.isnan, lazy(x))
+
+
+def iscomplexobj(x) -> LazyTensor:
+    return elementwise(ffuncs.iscomplexobj, lazy(x))
 
 
 def logical_and(x1, x2) -> LazyTensor:
-    return elementwise(np.logical_and, defer(x1), defer(x2))
+    return elementwise(ffuncs.logical_and, lazy(x1), lazy(x2))
 
 
 def logical_or(x1, x2) -> LazyTensor:
-    return elementwise(np.logical_or, defer(x1), defer(x2))
+    return elementwise(ffuncs.logical_or, lazy(x1), lazy(x2))
 
 
 def logical_xor(x1, x2) -> LazyTensor:
-    return elementwise(np.logical_xor, defer(x1), defer(x2))
+    return elementwise(ffuncs.logical_xor, lazy(x1), lazy(x2))
 
 
 def logical_not(x) -> LazyTensor:
-    return elementwise(np.logical_not, defer(x))
+    return elementwise(ffuncs.logical_not, lazy(x))
 
 
 def less(x1, x2) -> LazyTensor:
-    return elementwise(np.less, defer(x1), defer(x2))
+    return elementwise(ffuncs.less, lazy(x1), lazy(x2))
 
 
 def less_equal(x1, x2) -> LazyTensor:
-    return elementwise(np.less_equal, defer(x1), defer(x2))
+    return elementwise(ffuncs.less_equal, lazy(x1), lazy(x2))
 
 
 def greater(x1, x2) -> LazyTensor:
-    return elementwise(np.greater, defer(x1), defer(x2))
+    return elementwise(ffuncs.greater, lazy(x1), lazy(x2))
 
 
 def greater_equal(x1, x2) -> LazyTensor:
-    return elementwise(np.greater_equal, defer(x1), defer(x2))
+    return elementwise(ffuncs.greater_equal, lazy(x1), lazy(x2))
 
 
 def equal(x1, x2) -> LazyTensor:
-    return elementwise(np.equal, defer(x1), defer(x2))
+    return elementwise(ffuncs.equal, lazy(x1), lazy(x2))
+
+
+def same(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.same, lazy(x1), lazy(x2))
 
 
 def not_equal(x1, x2) -> LazyTensor:
-    return elementwise(np.not_equal, defer(x1), defer(x2))
+    return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+
+
+def not_same(x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.not_same, lazy(x1), lazy(x2))
+
+
+def where(condition, x1, x2) -> LazyTensor:
+    return elementwise(ffuncs.where, lazy(condition), lazy(x1), lazy(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     """
     Calculates the arithmetic mean of the input array ``x``.
     """
-    x = defer(x)
+    x = lazy(x)
     n = (
         np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
         if isinstance(axis, tuple)
@@ -1797,7 +2121,7 @@ def var(
     """
     Calculates the variance of the input array ``x``.
     """
-    x = defer(x)
+    x = lazy(x)
     n = (
         np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
         if isinstance(axis, tuple)
@@ -1819,6 +2143,42 @@ def std(
     """
     Calculates the standard deviation of the input array ``x``.
     """
-    x = defer(x)
+    x = lazy(x)
     d = var(x, axis=axis, correction=correction, keepdims=keepdims)
     return pow(d, 0.5)
+
+
+def einop(prgm, **kwargs):
+    stmt = ein.parse_einop(prgm)
+    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    xp = sys.modules[__name__]
+    ctx = ein.EinsumInterpreter(xp)
+    bindings = {ein.Alias(k): v for k, v in kwargs.items()}
+    return ctx(prgm, bindings)[0]
+
+
+def einsum(prgm, *args, **kwargs):
+    stmt, bindings = ein.parse_einsum(prgm, *args)
+    prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
+    xp = sys.modules[__name__]
+    ctx = ein.EinsumInterpreter(xp)
+    return ctx(prgm, bindings)[0]
+
+
+def get_lazy_tensor_stats(
+    lazy_tensor: LazyTensor,
+    stats_factory: StatsFactory,
+) -> TensorStats:
+    trace = lazy_tensor.ctx.trace()
+    interpreter = StatsInterpreter(stats_factory=stats_factory)
+    bindings: OrderedDict[Alias, TensorStats] = OrderedDict()
+    last_stats: TensorStats | tuple[TensorStats, ...]
+    for stmt in trace:
+        last_stats = interpreter(stmt, bindings)
+
+    if last_stats is None:
+        raise ValueError("Trace was empty or no stats produced")
+    if isinstance(last_stats, tuple):
+        return last_stats[0]
+
+    return last_stats

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
-from ..symbolic import ScopedDict, fisinstance
+from finchlite.algebra import fisinstance
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
+
 from . import nodes as asm
+from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
 
 
-class AssemblyInterpreterKernel:
+class AssemblyInterpreterKernel(AssemblyKernel):
     """
     A kernel for interpreting FinchAssembly code.
     This is a simple interpreter that executes the assembly code.
@@ -22,7 +26,7 @@ class AssemblyInterpreterKernel:
         return self.ctx(asm.Call(self.func, args_i))
 
 
-class AssemblyInterpreterModule:
+class AssemblyInterpreterLibrary(AssemblyLibrary):
     """
     A class to represent an interpreted module of FinchAssembly.
     """
@@ -52,13 +56,7 @@ class HaltState:
     return_value: Any = None
 
 
-def check_isinstance(obj, cls):
-    if hasattr(obj, "ftype"):
-        return obj.ftype == cls
-    return isinstance(obj, cls)
-
-
-class AssemblyInterpreter:
+class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
     """
     An interpreter for FinchAssembly.
     """
@@ -70,6 +68,7 @@ class AssemblyInterpreter:
         types=None,
         loop_state=None,
         function_state=None,
+        stdout=None,
     ):
         if bindings is None:
             bindings = ScopedDict()
@@ -82,6 +81,9 @@ class AssemblyInterpreter:
         self.types = types
         self.loop_state = loop_state
         self.function_state = function_state
+        if stdout is None:
+            stdout = sys.stdout
+        self.stdout = stdout
 
     def scope(
         self,
@@ -90,6 +92,7 @@ class AssemblyInterpreter:
         types=None,
         loop_state=None,
         function_state=None,
+        stdout=None,
     ):
         """
         Create a new scope for the interpreter.
@@ -105,12 +108,15 @@ class AssemblyInterpreter:
             loop_state = self.loop_state
         if function_state is None:
             function_state = self.function_state
+        if stdout is None:
+            stdout = self.stdout
         return AssemblyInterpreter(
             bindings=bindings,
             slots=slots,
             types=types,
             loop_state=loop_state,
             function_state=function_state,
+            stdout=stdout,
         )
 
     def should_halt(self):
@@ -126,10 +132,24 @@ class AssemblyInterpreter:
             and self.function_state.should_halt
         )
 
-    def __call__(self, prgm: asm.AssemblyNode):
+    def lower(self, prgm: asm.Module):
+        return self._dispatch(prgm)
+
+    @overload
+    def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
+
+    @overload
+    def __call__(self, prgm: asm.AssemblyNode) -> Any: ...
+
+    def __call__(self, prgm):
         """
         Run the program.
         """
+        if isinstance(prgm, asm.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm):
         match prgm:
             case asm.Literal(value):
                 return value
@@ -148,7 +168,7 @@ class AssemblyInterpreter:
                 )
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_e = self(val)
-                if not check_isinstance(val_e, var_t):
+                if not fisinstance(val_e, var_t):
                     raise TypeError(
                         f"Assigned value {val_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
@@ -159,12 +179,12 @@ class AssemblyInterpreter:
             case asm.GetAttr(obj, attr):
                 obj_e = self(obj)
                 attr = attr.val
-                return obj.result_format.struct_getattr(obj_e, attr)
+                return obj.result_type.struct_getattr(obj_e, attr)
             case asm.SetAttr(obj, attr, val):
                 obj_e = self(obj)
                 attr = attr.val
                 val_e = self(val)
-                obj.result_format.struct_setattr(obj_e, attr, val_e)
+                obj.result_type.struct_setattr(obj_e, attr, val_e)
                 return None
             case asm.Slot(var_n, var_t):
                 if var_n in self.types:
@@ -203,6 +223,16 @@ class AssemblyInterpreter:
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
+            case asm.LoadDict(dct, idx):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                return map_e.load(idx_e)
+            case asm.ExistsDict(dct, idx):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                return map_e.exists(idx_e)
             case asm.Store(buf, idx, val):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -210,6 +240,12 @@ class AssemblyInterpreter:
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
+            case asm.StoreDict(dct, idx, val):
+                assert isinstance(dct, asm.Slot)
+                map_e = self(dct)
+                idx_e = self(idx)
+                val_e = self(val)
+                return map_e.store(idx_e, val_e)
             case asm.Resize(buf, len_):
                 assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
@@ -229,7 +265,7 @@ class AssemblyInterpreter:
             case asm.ForLoop(asm.Variable(var_n, var_t) as var, start, end, body):
                 start_e = self(start)
                 end_e = self(end)
-                if not isinstance(start_e, var_t):
+                if not fisinstance(start_e, var_t):
                     raise TypeError(
                         f"Start value {start_e} is not of type {var_t} for "
                         f"variable '{var_n}'."
@@ -300,7 +336,7 @@ class AssemblyInterpreter:
                     ctx_2(body)
                     if ctx_2.function_state.should_halt:
                         ret_e = ctx_2.function_state.return_value
-                        if not check_isinstance(ret_e, ret_t):
+                        if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
                                 f"for function '{func_n}'."
@@ -333,7 +369,13 @@ class AssemblyInterpreter:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return AssemblyInterpreterModule(self, kernels)
+                return AssemblyInterpreterLibrary(self, kernels)
+            case asm.Print(args):
+                args_value_str = ""
+                for arg in args:
+                    args_value_str = args_value_str + f"{self(arg)} "
+                print(args_value_str, file=self.stdout)
+                return None
             case asm.Stack(val):
                 raise NotImplementedError(
                     "AssemblyInterpreter does not support symbolic, no target language"

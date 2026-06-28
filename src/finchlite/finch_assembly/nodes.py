@@ -2,10 +2,12 @@ from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from ..algebra import return_type
-from ..symbolic import Context, PostWalk, Rewrite, Term, TermTree, ftype, literal_repr
-from ..util import qual_str
-from .buffer import element_type, length_type
+from finchlite.algebra import ftype, ftypes, return_type
+from finchlite.algebra.ftypes import FType
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
+
+from .buffer import length_type
 
 
 class AssemblyNode(Term):
@@ -51,11 +53,26 @@ class AssemblyTree(AssemblyNode, TermTree):
 
 
 class AssemblyExpression(AssemblyNode):
+    """
+    Assembly AST expression base class.
+
+    An assembly expression is a program node which evaluates to a value.
+    """
+
     @property
     @abstractmethod
-    def result_format(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         ...
+
+
+class AssemblyStatement(AssemblyNode):
+    """
+    Assembly AST statement base class.
+
+    An assembly statement is a program node nested inside a function which does
+    not produce a value, but may modify the state of the machine.
+    """
 
 
 @dataclass(eq=True, frozen=True)
@@ -70,16 +87,19 @@ class Literal(AssemblyExpression):
     val: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
         return ftype(self.val)
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"val": self.val})
+
+
+L = Literal
 
 
 @dataclass(eq=True, frozen=True)
-class Variable(AssemblyExpression):
+class Variable(AssemblyExpression, NamedTerm):
     """
     Represents a logical AST expression for a variable named `name`, which
     will hold a value of type `type`.
@@ -90,40 +110,19 @@ class Variable(AssemblyExpression):
     """
 
     name: str
-    type: Any
+    type: FType
 
     @property
-    def result_format(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         return self.type
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
-
-
-@dataclass(eq=True, frozen=True)
-class TaggedVariable(AssemblyExpression):
-    """
-    Represents a numbered Variable assembly node that refers to variable
-    named `name`, with type `type`, and has ID `id`. Used in the the
-    representation of programs which need to distinguish between multiple
-    uses of the same variable, such as SSA or numbered occurrence forms.
-
-    Attributes:
-        variable: The variable that it references.
-        id: The ID of the variable
-    """
-
-    variable: Variable
-    id: int
+        return literal_repr(type(self).__name__, {"name": self.name, "type": self.type})
 
     @property
-    def result_format(self):
-        """Returns the type of the expression."""
-        return self.variable.result_format()
-
-    def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+    def symbol(self) -> str:
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
@@ -138,10 +137,10 @@ class Stack(AssemblyExpression):
     """
 
     obj: Any
-    type: Any
+    type: FType
 
     @property
-    def result_format(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         return self.type
 
@@ -161,16 +160,20 @@ class Slot(AssemblyExpression):
     type: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
         return self.type
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, asdict(self))
 
+    @property
+    def symbol(self) -> str:
+        return self.name
+
 
 @dataclass(eq=True, frozen=True)
-class Unpack(AssemblyTree):
+class Unpack(AssemblyTree, AssemblyStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
     `lhs`. The original object must not be accessed or modified until the
@@ -191,7 +194,7 @@ class Unpack(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Repack(AssemblyTree):
+class Repack(AssemblyTree, AssemblyStatement):
     """
     Registers updates from a symbolic object `val` with the original
     object. The original object may now be accessed and modified.
@@ -209,7 +212,7 @@ class Repack(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Assign(AssemblyTree):
+class Assign(AssemblyTree, AssemblyStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
     to `lhs`.
@@ -219,7 +222,7 @@ class Assign(AssemblyTree):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Variable | Stack
+    lhs: Variable
     rhs: AssemblyExpression
 
     @property
@@ -246,13 +249,13 @@ class GetAttr(AssemblyExpression, AssemblyTree):
         return [self.obj, self.attr]
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        return dict(self.obj.result_format.struct_fields)[self.attr.val]
+        return dict(self.obj.result_type.struct_fields)[self.attr.val]
 
 
 @dataclass(eq=True, frozen=True)
-class SetAttr(AssemblyTree):
+class SetAttr(AssemblyTree, AssemblyStatement):
     """
     Represents a setter for an attribute `attr` of an object `obj`.
     Attributes:
@@ -294,9 +297,9 @@ class Call(AssemblyExpression, AssemblyTree):
         return cls(op, args)
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        arg_types = [arg.result_format for arg in self.args]
+        arg_types = [arg.result_type for arg in self.args]
         return return_type(self.op.val, *arg_types)
 
 
@@ -318,13 +321,13 @@ class Load(AssemblyExpression, AssemblyTree):
         return [self.buffer, self.index]
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        return element_type(self.buffer.result_format)
+        return self.buffer.result_type.element_type
 
 
 @dataclass(eq=True, frozen=True)
-class Store(AssemblyTree):
+class Store(AssemblyTree, AssemblyStatement):
     """
     Represents storing a value into a buffer at a given index.
 
@@ -344,7 +347,69 @@ class Store(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Resize(AssemblyTree):
+class ExistsDict(AssemblyExpression, AssemblyTree):
+    """
+    Represents checking whether an integer tuple key is in a map.
+
+    Attributes:
+        map: The map to load from.
+        index: The key to check for existence.
+    """
+
+    map: Slot | Stack
+    index: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index]
+
+    def result_type(self):
+        return ftypes.bool
+
+
+@dataclass(eq=True, frozen=True)
+class LoadDict(AssemblyExpression, AssemblyTree):
+    """
+    Represents loading a value from a map given an integer tuple key.
+
+    Attributes:
+        map: The map to load from.
+        index: The key value
+    """
+
+    dct: Slot | Stack
+    index: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.dct, self.index]
+
+    def result_type(self):
+        return self.dct.result_type.value_type
+
+
+@dataclass(eq=True, frozen=True)
+class StoreDict(AssemblyTree, AssemblyStatement):
+    """
+    Represents storing a value into a buffer given an integer tuple key.
+
+    Attributes:
+        map: The map to load from.
+        index1: The first integer in the pair
+        index2: The second integer in the pair
+    """
+
+    map: Slot | Stack
+    index: AssemblyExpression
+    value: AssemblyExpression
+
+    @property
+    def children(self):
+        return [self.map, self.index, self.value]
+
+
+@dataclass(eq=True, frozen=True)
+class Resize(AssemblyTree, AssemblyStatement):
     """
     Represents resizing a buffer to a new size.
 
@@ -377,13 +442,13 @@ class Length(AssemblyExpression, AssemblyTree):
         return [self.buffer]
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        return length_type(self.buffer.result_format)
+        return length_type(self.buffer.result_type)
 
 
 @dataclass(eq=True, frozen=True)
-class ForLoop(AssemblyTree):
+class ForLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a for loop that iterates over a range of values.
 
@@ -397,7 +462,7 @@ class ForLoop(AssemblyTree):
     var: Variable
     start: AssemblyExpression
     end: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -406,7 +471,7 @@ class ForLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class BufferLoop(AssemblyTree):
+class BufferLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a loop that iterates over the elements of a buffer.
 
@@ -418,7 +483,7 @@ class BufferLoop(AssemblyTree):
 
     buffer: Slot | Stack
     var: Variable
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -427,7 +492,7 @@ class BufferLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class WhileLoop(AssemblyTree):
+class WhileLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a while loop that executes as long as the condition is true.
 
@@ -437,7 +502,7 @@ class WhileLoop(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -446,7 +511,7 @@ class WhileLoop(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class If(AssemblyTree):
+class If(AssemblyTree, AssemblyStatement):
     """
     Represents an if statement that executes the body if the condition is true.
 
@@ -456,7 +521,7 @@ class If(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -465,7 +530,25 @@ class If(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class IfElse(AssemblyTree):
+class Assert(AssemblyTree, AssemblyStatement):
+    """
+    Represents an assert node which asserts that expression is true.
+    Used in the dataflow analysis to assert conditions in conditionals and loops.
+
+    Attributes:
+        exp: Expression which is being asserted.
+    """
+
+    exp: AssemblyExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.exp]
+
+
+@dataclass(eq=True, frozen=True)
+class IfElse(AssemblyTree, AssemblyStatement):
     """
     Represents an if-else statement that executes the body if the condition
     is true, otherwise executes else_body.
@@ -477,8 +560,8 @@ class IfElse(AssemblyTree):
     """
 
     condition: AssemblyExpression
-    body: AssemblyNode
-    else_body: AssemblyNode
+    body: AssemblyStatement
+    else_body: AssemblyStatement
 
     @property
     def children(self):
@@ -502,7 +585,7 @@ class Function(AssemblyTree):
 
     name: Variable
     args: tuple[Variable, ...]
-    body: AssemblyNode
+    body: AssemblyStatement
 
     @property
     def children(self):
@@ -517,7 +600,7 @@ class Function(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Return(AssemblyTree):
+class Return(AssemblyTree, AssemblyStatement):
     """
     Represents a return statement that returns `arg` from the current function.
     Halts execution of the function body.
@@ -535,7 +618,7 @@ class Return(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Break(AssemblyTree):
+class Break(AssemblyTree, AssemblyStatement):
     """
     Represents a break statement that exits the current loop.
     """
@@ -547,7 +630,7 @@ class Break(AssemblyTree):
 
 
 @dataclass(eq=True, frozen=True)
-class Block(AssemblyTree):
+class Block(AssemblyTree, AssemblyStatement):
     """
     Represents a statement that executes a sequence of statements `bodies...`.
 
@@ -555,7 +638,7 @@ class Block(AssemblyTree):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyNode, ...] = ()
+    bodies: tuple[AssemblyStatement, ...] = ()
 
     @property
     def children(self):
@@ -577,7 +660,7 @@ class Module(AssemblyTree):
         funcs: The functions defined in the module.
     """
 
-    funcs: tuple[AssemblyNode, ...]
+    funcs: tuple[Function, ...]
 
     @property
     def children(self):
@@ -587,6 +670,23 @@ class Module(AssemblyTree):
     @classmethod
     def from_children(cls, *funcs):
         return cls(funcs)
+
+
+@dataclass(eq=True, frozen=True)
+class Print(AssemblyTree, AssemblyStatement):
+    """
+    Print values of give variables.
+
+    Attributes:
+        args: list of variables to be printed.
+    """
+
+    args: tuple[Variable, ...]
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [*self.args]
 
 
 class AssemblyPrinterContext(Context):
@@ -613,32 +713,32 @@ class AssemblyPrinterContext(Context):
         blk.indent = self.indent + 1
         return blk
 
-    def __call__(self, prgm: AssemblyNode):
+    def __call__(self, prgm: AssemblyNode, emit_calls: bool = False):
         feed = self.feed
         match prgm:
             case Literal(value):
                 return qual_str(value)
-            case TaggedVariable(Variable(name, _), id):
-                return f"{name}_{id}"
+            case Assert(exp):
+                return f"assert({self(exp)})"
             case Variable(name, _):
                 return str(name)
             case Assign(lhs, val):
                 match lhs:
                     case Variable(var_n, var_t):
                         self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
-                    case TaggedVariable(Variable(var_n, var_t), id):
-                        self.exec(
-                            f"{feed}{var_n}_{id}: {qual_str(var_t)} = {self(val)}"
-                        )
                     case _:
                         raise NotImplementedError(f"Unrecognized lhs type: {lhs}")
                 return None
             case GetAttr(obj, attr):
-                return f"getattr({obj}, {attr})"
+                return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
             case Call(Literal(_) as lit, args):
-                return f"{self(lit)}({', '.join(self(arg) for arg in args)})"
+                call_expr = f"{self(lit)}({', '.join(self(arg) for arg in args)})"
+                if emit_calls:
+                    self.exec(call_expr)
+                    return None
+                return call_expr
             case Unpack(Slot(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
@@ -647,10 +747,17 @@ class AssemblyPrinterContext(Context):
                 return None
             case Load(buf, idx):
                 return f"load({self(buf)}, {self(idx)})"
+            case LoadDict(map, idx):
+                return f"loadmap({self(map)}, {self(idx)})"
+            case ExistsDict(map, idx):
+                return f"existsmap({self(map)}, {self(idx)})"
             case Slot(name, type_):
                 return f"slot({name}, {qual_str(type_)})"
             case Store(buf, idx, val):
                 self.exec(f"{feed}store({self(buf)}, {self(idx)}, {self(val)})")
+                return None
+            case StoreDict(map, idx, val):
+                self.exec(f"{feed}storemap({self(map)}, {self(idx)}, {self(val)})")
                 return None
             case Resize(buf, size):
                 self.exec(f"{feed}resize({self(buf)}, {self(size)})")
@@ -660,7 +767,7 @@ class AssemblyPrinterContext(Context):
             case Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
-                    ctx_2(body)
+                    ctx_2(body, emit_calls=True)
                 self.exec(ctx_2.emit())
                 return None
             case ForLoop(var, start, end, body):
@@ -713,8 +820,6 @@ class AssemblyPrinterContext(Context):
                     match arg:
                         case Variable(arg_name, t):
                             arg_decls.append(f"{arg_name}: {qual_str(t)}")
-                        case TaggedVariable(Variable(arg_name, t), id):
-                            arg_decls.append(f"{arg_name}_{id}: {qual_str(t)}")
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
@@ -726,8 +831,6 @@ class AssemblyPrinterContext(Context):
                 match name:
                     case Variable(func_name, return_t):
                         func_decl = f"{func_name}"
-                    case TaggedVariable(Variable(func_name, return_t), id):
-                        func_decl = f"{func_name}_{id}"
                     case _:
                         raise NotImplementedError(
                             f"Unrecognized function name type: {name}"
@@ -753,24 +856,15 @@ class AssemblyPrinterContext(Context):
                         )
                     self(func)
                 return None
+            case Print(args):
+                args_value_str = ""
+                for arg in args:
+                    if isinstance(arg, Variable):
+                        args_value_str = args_value_str + f"{{{self(arg)}}} "
+                self.exec(f"{feed}print(f'{args_value_str}')")
+                return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
                 return None
             case node:
-                raise NotImplementedError(node)
-
-
-def number_assembly_ast(root: AssemblyNode) -> AssemblyNode:
-    """
-    Number every Variable occurrence in a post-order traversal.
-    """
-    counters: dict[str, int] = {}
-
-    def rule(node):
-        match node:
-            case Variable(name, _) as var:
-                idx = counters.get(name, 0)
-                counters[name] = idx + 1
-                return TaggedVariable(var, idx)
-
-    return Rewrite(PostWalk(rule))(root)
+                raise NotImplementedError(node, "AssemblyPrinterContext")

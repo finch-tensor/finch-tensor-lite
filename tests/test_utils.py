@@ -1,4 +1,4 @@
-from finchlite.autoschedule._utils import intersect, is_subsequence, with_subsequence
+from finchlite.algebra.utils import intersect, is_subsequence, with_subsequence
 
 
 def test_intersect(tp_0, tp_1, tp_2, tp_3):

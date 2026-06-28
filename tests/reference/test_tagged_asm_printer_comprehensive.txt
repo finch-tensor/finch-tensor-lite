@@ -1,0 +1,42 @@
+def compute_0(x_0: int64, y_0: int64) -> int64:
+    temp_0: int64 = x_1
+    temp_1: int64 = add(temp_2, y_1)
+    return temp_3
+
+def main_0() -> int64:
+    a_0: int64 = 10
+    b_0: int64 = a_1
+    c_0: int64 = b_1
+    d_0: int64 = 5
+    if gt(c_1, 5):
+        a_2: int64 = add(a_3, d_1)
+        b_2: int64 = a_4
+    result_0: int64 = 0
+    for i_0 in range(0, 5):
+        temp_4: int64 = i_1
+        result_1: int64 = add(result_2, temp_5)
+        if eq(mod(i_2, 2), 0):
+            result_3: int64 = mul(result_4, 2)
+    if gt(result_5, 20):
+        c_2: int64 = result_6
+        result_7: int64 = add(c_3, b_3)
+    else:
+        c_4: int64 = b_4
+        result_8: int64 = mul(c_5, 3)
+    for i_3 in range(0, 3):
+        a_5: int64 = i_4
+        for j_0 in range(0, 2):
+            b_5: int64 = j_1
+            result_9: int64 = add(result_10, add(a_6, b_6))
+    d_2: int64 = result_11
+    if lt(d_3, 100):
+        c_6: int64 = d_4
+        if gt(c_7, 50):
+            result_12: int64 = mul(c_8, 2)
+        else:
+            result_13: int64 = c_9
+    else:
+        result_14: int64 = d_5
+    a_7: int64 = result_15
+    b_7: int64 = a_8
+    return b_8

@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .. import algebra
-from ..algebra import query_property
-from ..symbolic import FType, FTyped
+from finchlite.algebra import FType, FTyped, intp
 
 
 class Buffer(FTyped, ABC):
@@ -24,20 +22,20 @@ class Buffer(FTyped, ABC):
         ...
 
     @property
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
         """
-        return self.ftype.element_type()
+        return self.ftype.element_type
 
     @property
-    def length_type(self):
+    def length_type(self) -> FType:
         """
         Return the type of indices used to access elements in the buffer.
         This is typically an integer type.
         """
-        return self.ftype.length_type()
+        return self.ftype.length_type
 
     @abstractmethod
     def load(self, idx: int): ...
@@ -68,11 +66,11 @@ def length_type(arg: Any):
     """
     if hasattr(arg, "length_type"):
         return arg.length_type
-    return query_property(arg, "length_type", "__attr__")
+    raise AttributeError(f"{type(arg).__name__} has no length_type")
 
 
 def element_type(arg: Any):
-    return algebra.element_type(arg)
+    return arg.element_type
 
 
 class BufferFType(FType):
@@ -90,7 +88,7 @@ class BufferFType(FType):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Return the type of elements stored in the buffer.
         This is typically the same as the dtype used to create the buffer.
@@ -98,8 +96,8 @@ class BufferFType(FType):
         ...
 
     @property
-    def length_type(self):
+    def length_type(self) -> FType:
         """
         Returns the type used for the length of the buffer.
         """
-        return int
+        return intp

@@ -1,5 +1,4 @@
 import ctypes
-import operator
 import re
 import subprocess
 import sys
@@ -9,11 +8,11 @@ from pathlib import Path
 import pytest
 
 import numpy as np
-from numpy.testing import assert_equal
 
 import finchlite
 import finchlite.finch_assembly as asm
-from finchlite import ftype
+from finchlite import dense, element, ffuncs, fiber_tensor, ftype
+from finchlite.algebra import TupleFType, ftypes
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
@@ -23,12 +22,20 @@ from finchlite.codegen import (
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.c import construct_from_c, deserialize_from_c, serialize_to_c
-from finchlite.codegen.numba_backend import (
+from finchlite.codegen.buffers import CHashTable, MallocBuffer, NumbaHashTable
+from finchlite.codegen.c_codegen import (
+    construct_from_c,
+    deserialize_from_c,
+    serialize_to_c,
+)
+from finchlite.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,
     serialize_to_numba,
 )
+from finchlite.tensor import BufferizedNDArrayFType
+
+from .conftest import finch_assert_equal
 
 
 def test_add_function():
@@ -39,7 +46,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finchlite.codegen.c.load_shared_lib(c_code).add
+    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -78,12 +85,14 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
-    f = finchlite.codegen.c.load_shared_lib(c_code).concat_buffer_with_self
-    k = finchlite.codegen.c.CKernel(f, type(None), [NumpyBufferFType(np.float64)])
+    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
+    k = finchlite.codegen.c_codegen.CKernel(
+        f, finchlite.none_, [NumpyBufferFType(ftypes.float64)]
+    )
     k(b)
     result = b.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -98,13 +107,13 @@ def test_codegen(compiler, buffer):
     buf = buffer(a)
 
     a_var = asm.Variable("a", buf.ftype)
-    i_var = asm.Variable("i", np.intp)
-    length_var = asm.Variable("l", np.intp)
+    i_var = asm.Variable("i", finchlite.intp)
+    length_var = asm.Variable("l", finchlite.intp)
     a_slt = asm.Slot("a_", buf.ftype)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("test_function", np.intp),
+                asm.Variable("test_function", finchlite.intp),
                 (a_var,),
                 asm.Block(
                     (
@@ -113,7 +122,7 @@ def test_codegen(compiler, buffer):
                         asm.Resize(
                             a_slt,
                             asm.Call(
-                                asm.Literal(operator.mul),
+                                asm.Literal(ffuncs.mul),
                                 (asm.Length(a_slt), asm.Literal(2)),
                             ),
                         ),
@@ -123,11 +132,9 @@ def test_codegen(compiler, buffer):
                             length_var,
                             asm.Store(
                                 a_slt,
+                                asm.Call(asm.Literal(ffuncs.add), (i_var, length_var)),
                                 asm.Call(
-                                    asm.Literal(operator.add), (i_var, length_var)
-                                ),
-                                asm.Call(
-                                    asm.Literal(operator.add),
+                                    asm.Literal(ffuncs.add),
                                     (asm.Load(a_slt, i_var), asm.Literal(1)),
                                 ),
                             ),
@@ -144,28 +151,28 @@ def test_codegen(compiler, buffer):
     f(buf)
     result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
-    assert_equal(result, expected)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumpyBuffer),
-        (asm.AssemblyInterpreter(), NumpyBuffer),
+        (CCompiler(), MallocBuffer),
+        (asm.AssemblyInterpreter(), MallocBuffer),
     ],
 )
-def test_dot_product(compiler, buffer):
-    a = np.array([1, 2, 3], dtype=np.float64)
-    b = np.array([4, 5, 6], dtype=np.float64)
+def test_dot_product_malloc(compiler, buffer):
+    a = [1.0, 2.0, 3.0]
+    b = [4.0, 5.0, 6.0]
 
-    a_buf = buffer(a)
-    b_buf = buffer(b)
+    a_buf = buffer(len(a), ftypes.float64, a)
+    b_buf = buffer(len(b), ftypes.float64, b)
+    ab = buffer(len(a), ftypes.float64, a)
+    bb = buffer(len(b), ftypes.float64, b)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
-    ab = buffer(a)
-    bb = buffer(b)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
+
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -173,7 +180,7 @@ def test_dot_product(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -192,11 +199,133 @@ def test_dot_product(compiler, buffer):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffuncs.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.dot_product(a_buf, b_buf)
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.dot_product(a_buf, b_buf)
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    ["compiler", "new_size"],
+    [
+        [compiler, size]
+        for compiler in (asm.AssemblyInterpreter(), CCompiler())
+        for size in [1, 5, 10]
+    ],
+)
+def test_malloc_resize(compiler, new_size):
+    a = [1.0, 4.0, 3.0, 4.0]
+
+    ab = MallocBuffer(len(a), ftypes.float64, a)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("b_", ab.ftype)
+    size = asm.Variable("size", finchlite.intp)
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("length", finchlite.intp),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+    mod = compiler(prgm)
+    assert mod.length(ab) == new_size
+    assert ab.length() == new_size
+    for i in range(new_size):
+        assert ab.load(i) == 0 if i >= len(a) else a[i]
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), NumpyBuffer),
+        (NumbaCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ],
+)
+def test_dot_product(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    a_buf = buffer(a)
+    b_buf = buffer(b)
+    ab = buffer(a)
+    bb = buffer(b)
+
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("dot_product", finchlite.float64),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.L(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.L(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.L(ffuncs.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.L(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -231,18 +360,17 @@ def test_dot_product(compiler, buffer):
 @pytest.mark.parametrize(
     ["compiler", "extension", "buffer"],
     [
-        (CGenerator(), ".c", NumpyBuffer),
-        (NumbaGenerator(), ".py", NumpyBuffer),
+        (CGenerator(), ".c", MallocBuffer),
     ],
 )
-def test_dot_product_regression(compiler, extension, buffer, file_regression):
+def test_dot_product_regression_malloc(compiler, extension, buffer, file_regression):
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
-    ab = buffer(a)
-    bb = buffer(b)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
+    ab = buffer(len(a), ftypes.float64, a)
+    bb = buffer(len(b), ftypes.float64, b)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -250,7 +378,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", np.float64),
+                asm.Variable("dot_product", finchlite.float64),
                 (
                     ab_v,
                     bb_v,
@@ -269,11 +397,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(operator.mul),
+                                                    asm.Literal(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -294,30 +422,99 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
         )
     )
 
-    file_regression.check(compiler(prgm), extension=extension)
+    file_regression.check(str(compiler(prgm)), extension=extension)
 
 
 @pytest.mark.parametrize(
-    ["compiler", "buffer"],
+    ["compiler", "extension", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
-        (NumbaCompiler(), NumpyBuffer),
-        (asm.AssemblyInterpreter(), NumpyBuffer),
+        (CGenerator(), ".c", NumpyBuffer),
+        (NumbaGenerator(), ".py", NumpyBuffer),
     ],
 )
-def test_if_statement(compiler, buffer):
-    var = asm.Variable("a", np.int64)
+def test_dot_product_regression(compiler, extension, buffer, file_regression):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
+    ab = buffer(a)
+    bb = buffer(b)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("dot_product", finchlite.float64),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Literal(ffuncs.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(compiler(prgm)), extension=extension)
+
+
+@pytest.mark.parametrize(
+    ["compiler"],
+    [
+        (CCompiler(),),
+        (NumbaCompiler(),),
+        (asm.AssemblyInterpreter(),),
+    ],
+)
+def test_if_statement(compiler):
+    var = asm.Variable("a", finchlite.int64)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(operator.eq),
+                                asm.Literal(ffuncs.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -325,7 +522,7 @@ def test_if_statement(compiler, buffer):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffuncs.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -334,7 +531,7 @@ def test_if_statement(compiler, buffer):
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(operator.lt),
+                                asm.Literal(ffuncs.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -342,7 +539,7 @@ def test_if_statement(compiler, buffer):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.sub),
+                                            asm.Literal(ffuncs.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -353,7 +550,7 @@ def test_if_statement(compiler, buffer):
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -392,19 +589,19 @@ def test_simple_struct(compiler):
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", finchlite.float64)
     mod = compiler(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", finchlite.float64),
                     (p_var, x_var),
                     asm.Block(
                         (
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.mul),
+                                    asm.Literal(ffuncs.mul),
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
                                         asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -414,11 +611,11 @@ def test_simple_struct(compiler):
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.add),
+                                    asm.Literal(ffuncs.add),
                                     (
                                         res_var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
                                                 asm.GetAttr(
@@ -454,8 +651,8 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
     ab_safe = SafeBuffer(ab)
     ab_v = asm.Variable("a", ab_safe.ftype)
     ab_slt = asm.Slot("a_", ab_safe.ftype)
-    idx = asm.Variable("idx", ctypes.c_size_t)
-    val = asm.Variable("val", ctypes.c_int64)
+    idx = asm.Variable("idx", ftype(np.intp))
+    val = asm.Variable("val", ftype(np.int64))
 
     res_var = asm.Variable("val", ab_safe.ftype.element_type)
     res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
@@ -492,14 +689,14 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
                             idx,
                             val,
                         ),
-                        asm.Return(asm.Literal(ctypes.c_int64(0))),
+                        asm.Return(asm.Literal(np.int64(0))),
                     )
                 ),
             ),
         )
     )
     output = compiler(mod)
-    file_regression.check(output, extension=extension)
+    file_regression.check(str(output), extension=extension)
 
 
 @pytest.mark.parametrize(
@@ -678,30 +875,31 @@ def test_c_store_safebuffer(size, idx, value):
     ],
 )
 def test_np_c_serialization(value, np_type, c_type):
-    serialized = serialize_to_c(np_type, np_type(value))
+    fmt = ftype(np_type)
+    serialized = serialize_to_c(fmt, np_type(value))
     assert serialized.value == c_type(value).value
     assert isinstance(serialized, c_type)
-    constructed = construct_from_c(np_type, serialized)
+    constructed = construct_from_c(fmt, serialized)
     assert constructed == np_type(value)
-    assert deserialize_from_c(np_type, constructed, serialized) is None
+    assert deserialize_from_c(fmt, constructed, serialized) is None
 
 
 @pytest.mark.parametrize(
-    "value,c_type",
+    "value,fmt,c_type",
     [
-        (3, ctypes.c_int64),
-        (1, ctypes.c_float),
-        (1.2, ctypes.c_double),
+        (3, ftype(np.int64), ctypes.c_int64),
+        (1, ftype(np.float32), ctypes.c_float),
+        (1.2, ftype(np.float64), ctypes.c_double),
     ],
 )
-def test_ctypes_c_serialization(value, c_type):
+def test_ctypes_c_serialization(value, fmt, c_type):
     cvalue = c_type(value)
-    serialized = serialize_to_c(c_type, cvalue)
+    serialized = serialize_to_c(fmt, cvalue.value)
     assert serialized.value == c_type(value).value
     assert isinstance(serialized, c_type)
-    constructed = construct_from_c(c_type, serialized)
-    assert constructed.value == c_type(value).value
-    assert deserialize_from_c(c_type, constructed, serialized) is None
+    constructed = construct_from_c(fmt, serialized)
+    assert constructed == fmt(value)
+    assert deserialize_from_c(fmt, constructed, serialized) is None
 
 
 @pytest.mark.parametrize(
@@ -714,27 +912,259 @@ def test_ctypes_c_serialization(value, c_type):
 )
 def test_np_numba_serialization(value, np_type):
     cvalue = np_type(value)
-    serialized = serialize_to_numba(np_type, cvalue)
+    fmt = ftype(np_type)
+    serialized = serialize_to_numba(fmt, cvalue)
     assert serialized == np_type(value)
     assert isinstance(serialized, np_type)
-    constructed = construct_from_numba(np_type, serialized)
+    constructed = construct_from_numba(fmt, serialized)
     assert constructed == np_type(value)
-    assert deserialize_from_numba(np_type, constructed, serialized) is None
+    assert deserialize_from_numba(fmt, constructed, serialized) is None
 
 
-def test_e2e_numba():
-    ctx = finchlite.get_default_scheduler()  # TODO: as fixture
-    finchlite.set_default_scheduler(mode=finchlite.Mode.COMPILE_NUMBA)
+@pytest.mark.parametrize(
+    "fmt_fn",
+    [
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(ftype(dtype)),
+            ndim=2,
+            dimension_type=(ftypes.intp, ftypes.intp),
+        ),
+        lambda dtype: fiber_tensor(
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
+        ),
+    ],
+)
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_numba(fmt_fn, dtype):
+    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
+    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
-    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=np.float64)
-    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=np.float64)
+    fmt = fmt_fn(dtype)
+    aa = finchlite.asarray(a, format=fmt)
+    bb = finchlite.asarray(b, format=fmt)
 
-    wa = finchlite.defer(a)
-    wb = finchlite.defer(b)
+    wa = finchlite.lazy(aa)
+    wb = finchlite.lazy(bb)
 
     plan = finchlite.matmul(wa, wb)
     result = finchlite.compute(plan)
 
-    assert_equal(result, a @ b)
+    finch_assert_equal(result, a @ b)
 
-    finchlite.set_default_scheduler(ctx=ctx)
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_numba(a, dtype):
+    """Transposing through the compiled (assembly/numba) backend must produce
+    the actual transpose, not zeros.
+
+    Regression: a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = in[..., i]``). The notation->assembly
+    lowering dropped that ``If`` body (it was emitted into a throwaway block),
+    so ``compute(permute_dims(x))`` returned an all-zero array on every
+    compiled backend while the notation interpreter stayed correct. See the
+    lower-level reproduction in
+    ``test_notation_compiler.test_if_in_loop_is_lowered``.
+    """
+    a = a.astype(dtype)
+    wa = finchlite.lazy(finchlite.asarray(a))
+    result = finchlite.compute(finchlite.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
+
+
+@pytest.mark.parametrize(
+    ["compiler", "constructor"],
+    [
+        (
+            CCompiler(),
+            CHashTable,
+        ),
+        (
+            asm.AssemblyInterpreter(),
+            CHashTable,
+        ),
+        (
+            NumbaCompiler(),
+            NumbaHashTable,
+        ),
+        (
+            asm.AssemblyInterpreter(),
+            NumbaHashTable,
+        ),
+    ],
+)
+def test_hashtable(compiler, constructor):
+    table = constructor(
+        TupleFType.from_tuple((ftypes.int_, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.int_, ftypes.int_, ftypes.int_)),
+    )
+
+    table_v = asm.Variable("a", ftype(table))
+    table_slt = asm.Slot("a_", ftype(table))
+
+    key_type = table.ftype.key_type
+    val_type = table.ftype.value_type
+    key_v = asm.Variable("key", key_type)
+    val_v = asm.Variable("val", val_type)
+
+    module = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("setidx", val_type),
+                (table_v, key_v, val_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.StoreDict(
+                            table_slt,
+                            key_v,
+                            val_v,
+                        ),
+                        asm.Repack(table_slt),
+                        asm.Return(asm.LoadDict(table_slt, key_v)),
+                    )
+                ),
+            ),
+            asm.Function(
+                asm.Variable("exists", ftypes.bool),
+                (table_v, key_v),
+                asm.Block(
+                    (
+                        asm.Unpack(table_slt, table_v),
+                        asm.Return(asm.ExistsDict(table_slt, key_v)),
+                    )
+                ),
+            ),
+        )
+    )
+    compiled = compiler(module)
+    assert compiled.setidx(
+        table,
+        key_type.from_fields(1, 2),
+        val_type.from_fields(2, 3, 4),
+    ) == val_type.from_fields(2, 3, 4)
+
+    assert compiled.setidx(
+        table,
+        key_type.from_fields(1, 4),
+        val_type.from_fields(3, 4, 1),
+    ) == val_type.from_fields(3, 4, 1)
+
+    assert compiled.exists(table, key_type.from_fields(1, 2))
+
+    assert not compiled.exists(table, key_type.from_fields(1, 3))
+
+    assert not compiled.exists(table, val_type.from_fields(2, 3))
+
+
+@pytest.mark.parametrize(
+    ["compiler", "tabletype"],
+    [
+        (CCompiler(), CHashTable),
+        (asm.AssemblyInterpreter(), CHashTable),
+        (NumbaCompiler(), NumbaHashTable),
+        (asm.AssemblyInterpreter(), NumbaHashTable),
+    ],
+)
+def test_multiple_hashtable(compiler, tabletype):
+    """
+    This test exists because in the case of C, we might need to dump multiple
+    hash table definitions into the context.
+
+    So I am not gonna touch heterogeneous structs right now because the hasher
+    hashes the padding bytes too (even though they are worse than useless)
+    """
+
+    def _int_tupletype(arity):
+        return TupleFType.from_tuple(tuple(ftypes.int_ for _ in range(arity)))
+
+    def func(table, num: int):
+        key_type = table.ftype.key_type
+        val_type = table.ftype.value_type
+        key_v = asm.Variable("key", key_type)
+        val_v = asm.Variable("val", val_type)
+        table_v = asm.Variable("a", ftype(table))
+        table_slt = asm.Slot("a_", ftype(table))
+        return asm.Function(
+            asm.Variable(f"setidx_{num}", val_type),
+            (table_v, key_v, val_v),
+            asm.Block(
+                (
+                    asm.Unpack(table_slt, table_v),
+                    asm.StoreDict(
+                        table_slt,
+                        key_v,
+                        val_v,
+                    ),
+                    asm.Repack(table_slt),
+                    asm.Return(asm.LoadDict(table_slt, key_v)),
+                )
+            ),
+        )
+
+    table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
+    table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
+    table3 = tabletype(
+        TupleFType.from_tuple((ftypes.float_, ftypes.int_)),
+        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
+    )
+    table4 = tabletype(
+        TupleFType.from_tuple(
+            (ftypes.float_, TupleFType.from_tuple((ftypes.int_, ftypes.float_)))
+        ),
+        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
+    )
+    table5 = tabletype(ftypes.int_, ftypes.int_)
+
+    mod = compiler(
+        asm.Module(
+            (
+                func(table1, 1),
+                func(table2, 2),
+                func(table3, 3),
+                func(table4, 4),
+                func(table5, 5),
+            )
+        )
+    )
+
+    # what's important here is that you can call setidx_1 on table1 and
+    # setidx_2 on table2.
+    assert mod.setidx_1(
+        table1,
+        (1, 2),
+        (2, 3, 4),
+    ) == (2, 3, 4)
+
+    assert mod.setidx_2(
+        table2,
+        (1,),
+        (2, 3, 4, 5),
+    ) == (2, 3, 4, 5)
+
+    assert mod.setidx_3(
+        table3,
+        (0.1, 2),
+        (0.2, 0.2),
+    ) == (0.2, 0.2)
+
+    assert mod.setidx_4(
+        table4,
+        (
+            0.1,
+            (1, 0.2),
+        ),
+        (0.2, 0.2),
+    ) == (0.2, 0.2)
+
+    assert mod.setidx_5(table5, 3, 2) == 2
