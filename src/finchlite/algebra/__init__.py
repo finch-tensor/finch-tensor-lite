@@ -58,10 +58,10 @@ from .tensor import (
 )
 
 __all__ = [
-    "FType",
-    "FTyped",
     "FDTypeSignedInteger",
     "FDTypeUnsignedInteger",
+    "FType",
+    "FTyped",
     "FinchOperator",
     "ImmutableStructFType",
     "MutableStructFType",
