@@ -180,7 +180,6 @@ array_api_tests/test_linalg.py::test_inv
 array_api_tests/test_linalg.py::test_matrix_norm
 array_api_tests/test_linalg.py::test_matrix_power
 array_api_tests/test_linalg.py::test_matrix_rank
-array_api_tests/test_linalg.py::test_linalg_matrix_transpose
 array_api_tests/test_linalg.py::test_pinv
 array_api_tests/test_linalg.py::test_qr
 array_api_tests/test_linalg.py::test_slogdet
