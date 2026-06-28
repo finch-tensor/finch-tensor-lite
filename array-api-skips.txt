@@ -302,17 +302,12 @@ array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i < 0 and x2_i 
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i < 0 and x2_i is +0) -> -infinity]
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i > 0 and x2_i is +0) -> +infinity]
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i is -0 and x2_i < 0) -> +0]
-array_api_tests/test_special_cases.py::test_empty_arrays[mean]
-array_api_tests/test_special_cases.py::test_empty_arrays[std]
-array_api_tests/test_special_cases.py::test_empty_arrays[var]
-
 # test_statistical_functions
 
 # check for errors
 array_api_tests/test_statistical_functions.py::test_sum
 
 # not implemented
-array_api_tests/test_statistical_functions.py::test_mean
 array_api_tests/test_statistical_functions.py::test_cumulative_prod
 array_api_tests/test_statistical_functions.py::test_cumulative_sum
 

@@ -1565,7 +1565,7 @@ def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fa
         else (np.prod(x.shape) if axis is None else x.shape[axis])
     )
     s = sum(x, axis=axis, keepdims=keepdims)
-    return truediv(s, n)
+    return truediv(s, x.element_type(n))
 
 
 def var(
@@ -1586,8 +1586,8 @@ def var(
         else (np.prod(x.shape) if axis is None else x.shape[axis])
     )
     m = mean(x, axis=axis, keepdims=True)
-    v = truediv(pow(x - m, 2.0), (n - correction))
-    return sum(v, axis=axis, keepdims=keepdims)
+    v = sum(pow(x - m, x.element_type(2.0)), axis=axis, keepdims=keepdims)
+    return truediv(v, x.element_type(n - correction))
 
 
 def std(
