@@ -211,6 +211,7 @@ class FusedCFGBuilder:
                 # fill in the loop body
                 self.current_block = body_block
                 self(body, after_block, return_block)
+                self.emit(cond)
 
                 # connect the end of loop body back to the beginning to form the loop
                 self.current_block.add_successor(body_block)

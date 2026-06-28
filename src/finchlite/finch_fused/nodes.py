@@ -161,7 +161,7 @@ class Block(FusedTree, FusedStatement):
 
 @dataclass(eq=True, frozen=True)
 class Assign(FusedTree, FusedStatement):
-    lhs: Variable
+    lhs: FusedExpression
     rhs: FusedExpression
 
     @property
@@ -299,6 +299,10 @@ class FusedPrinterContext(Context):
             case Variable(name, _):
                 return name
             case Call(fn, args):
+                if isinstance(fn, Literal) and fn.val is tuple:
+                    if len(args) == 1:
+                        return f"({self(args[0])},)"
+                    return f"({', '.join(self(arg) for arg in args)})"
                 return f"{self(fn)}({', '.join(self(arg) for arg in args)})"
             case Compare(left, op, right):
                 return f"({self(left)} {self(op)} {self(right)})"

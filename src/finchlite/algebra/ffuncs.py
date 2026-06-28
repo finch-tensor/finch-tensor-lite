@@ -12,12 +12,17 @@ from .algebra import (
 )
 from .ftypes import (
     FDType,
+    FDTypeBoolean,
+    FDTypeInteger,
     FDTypeOrdered,
+    FDTypeUnsignedInteger,
     FType,
     TupleFType,
     bool,
     ftype,
+    int64,
     promote_type,
+    uint64,
 )
 
 
@@ -105,7 +110,11 @@ class _Mul(NAryFinchOperator):
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        return self(type_(1), type_(1))
+        if isinstance(type_, FDTypeInteger) and not isinstance(type_, FDTypeBoolean):
+            if isinstance(type_, FDTypeUnsignedInteger):
+                return self(type_(1), uint64(1))
+            return self(type_(1), int64(1))
+        return type_(1)
 
 
 mul = _Mul()
@@ -127,7 +136,7 @@ class _TrueDiv(BinaryFinchOperator):
         return "truediv"
 
     def __call__(self, a: Any, b: Any):
-        return operator.truediv(a, b)
+        return np.true_divide(a, b)
 
     def is_identity(self, arg):
         return arg == 1
@@ -141,7 +150,7 @@ class _FloorDiv(BinaryFinchOperator):
         return "floor_divide"
 
     def __call__(self, a: Any, b: Any):
-        return operator.floordiv(a, b)
+        return np.floor_divide(a, b)
 
 
 floordiv = _FloorDiv()
@@ -152,7 +161,7 @@ class _Mod(BinaryFinchOperator):
         return "mod"
 
     def __call__(self, a: Any, b: Any):
-        return operator.mod(a, b)
+        return np.mod(a, b)
 
 
 mod = _Mod()
@@ -175,7 +184,7 @@ class _Pow(BinaryFinchOperator):
         return "pow"
 
     def __call__(self, a: Any, b: Any):
-        return operator.pow(a, b)
+        return np.power(a, b)
 
     def is_identity(self, arg):
         return arg == 1
@@ -759,10 +768,10 @@ conj = _Conj()
 
 class _Clip(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
-        return np.clip(a, b, c)
+        return ftype(a)(np.clip(a, b, c))
 
     def return_type(self, a: FType, b: FType, c: FType) -> FType:  # type: ignore[override]
-        return ftype(float)
+        return a
 
     def __repr__(self) -> str:
         return "clip"
@@ -771,7 +780,32 @@ class _Clip(FinchOperator):
 clip = _Clip()
 
 
-class _Equal(BinaryFinchOperator):
+class _Cast(FinchOperator):
+    def __init__(self, dtype: FType):
+        self.dtype = dtype
+
+    def __call__(self, a: Any):
+        assert isinstance(self.dtype, FDType)
+        return self.dtype(a)
+
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return self.dtype
+
+    def __eq__(self, other):
+        return isinstance(other, _Cast) and self.dtype == other.dtype
+
+    def __hash__(self):
+        return hash((type(self), self.dtype))
+
+    def __repr__(self) -> str:
+        return "astype"
+
+
+def astype(dtype: FType):
+    return _Cast(dtype)
+
+
+class _Equal(ComparisonFinchOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
@@ -836,7 +870,7 @@ class _NotSame(BinaryFinchOperator):
 not_same = _NotSame()
 
 
-class _NotEqual(BinaryFinchOperator):
+class _NotEqual(ComparisonFinchOperator):
     is_commutative = True
 
     def __call__(self, a: Any, b: Any):
@@ -849,7 +883,7 @@ class _NotEqual(BinaryFinchOperator):
 not_equal = _NotEqual()
 
 
-class _Less(BinaryFinchOperator):
+class _Less(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.less(a, b)
 
@@ -860,7 +894,7 @@ class _Less(BinaryFinchOperator):
 less = _Less()
 
 
-class _LessEqual(BinaryFinchOperator):
+class _LessEqual(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.less_equal(a, b)
 
@@ -871,7 +905,7 @@ class _LessEqual(BinaryFinchOperator):
 less_equal = _LessEqual()
 
 
-class _Greater(BinaryFinchOperator):
+class _Greater(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater(a, b)
 
@@ -882,7 +916,7 @@ class _Greater(BinaryFinchOperator):
 greater = _Greater()
 
 
-class _GreaterEqual(BinaryFinchOperator):
+class _GreaterEqual(ComparisonFinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater_equal(a, b)
 
@@ -1439,6 +1473,7 @@ __all__ = [
     "arctanh",
     "asin",
     "asinh",
+    "astype",
     "atan",
     "atan2",
     "atanh",
