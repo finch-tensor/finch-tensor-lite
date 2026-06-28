@@ -915,6 +915,18 @@ def test_matrix_transpose(a, a_wrap):
     finch_assert_equal(result, expected)
 
 
+def test_matrix_transpose_true_value_from_indexed_scalars():
+    a = finchlite.asarray(np.arange(6).reshape(2, 3))
+
+    result = finchlite.matrix_transpose(a)
+    expected = finchlite.asarray(
+        [[a[i, j] for i in range(a.shape[0])] for j in range(a.shape[1])],
+        dtype=a.dtype,
+    )
+
+    finch_assert_equal(result, expected)
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a, b, axes",

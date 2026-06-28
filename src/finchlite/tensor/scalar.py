@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 from finchlite.algebra import FType, TensorFType, ffuncs, ftype
 from finchlite.algebra.ftypes import FDType
 
@@ -95,6 +97,11 @@ class Scalar(OverrideTensor):
 
     def item(self):
         return self.val.item() if hasattr(self.val, "item") else self.val
+
+    def __array__(self, dtype=None, copy=None):
+        if copy is None:
+            return np.asarray(self.val, dtype=dtype)
+        return np.array(self.val, dtype=dtype, copy=copy)
 
     def __getitem__(self, idx):
         if idx == () or idx is Ellipsis or idx == (...,):
