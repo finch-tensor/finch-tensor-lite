@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import bisect
 import builtins
 import sys
 import threading
@@ -8,10 +7,10 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
-from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_tuple
 
 from finchlite import finch_einsum as ein
 from finchlite.algebra import (
@@ -23,11 +22,10 @@ from finchlite.algebra import (
     fixpoint_type,
     ftype,
     init_value,
-    promote_type,
     return_type,
 )
 from finchlite.algebra.ftypes import (
-    FDType,
+    FDTypeBoolean,
     FDTypeBuiltin,
     FDTypeNumpy,
 )
@@ -242,7 +240,8 @@ class LazyTensor(OverrideTensor):
 
     def item(self):
         raise ValueError(
-            "Cannot convert LazyTensor to Python scalar. Use compute() to evaluate it first."
+            "Cannot convert LazyTensor to Python scalar. "
+            "Use compute() to evaluate it first."
         )
 
     # raise ValueError for unsupported operations according to the data-apis spec.
@@ -1348,8 +1347,6 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
     return tuple(broadcast_to(arr, shape) for arr in arrays)
 
 
-
-
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
     """
     Moves axes of an array to new positions.
@@ -1369,25 +1366,6 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
         final_order.insert(dest, src)
 
     return permute_dims(x, axes=tuple(final_order))
-
-
-def stack(arrays, /, axis: int = 0) -> LazyTensor:
-    """
-    Stacks input tensors along a new axis.
-
-    Parameters:
-        arrays: Sequence of tensors to stack (tuple or list of LazyTensor)
-        axis: Axis along which to stack (default=0)
-    Returns:
-        Stacked tensor as LazyTensor
-    """
-    if not isinstance(arrays, tuple | list):
-        raise TypeError("arrays must be a tuple or list of LazyTensors")
-    arrays = [lazy(arr) for arr in arrays]
-    # add 1-dim at the axis position for stacking
-    arrays = tuple(expand_dims(x, axis=axis) for x in arrays)
-    # concat, this will also do the shape verification
-    return concat(arrays, axis=axis)
 
 
 def sin(x) -> LazyTensor:

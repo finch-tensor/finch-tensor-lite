@@ -204,14 +204,13 @@ class NotationContext:
             loop_idxs = toposort([list(agg_arg.idxs), list(output_idxs)])
         except CycleInFields:
             raise ValueError(
-                "Cannot choose a loop order that preserves both aggregate and output indices."
+                "Cannot choose a loop order that preserves both aggregate "
+                "and output indices."
             ) from None
         shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in loop_idxs}
         arg_types = agg_arg.shape_type(self.shape_types)
         shape_type_map = dict(zip(agg_arg.idxs, arg_types, strict=True))
-        shape_type = {
-            idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_idxs
-        }
+        shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_idxs}
         loops = {
             idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in loop_idxs
         }
