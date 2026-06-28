@@ -342,9 +342,6 @@ def asarray(
     return format(obj)
 
 
-def _is_convertible_to_array(arg: Any) -> bool:
-    return isinstance(arg, np.ndarray) or np.isscalar(arg) or arg is None
-
 
 def lazy(arr) -> LazyTensor | tuple:
     """
@@ -359,10 +356,8 @@ def lazy(arr) -> LazyTensor | tuple:
     Returns:
     - LazyTensor: A lazy representation of the input array.
     """
-    if isinstance(arg, tuple):
-        return tuple(lazy(arg_i) for arg_i in arg)
-    if not isinstance(arr, Tensor) and not _is_convertible_to_array(arr):
-        return arr
+    if isinstance(arr, tuple):
+        return tuple(lazy(arr_i) for arr_i in arr)
 
     if isinstance(arr, LazyTensor):
         return arr

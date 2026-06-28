@@ -118,9 +118,8 @@ from .fuse import (
     compute,
     fuse,
     fused,
-    lazy,
 )
-from .lazy import LazyTensor, asarray, lazyarray
+from .lazy import LazyTensor, asarray, lazy
 
 __all__ = [
     "LazyTensor",
@@ -183,7 +182,6 @@ __all__ = [
     "isinf",
     "isnan",
     "lazy",
-    "lazyarray",
     "less",
     "less_equal",
     "linspace",

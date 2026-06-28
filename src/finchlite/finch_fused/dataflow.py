@@ -141,6 +141,8 @@ def _insert_compute(
 
     return Rewrite(PostWalk(_visitor))(prgm)
 
+def maybelazy(arrs):
+    return tuple(lazy(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
     def _visitor(node):
@@ -151,7 +153,7 @@ def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNo
                 lazy_vars = tuple(sorted(vars, key=lambda var: var.name))
                 lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
                 lazies = (
-                    Assign(lazy_vars_tuple, Call(Literal(lazy), (lazy_vars_tuple,))),
+                    Assign(lazy_vars_tuple, Call(Literal(maybelazy), (lazy_vars_tuple,))),
                 )
                 return Block(lazies + (node,))
             case node:
