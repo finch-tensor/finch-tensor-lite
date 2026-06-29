@@ -11,7 +11,7 @@ The following is a rough grammar for FinchAssembly, written in terms of the curr
 EXPR       := LITERAL | VARIABLE | SLOT | STACK | GETATTR | CALL | LOAD | LENGTH
 STMT       := UNPACK | REPACK | ASSIGN | SETATTR | STORE | RESIZE | FORLOOP
             | BUFFERLOOP | WHILELOOP | IF | IFELSE | FUNCTION | RETURN | BREAK
-            | BLOCK | MODULE
+            | BLOCK | MODULE | LOADMAP | STOREMAP | EXISTSMAP
 NODE       := EXPR | STMT
 
 LITERAL    := Literal(val=VALUE)
@@ -27,6 +27,9 @@ LOAD       := Load(buffer=SLOT | STACK, index=EXPR)
 STORE      := Store(buffer=SLOT | STACK, index=EXPR, value=EXPR)
 RESIZE     := Resize(buffer=SLOT | STACK, new_size=EXPR)
 LENGTH     := Length(buffer=SLOT | STACK)
+LOADMAP    := LoadMap(map=SLOT | STACK, index=EXPR)
+STOREMAP   := StoreMap(map=SLOT | STACK, index=EXPR, value=EXPR)
+EXISTSMAP  := ExistMap(map=SLOT | STACK, index=EXPR)
 STACK      := Stack(obj=ANY, type=TYPE)
 FORLOOP    := ForLoop(var=VARIABLE, start=EXPR, end=EXPR, body=NODE)
 BUFFERLOOP := BufferLoop(buffer=EXPR, var=VARIABLE, body=NODE)

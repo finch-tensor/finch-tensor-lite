@@ -1,11 +1,17 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
+import logging
 from itertools import product
-from typing import Any
 
 import numpy as np
 
-from ..algebra import element_type, fill_value, fixpoint_type, return_type
+import finchlite
+from finchlite.algebra import fisinstance, fixpoint_type, ftype, return_type
+from finchlite.algebra.tensor import TensorFType
+from finchlite.codegen.numba_codegen import to_numpy_type
+from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finchlite.symbolic import UnvalidatedForm
+from finchlite.util.logging import LOG_LOGIC_PRE_OPT
+
+from . import nodes as lgc
 from .nodes import (
     Aggregate,
     Alias,
@@ -17,50 +23,65 @@ from .nodes import (
     Query,
     Relabel,
     Reorder,
-    Subquery,
     Table,
+    TableValue,
     Value,
 )
+from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .tensor_stats import StatsFactory, TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
 
-@dataclass(eq=True, frozen=True)
-class TableValue:
-    tns: Any
-    idxs: Iterable[Any]
-
-    def __post_init__(self):
-        if isinstance(self.tns, TableValue):
-            raise ValueError("The tensor (tns) cannot be a TableValue")
+def make_tensor(shape, fill_value, *, dtype=None):
+    dtype = ftype(fill_value) if dtype is None else ftype(dtype)
+    return finchlite.asarray(
+        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
+    )
 
 
-class FinchLogicInterpreter:
-    def __init__(self, *, make_tensor=np.full, verbose=False):
-        self.verbose = verbose
-        self.bindings = {}
+class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
+    def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
+    def lower(self, node, bindings=None):
+        if bindings is None:
+            bindings = {}
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
+        return machine(node)
+
+
+class LogicMachine:
+    def __init__(self, *, make_tensor=np.full, bindings=None):
+        if bindings is None:
+            bindings = {}
+        self.bindings = bindings
+        self.make_tensor = make_tensor
+
     def __call__(self, node):
-        # Example implementation for evaluating an expression
-        if self.verbose:
-            print(f"Evaluating: {node}")
-        # Placeholder for actual logic
+        logger.debug("Evaluating: %s", node)
         match node:
             case Literal(val):
                 return val
             case Value(_):
                 raise ValueError(
-                    "The interpreter cannot evaluate a deferred node, a compiler might "
-                    "generate code for it"
+                    "The interpreter cannot evaluate a lazy node. Instead, you can "
+                    "use a compiler to generate code for it"
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
-            case Alias(_):
-                alias = self.bindings.get(node, None)
-                if alias is None:
+            case Table(Alias() as var, idxs):
+                val = self.bindings.get(var, None)
+                if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
-                return alias
+                return TableValue(val, idxs)
             case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
+            case Alias() as var:
+                val = self.bindings.get(var, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return val
             case MapJoin(Literal(op), args):
                 args = tuple(self(a) for a in args)
                 dims = {}
@@ -73,21 +94,22 @@ class FinchLogicInterpreter:
                         else:
                             idxs.append(idx)
                             dims[idx] = dim
-                fill_val = op(*[fill_value(arg.tns) for arg in args])
-                dtype = return_type(op, *[element_type(arg.tns) for arg in args])
+                fill_val = op(*[arg.tns.fill_value for arg in args])
+                dtype = return_type(op, *[arg.tns.element_type for arg in args])
                 result = self.make_tensor(
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
                 )
                 for crds in product(*[range(dims[idx]) for idx in idxs]):
                     idx_crds = dict(zip(idxs, crds, strict=True))
                     vals = [
-                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args
+                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]].item()
+                        for arg in args
                     ]
                     result[*crds] = op(*vals)
-                return TableValue(result, idxs)
+                return TableValue(result, tuple(idxs))
             case Aggregate(Literal(op), Literal(init), arg, idxs):
                 arg = self(arg)
-                dtype = fixpoint_type(op, init, element_type(arg.tns))
+                dtype = fixpoint_type(op, init, arg.tns.element_type)
                 new_shape = tuple(
                     dim
                     for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
@@ -100,9 +122,11 @@ class FinchLogicInterpreter:
                         for (crd, idx) in zip(crds, arg.idxs, strict=True)
                         if idx not in node.idxs
                     ]
-                    result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
+                    result[*out_crds] = op(
+                        result[*out_crds].item(), arg.tns[*crds].item()
+                    )
                 return TableValue(
-                    result, [idx for idx in arg.idxs if idx not in node.idxs]
+                    result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
                 )
             case Relabel(arg, idxs):
                 arg = self(arg)
@@ -113,20 +137,32 @@ class FinchLogicInterpreter:
                 arg = self(arg)
                 for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                     if idx not in idxs and dim != 1:
-                        raise ValueError("Trying to drop a dimension that is not 1")
+                        raise ValueError(
+                            f"Trying to drop a dimension that is not 1 : idx "
+                            f"{idx} indices {idxs} shape {arg.tns.shape}"
+                        )
                 arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
                 dims = [arg_dims.get(idx, 1) for idx in idxs]
                 result = self.make_tensor(
-                    dims, fill_value(arg.tns), dtype=element_type(arg.tns)
+                    dims, arg.tns.fill_value, dtype=arg.tns.element_type
                 )
                 for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(zip(idxs, crds, strict=True))
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
-                    result[*crds] = arg.tns[*in_crds]
+                    result[*crds] = arg.tns[*in_crds].item()
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
-                self.bindings[lhs] = rhs
+                if lhs not in self.bindings:
+                    tns = self.make_tensor(
+                        rhs.tns.shape,
+                        rhs.tns.fill_value,
+                        dtype=rhs.tns.element_type,
+                    )
+                    self.bindings[lhs] = tns
+                lhs = self(lhs)
+                for crds in product(*[range(dim) for dim in rhs.tns.shape]):
+                    lhs[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case Plan(bodies):
                 res = ()
@@ -134,12 +170,59 @@ class FinchLogicInterpreter:
                     res = self(body)
                 return res
             case Produces(args):
-                return tuple(self(arg).tns for arg in args)
-            case Subquery(lhs, arg):
-                res = self.bindings.get(lhs)
-                if res is None:
-                    res = self(arg)
-                    self.bindings[lhs] = res
-                return res
+                return tuple(self(arg) for arg in args)
             case _:
                 raise ValueError(f"Unknown expression type: {type(node)}")
+
+
+class MockLogicKernel(AssemblyKernel):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __call__(self, *args):
+        if len(args) != len(self.bindings):
+            raise ValueError(
+                f"Wrong number of arguments passed to kernel, "
+                f"have {len(args)}, expected {len(self.bindings)}"
+            )
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = LogicInterpreter()
+        res = ctx(self.prgm, bindings)
+        if isinstance(res, tuple):
+            return tuple(tbl.tns for tbl in res)
+        return res.tns
+
+
+class MockLogicLibrary(AssemblyLibrary):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __getattr__(self, name):
+        if name == "main":
+            return MockLogicKernel(self.prgm, self.bindings)
+        if name == "prgm":
+            return self.prgm
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+
+class MockLogicLoader(UnvalidatedForm, LogicLoader):
+    def __init__(self):
+        pass
+
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[
+        MockLogicLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+    ]:
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return MockLogicLibrary(prgm, bindings), bindings, shape_vars

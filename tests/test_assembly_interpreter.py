@@ -1,5 +1,3 @@
-import _operator  # noqa: F401
-import operator
 from collections import namedtuple
 
 import pytest
@@ -7,7 +5,10 @@ import pytest
 import numpy  # noqa: F401, ICN001
 import numpy as np
 
+import finchlite  # noqa: F401, ICN001
+from finchlite import ffuncs
 from finchlite import finch_assembly as asm
+from finchlite.algebra import ftype
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import (  # noqa: F401
     AssemblyInterpreter,
@@ -19,10 +20,12 @@ from finchlite.finch_assembly import (  # noqa: F401
     IfElse,
     Literal,
     Module,
+    Print,
     Return,
     Variable,
 )
-from finchlite.symbolic import ftype
+
+from .conftest import finch_assert_allclose
 
 
 @pytest.mark.parametrize(
@@ -38,8 +41,8 @@ from finchlite.symbolic import ftype
 )
 def test_dot_product(a, b):
     # Simple dot product using numpy for expected result
-    c = asm.Variable("c", np.float64)
-    i = asm.Variable("i", np.int64)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -51,7 +54,7 @@ def test_dot_product(a, b):
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("dot_product", np.float64),
+                    asm.Variable("dot_product", finchlite.float64),
                     (
                         ab_v,
                         bb_v,
@@ -70,11 +73,11 @@ def test_dot_product(a, b):
                                         asm.Assign(
                                             c,
                                             asm.Call(
-                                                asm.Literal(operator.add),
+                                                asm.Literal(ffuncs.add),
                                                 (
                                                     c,
                                                     asm.Call(
-                                                        asm.Literal(operator.mul),
+                                                        asm.Literal(ffuncs.mul),
                                                         (
                                                             asm.Load(ab_slt, i),
                                                             asm.Load(bb_slt, i),
@@ -98,22 +101,22 @@ def test_dot_product(a, b):
 
     result = mod.dot_product(ab, bb)
     expected = np.dot(a, b)
-    assert np.allclose(result, expected)
+    finch_assert_allclose(result, expected)
 
 
 def test_if_statement():
-    var = asm.Variable("a", np.int64)
+    var = asm.Variable("a", finchlite.int64)
     root = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", np.int64),
+                asm.Variable("if_else", finchlite.int64),
                 (),
                 asm.Block(
                     (
                         asm.Assign(var, asm.Literal(np.int64(5))),
                         asm.If(
                             asm.Call(
-                                asm.Literal(operator.eq),
+                                asm.Literal(ffuncs.eq),
                                 (var, asm.Literal(np.int64(5))),
                             ),
                             asm.Block(
@@ -121,7 +124,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.add),
+                                            asm.Literal(ffuncs.add),
                                             (var, asm.Literal(np.int64(10))),
                                         ),
                                     ),
@@ -130,7 +133,7 @@ def test_if_statement():
                         ),
                         asm.IfElse(
                             asm.Call(
-                                asm.Literal(operator.lt),
+                                asm.Literal(ffuncs.lt),
                                 (var, asm.Literal(np.int64(15))),
                             ),
                             asm.Block(
@@ -138,7 +141,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.sub),
+                                            asm.Literal(ffuncs.sub),
                                             (var, asm.Literal(np.int64(3))),
                                         ),
                                     ),
@@ -149,7 +152,7 @@ def test_if_statement():
                                     asm.Assign(
                                         var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (var, asm.Literal(np.int64(2))),
                                         ),
                                     ),
@@ -168,7 +171,7 @@ def test_if_statement():
     result = mod.if_else()
     assert result == 30
 
-    assert root == eval(repr(root))
+    assert root == eval(repr(root), {**vars(asm), **vars(ffuncs), **globals()})
 
 
 def test_simple_struct():
@@ -178,19 +181,19 @@ def test_simple_struct():
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", finchlite.float64)
     mod = AssemblyInterpreter()(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", finchlite.float64),
                     (p_var, x_var),
                     asm.Block(
                         (
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.mul),
+                                    asm.Literal(ffuncs.mul),
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
                                         asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -200,11 +203,11 @@ def test_simple_struct():
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.add),
+                                    asm.Literal(ffuncs.add),
                                     (
                                         res_var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
                                                 asm.GetAttr(
@@ -225,3 +228,71 @@ def test_simple_struct():
 
     result = mod.simple_struct(p, x)
     assert result == 9.0
+
+
+def test_asm_print(capsys, file_regression):
+    p_var_name = "p"
+    x_var_name = "x"
+    res_var_name = "res"
+
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+    x = (1, 4)
+
+    p_var = asm.Variable(p_var_name, ftype(p))
+    x_var = asm.Variable(x_var_name, ftype(x))
+    res_var = asm.Variable(res_var_name, finchlite.float64)
+    mod = AssemblyInterpreter()(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("simple_struct", finchlite.float64),
+                    (p_var, x_var),
+                    asm.Block(
+                        (
+                            asm.Print((p_var,)),
+                            asm.Print((x_var,)),
+                            asm.Print((p_var, x_var)),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(ffuncs.mul),
+                                    (
+                                        asm.GetAttr(p_var, asm.Literal("x")),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                    ),
+                                ),
+                            ),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(ffuncs.add),
+                                    (
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            asm.Print((res_var,)),
+                            asm.Print((p_var, x_var, res_var)),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = mod.simple_struct(p, x)
+    assert result == 9.0
+
+    capture = capsys.readouterr().out
+    file_regression.check(capture, extension=".txt")

@@ -1,4 +1,5 @@
-from ..finch_logic import (
+from finchlite.autoschedule.optimize import DefaultLogicOptimizer
+from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -7,76 +8,69 @@ from ..finch_logic import (
     Plan,
     Produces,
     Query,
-    Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
     Value,
 )
-from ..symbolic import PostOrderDFS, PostWalk, PreWalk
-from .compiler import LogicCompiler
-from .optimize import (
-    DefaultLogicOptimizer,
-    concordize,
-    flatten_plans,
-    isolate_aggregates,
-    isolate_reformats,
-    isolate_tables,
-    lift_fields,
-    lift_subqueries,
-    materialize_squeeze_expand_productions,
-    normalize_names,
-    optimize,
-    pretty_labels,
-    propagate_copy_queries,
-    propagate_fields,
-    propagate_into_reformats,
-    propagate_map_queries,
-    propagate_map_queries_backward,
-    propagate_transpose_queries,
-    push_fields,
-    set_loop_order,
+from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk
+
+from .capture import LogicCapture
+from .compiler import LogicCompiler, NotationGenerator
+from .default_schedulers import (
+    COMPILE_NUMBA,
+    INTERPRET_ASSEMBLY,
+    INTERPRET_LOGIC,
+    INTERPRET_NOTATION,
+    INTERPRET_NOTATION_GALLEY,
+    OPTIMIZE_LOGIC,
+    get_default_scheduler,
+    set_default_scheduler,
+    with_default_scheduler,
 )
+from .executor import LogicExecutor
+from .formatter import DefaultLogicFormatter, LogicFormatter
+from .loop_ordering import DefaultLoopOrderer
+from .normalize import LogicNormalizer, normalize_names
+from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .standardize import LogicStandardizer
 
 __all__ = [
+    "COMPILE_NUMBA",
+    "INTERPRET_ASSEMBLY",
+    "INTERPRET_LOGIC",
+    "INTERPRET_NOTATION",
+    "INTERPRET_NOTATION_GALLEY",
+    "OPTIMIZE_LOGIC",
     "Aggregate",
     "Alias",
+    "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
+    "DefaultLoopOrderer",
     "Field",
     "Literal",
+    "LogicCapture",
     "LogicCompiler",
+    "LogicEinsumLowerer",
+    "LogicExecutor",
+    "LogicFormatter",
+    "LogicNormalizer",
+    "LogicNotationLowerer",
+    "LogicStandardizer",
     "MapJoin",
+    "NotationGenerator",
     "Plan",
     "PostOrderDFS",
     "PostWalk",
     "PreWalk",
     "Produces",
     "Query",
-    "Reformat",
     "Relabel",
     "Reorder",
-    "Subquery",
     "Table",
     "Value",
-    "concordize",
-    "flatten_plans",
-    "isolate_aggregates",
-    "isolate_reformats",
-    "isolate_tables",
-    "lift_fields",
-    "lift_subqueries",
-    "materialize_squeeze_expand_productions",
+    "get_default_scheduler",
     "normalize_names",
-    "optimize",
-    "pretty_labels",
-    "propagate_copy_queries",
-    "propagate_copy_queries",
-    "propagate_fields",
-    "propagate_into_reformats",
-    "propagate_map_queries",
-    "propagate_map_queries_backward",
-    "propagate_transpose_queries",
-    "push_fields",
-    "set_loop_order",
+    "set_default_scheduler",
+    "with_default_scheduler",
 ]

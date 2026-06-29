@@ -1,4 +1,9 @@
-from .interpreter import FinchLogicInterpreter
+from .interpreter import (
+    LogicInterpreter,
+    MockLogicKernel,
+    MockLogicLibrary,
+    MockLogicLoader,
+)
 from .nodes import (
     Aggregate,
     Alias,
@@ -6,36 +11,52 @@ from .nodes import (
     Literal,
     LogicExpression,
     LogicNode,
+    LogicStatement,
     LogicTree,
     MapJoin,
     Plan,
     Produces,
     Query,
-    Reformat,
     Relabel,
     Reorder,
-    Subquery,
     Table,
+    TableValue,
+    TableValueFType,
     Value,
 )
+from .stages import (
+    LogicEvaluator,
+    LogicLoader,
+    compute_shape_vars,
+)
+from .tensor_stats import StatsFactory, TensorStats
 
 __all__ = [
     "Aggregate",
     "Alias",
     "Field",
-    "FinchLogicInterpreter",
     "Literal",
+    "LogicEvaluator",
     "LogicExpression",
+    "LogicInterpreter",
+    "LogicLoader",
     "LogicNode",
+    "LogicStatement",
     "LogicTree",
     "MapJoin",
+    "MockLogicKernel",
+    "MockLogicLibrary",
+    "MockLogicLoader",
     "Plan",
     "Produces",
     "Query",
-    "Reformat",
     "Relabel",
     "Reorder",
-    "Subquery",
+    "StatsFactory",
     "Table",
+    "TableValue",
+    "TableValueFType",
+    "TensorStats",
     "Value",
+    "compute_shape_vars",
 ]

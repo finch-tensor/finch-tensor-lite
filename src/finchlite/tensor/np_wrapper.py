@@ -1,0 +1,85 @@
+from typing import Any
+
+import numpy as np
+
+from finchlite.algebra import FType, ftype, intp
+from finchlite.algebra.tensor import Tensor, TensorFType
+
+
+class NumPyFType(TensorFType):
+    def __init__(self, dtype: np.dtype, ndim: int):
+        self._dtype = np.dtype(dtype)
+        self._ndim = ndim
+
+    @property
+    def fill_value(self) -> Any:
+        return self._dtype.type(0)
+
+    @property
+    def element_type(self) -> FType:
+        return ftype(self._dtype.type)
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return (intp,) * self._ndim
+
+    def construct(self, shape: tuple) -> "NumPyWrapper":
+        # creates a zero-filled tensor
+        return NumPyWrapper(np.zeros(shape, dtype=self._dtype))
+
+    def __call__(self, val: "NumPyWrapper") -> "NumPyWrapper":
+        """
+        Convert a tensor to this numpy tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A NumPyWrapper instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, NumPyFType):
+            return False
+        return self._dtype == other._dtype and self._ndim == other._ndim
+
+    def __hash__(self):
+        return hash((self._dtype, self._ndim))
+
+    def from_numpy(self, arr: np.ndarray) -> "NumPyWrapper":
+        return NumPyWrapper(arr)
+
+
+class NumPyWrapper(Tensor):
+    def __init__(self, data: np.ndarray):
+        self._data = np.asarray(data)
+
+    @property
+    def ftype(self) -> NumPyFType:
+        return NumPyFType(self._data.dtype, self._data.ndim)
+
+    @property
+    def shape(self) -> tuple:
+        return self._data.shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default fill value."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor's elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self._data.item()

@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
 
-from ..algebra import (
+from finchlite import finch_assembly as asm
+from finchlite.algebra import (
     Tensor,
     TensorFType,
-    element_type,
-    fill_value,
-    query_property,
-    register_property,
-    shape_type,
+    fisinstance,
+    ftype,
 )
-from ..finch_assembly import nodes as asm
-from ..symbolic import ScopedDict, fisinstance, ftype
+from finchlite.symbolic import ScopedDict, UnvalidatedForm
+
 from . import nodes as ntn
+from .stages import NotationLoader
 
 
 class TensorViewFType(TensorFType):
@@ -52,7 +51,7 @@ class TensorViewFType(TensorFType):
 
     @property
     def element_type(self):
-        return element_type(self.tns)
+        return self.tns.element_type
 
     @property
     def fill_value(self):
@@ -60,7 +59,7 @@ class TensorViewFType(TensorFType):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return fill_value(self.tns)
+        return self.tns.fill_value
 
     @property
     def shape_type(self):
@@ -68,7 +67,7 @@ class TensorViewFType(TensorFType):
         Get the shape type of the tensor view.
         This is the shape type of the tensor at the specified indices.
         """
-        return shape_type(self.tns)[len(self.idxs) : -1]
+        return self.tns.shape_type[len(self.idxs) : -1]
 
 
 class TensorView(Tensor):
@@ -113,7 +112,7 @@ class TensorView(Tensor):
         Get the element type of the tensor view.
         This is the type of the elements in the tensor at the specified indices.
         """
-        return element_type(self.tns)
+        return self.tns.ftype.element_type
 
     @property
     def fill_value(self):
@@ -121,7 +120,15 @@ class TensorView(Tensor):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return self.tns.fill_value
+        return self.tns.ftype.fill_value
+
+    @property
+    def shape_type(self):
+        """
+        Get the shape type of the tensor view.
+        This is the shape type of the tensor at the specified indices.
+        """
+        return self.tns.ftype.shape_type[len(self.idxs) : -1]
 
     def access(self, idxs, op=None):
         """
@@ -130,19 +137,28 @@ class TensorView(Tensor):
         """
         return TensorView(idxs=self.idxs + idxs, tns=self.tns, op=op)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.unwrap()
+
     def unwrap(self):
         """
-        Unwrap the tensor view to get the underlying tensor.
-        This returns the original tensor from which the view was created.
+        Unwrap the tensor view to get a scalar.
         """
-        return self.tns[*self.idxs]
+        val = self.tns[*self.idxs]
+        assert isinstance(val, Tensor) and val.ndim == 0
+        return val.item()
 
     def increment(self, val):
         """
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        self.tns[*self.idxs] = self.op(self.tns[*self.idxs], val)
+        lhs = self.tns[*self.idxs]
+        assert isinstance(lhs, Tensor) and lhs.ndim == 0
+        lhs = lhs.item()
+        self.tns[*self.idxs] = self.op(lhs, val)
         return
 
 
@@ -153,10 +169,7 @@ def access(tns, idxs, op=None):
     """
     if hasattr(tns, "access"):
         return tns.access(idxs, op)
-    try:
-        return query_property(tns, "access", "__attr__", idxs, op)
-    except AttributeError:
-        return TensorView(idxs=idxs, tns=tns, op=op)
+    return TensorView(idxs=idxs, tns=tns, op=op)
 
 
 def unwrap(tns):
@@ -166,7 +179,7 @@ def unwrap(tns):
     """
     if hasattr(tns, "unwrap"):
         return tns.unwrap()
-    return query_property(tns, "unwrap", "__attr__")
+    raise AttributeError(f"{type(tns).__name__} has no unwrap")
 
 
 def increment(tns, val):
@@ -176,7 +189,7 @@ def increment(tns, val):
     """
     if hasattr(tns, "increment"):
         return tns.increment(val)
-    return query_property(tns, "increment", "__attr__", val)
+    raise AttributeError(f"{type(tns).__name__} has no increment")
 
 
 def declare(tns, init, op, shape):
@@ -185,7 +198,11 @@ def declare(tns, init, op, shape):
     """
     if hasattr(tns, "declare"):
         return tns.declare(init, op, shape)
-    return query_property(tns, "declare", "__attr__", init, op, shape)
+    match tns:
+        case np.ndarray():
+            return np_declare(tns, init, op, shape)
+        case _:
+            raise AttributeError(f"{type(tns).__name__} has no declare")
 
 
 def np_declare(tns, init, op, shape):
@@ -201,34 +218,25 @@ def np_declare(tns, init, op, shape):
     return tns
 
 
-register_property(np.ndarray, "declare", "__attr__", np_declare)
-
-
 def freeze(tns, op):
     """
     Freeze a tensor.
     """
     if hasattr(tns, "freeze"):
         return tns.freeze(op)
-    try:
-        query_property(tns, "freeze", "__attr__", op)
-    except AttributeError:
-        return tns
+    return tns
 
 
 def thaw(tns, op):
     """
     Thaw a tensor.
     """
-    if hasattr(tns, "freeze"):
-        return tns.freeze(op)
-    try:
-        return query_property(tns, "freeze", "__attr__", op)
-    except AttributeError:
-        return tns
+    if hasattr(tns, "thaw"):
+        return tns.thaw(op)
+    return tns
 
 
-class NotationInterpreterKernel:
+class NotationInterpreterKernel(asm.AssemblyKernel):
     """
     A kernel for interpreting FinchNotation code.
     This is a simple interpreter that executes the assembly code.
@@ -239,11 +247,11 @@ class NotationInterpreterKernel:
         self.func = ntn.Variable(func_n, ret_t)
 
     def __call__(self, *args):
-        args_i = (ntn.Literal(arg) for arg in args)
+        args_i = tuple(ntn.Literal(arg) for arg in args)
         return self.ctx(ntn.Call(self.func, args_i))
 
 
-class NotationInterpreterModule:
+class NotationInterpreterLibrary(asm.AssemblyLibrary):
     """
     A class to represent an interpreted module of FinchNotation.
     """
@@ -272,7 +280,7 @@ class HaltState:
     return_value: Any = None
 
 
-class NotationInterpreter:
+class NotationInterpreter(UnvalidatedForm, NotationLoader):
     """
     An interpreter for FinchNotation.
     """
@@ -327,19 +335,33 @@ class NotationInterpreter:
             function_state=function_state,
         )
 
+    def lower(self, prgm: ntn.Module):
+        return self._dispatch(prgm)
+
+    @overload
+    def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
+
+    @overload
+    def __call__(self, prgm: ntn.NotationNode | asm.AssemblyNode) -> Any: ...
+
     def __call__(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         """
         Run the program.
         """
+        if isinstance(prgm, ntn.Module):
+            return super().__call__(prgm)
+        return self._dispatch(prgm)
+
+    def _dispatch(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         match prgm:
             case ntn.Literal(val) | asm.Literal(val):
                 return val
             case ntn.Value(val, val_t):
                 val_e = self(val)
-                if type(val_e) is not val_t:
+                if ftype(val_e) is not val_t:
                     raise TypeError(
-                        f"Value '{val_e}' is expected to be of type {val_t}, "
-                        f"but is a type {type(val_e)}."
+                        f"Value '{val_e}' is expected to be of ftype {val_t}, "
+                        f"but is a type {ftype(val_e)}."
                     )
                 return val_e
             case ntn.Variable(var_n, var_t):
@@ -364,6 +386,8 @@ class NotationInterpreter:
             case ntn.Assign(var, val):
                 val_e = self(val)
                 if isinstance(var, ntn.Variable):
+                    if var.type_ is not None:
+                        assert fisinstance(val_e, var.type_)
                     var_n = var.name
                     self.bindings[var_n] = val_e
                     return None
@@ -405,18 +429,35 @@ class NotationInterpreter:
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
-                match mode:
-                    case ntn.Read():
-                        return access(tns_e, idxs_e)
-                    case ntn.Update(op):
-                        op_e = self(op)
-                        return access(tns_e, idxs_e, op=op_e)
-                    case _:
-                        raise NotImplementedError(f"Unrecognized access mode: {mode}")
+                try:
+                    match mode:
+                        case ntn.Read():
+                            return access(tns_e, idxs_e)
+                        case ntn.Update(op):
+                            op_e = self(op)
+                            return access(tns_e, idxs_e, op=op_e)
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized access mode: {mode}"
+                            )
+                except Exception as e:
+                    print(f"Error during tensor access {prgm}")
+                    raise e
+
+            case ntn.Dimension(tns, r):
+                assert isinstance(tns, ntn.Slot)
+                tns_e = self(tns)
+                r_e = self(r)
+                shape_ft = tns_e.ftype.shape_type[r_e]
+                return shape_ft(tns_e.shape[r_e])
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)
-                increment(tns_e, val_e)
+                try:
+                    increment(tns_e, val_e)
+                except Exception as e:
+                    print(f"Error during tensor increment {prgm}")
+                    raise e
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
@@ -424,7 +465,8 @@ class NotationInterpreter:
                 return None
             case ntn.Loop(idx, ext, body):
                 ext_e = self(ext)
-                ext_e.loop(self, idx, body)
+                # assert isinstance(ext_e, Extent)
+                ext_e.loop_interpreter(self, idx, body)
                 return None
             case ntn.Declare(tns, init, op, shape):
                 assert isinstance(tns, ntn.Slot)
@@ -480,7 +522,7 @@ class NotationInterpreter:
                         if not fisinstance(ret_e, ret_t):
                             raise TypeError(
                                 f"Return value {ret_e} is not of type {ret_t} "
-                                f"for function '{func_n}'."
+                                f"for function '{func_n}'. have type {ftype(ret_e)}"
                             )
                         return ret_e
                     raise ValueError(
@@ -507,10 +549,10 @@ class NotationInterpreter:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return NotationInterpreterModule(self, kernels)
+                return NotationInterpreterLibrary(self, kernels)
             case ntn.Stack(val):
                 raise NotImplementedError(
-                    "NotationInterpreter does not support symbolic, no target language"
+                    "NotationInterpreter does not support stacks."
                 )
             case _:
                 raise NotImplementedError(

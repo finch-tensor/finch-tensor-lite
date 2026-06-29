@@ -18,8 +18,8 @@ Key Functions:
 Examples:
 ---------
 1. Basic Usage:
-    >>> C = defer(A)
-    >>> D = defer(B)
+    >>> C = lazy(A)
+    >>> D = lazy(B)
     >>> E = (C + D) / 2
     >>> compute(E)
 
@@ -50,133 +50,11 @@ Performance:
   or `with_scheduler`.
 """
 
-from enum import Enum
-from typing import Any
+from finchlite.autoschedule import get_default_scheduler
+from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finchlite.symbolic import gensym
 
-import numpy as np
-
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import Tensor, TensorPlaceholder
-from ..autoschedule import DefaultLogicOptimizer, LogicCompiler
-from ..codegen import NumbaCompiler
-from ..compile import BufferizedNDArray, NotationCompiler
-from ..finch_logic import (
-    Alias,
-    Field,
-    FinchLogicInterpreter,
-    Literal,
-    Plan,
-    Produces,
-    Query,
-    Table,
-)
-from ..symbolic import Reflector, gensym
-from .lazy import defer
-
-_DEFAULT_SCHEDULER = None
-
-
-class Mode(Enum):
-    INTERPRET_LOGIC = 0
-    INTERPRET_NOTATION = 1
-    INTERPRET_ASSEMBLY = 2
-    COMPILE_NUMBA = 3
-    COMPILE_C = 4
-
-
-def set_default_scheduler(
-    *,
-    ctx=None,
-    mode=Mode.INTERPRET_LOGIC,  # TODO: change to NOTATION
-):
-    global _DEFAULT_SCHEDULER
-
-    if ctx is not None:
-        _DEFAULT_SCHEDULER = ctx
-
-    elif mode == Mode.INTERPRET_LOGIC:
-        _DEFAULT_SCHEDULER = FinchLogicInterpreter()
-
-    elif mode == Mode.INTERPRET_NOTATION:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        ntn_interp = ntn.NotationInterpreter()
-
-        def fn_compile(plan):
-            prgm, tables = optimizer(plan)
-            mod = ntn_interp(prgm)
-            args = provision_tensors(prgm, tables)
-            return (mod.func(*args),)
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.INTERPRET_ASSEMBLY:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        notation_compiler = NotationCompiler(Reflector())
-        asm_interp = asm.AssemblyInterpreter()
-
-        def fn_compile(plan):
-            ntn_prgm, tables = optimizer(plan)
-            asm_prgm = notation_compiler(ntn_prgm)
-            mod = asm_interp(asm_prgm)
-            args = provision_tensors(asm_prgm, tables)
-            return (mod.func(*args),)
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.COMPILE_NUMBA:
-        optimizer = DefaultLogicOptimizer(LogicCompiler())
-        notation_compiler = NotationCompiler(Reflector())
-        numba_compiler = NumbaCompiler()
-
-        def fn_compile(plan):
-            # TODO: proper logging
-            # print("Logic: \n", plan)
-            ntn_prgm, tables = optimizer(plan)
-            # print("Notation: \n", ntn_prgm)
-            asm_prgm = notation_compiler(ntn_prgm)
-            # print("Assembler: \n", asm_prgm)
-            mod = numba_compiler(asm_prgm)
-            args = provision_tensors(asm_prgm, tables)
-            return (mod.func(*args),)
-
-        _DEFAULT_SCHEDULER = fn_compile
-
-    elif mode == Mode.COMPILE_C:
-        raise NotImplementedError
-
-    else:
-        raise Exception(f"Invalid scheduler mode: {mode}")
-
-
-set_default_scheduler()
-
-
-def get_default_scheduler():
-    global _DEFAULT_SCHEDULER
-    return _DEFAULT_SCHEDULER
-
-
-def provision_tensors(prgm: Any, tables: dict[Alias, Table]) -> list[Tensor]:
-    args: list[Tensor] = []
-    dims_dict: dict[Field, int] = {}
-    for arg in prgm.funcs[0].args:
-        table = tables[Alias(arg.name)]
-        match table:
-            case Table(Literal(val), idxs):
-                if isinstance(val, TensorPlaceholder):
-                    shape = tuple(dims_dict[field] for field in idxs)
-                    tensor = BufferizedNDArray(np.zeros(dtype=val.dtype, shape=shape))
-                else:
-                    for idx, field in enumerate(table.idxs):
-                        dims_dict[field] = val.shape[idx]
-                    tensor = val
-            case _:
-                raise Exception(f"Invalid table for tensor processing: {table}")
-
-        args.append(tensor)
-
-    return args
+from .lazy import LazyTensor, asarray, lazy
 
 
 def compute(arg, ctx=None):
@@ -197,13 +75,44 @@ def compute(arg, ctx=None):
         ctx = get_default_scheduler()
 
     args = arg if isinstance(arg, tuple) else (arg,)
-    vars = tuple(Alias(gensym("A")) for _ in args)
-    bodies = tuple(map(lambda arg, var: Query(var, arg.data), args, vars))
-    prgm = Plan(bodies + (Produces(vars),))
-    res = ctx(prgm)
-    if isinstance(arg, tuple):
-        return tuple(res)
-    return res[0].to_numpy() if hasattr(res[0], "to_numpy") else res[0]
+    outputs = [None for _ in args]
+    lazy_args = []
+    lazy_arg_idxs = []
+    for i, arg_i in enumerate(args):
+        if not isinstance(arg_i, LazyTensor):
+            outputs[i] = arg_i
+        else:
+            lazy_args.append(arg_i)
+            lazy_arg_idxs.append(i)
+
+    if lazy_args:
+        vars = tuple(Alias(gensym("A")) for _ in lazy_args)
+        ctx_2 = lazy_args[0].ctx.join(*[x.ctx for x in lazy_args[1:]])
+        bodies = tuple(
+            map(
+                lambda arg, var: Query(
+                    var,
+                    Table(
+                        arg.data,
+                        tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
+                    ),
+                ),
+                lazy_args,
+                vars,
+            )
+        )
+        prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
+        res = ctx(prgm)
+        for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
+            if (
+                len(res[lazy_idx].shape) == 0
+            ):  # if the result is a scalar, extract the value and turn it into a
+                # finch `Scalar`
+                outputs[out_idx] = asarray(res[lazy_idx][()])
+            else:
+                outputs[out_idx] = res[lazy_idx]
+
+    return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
 
 def fuse(f, *args, ctx=None):
@@ -224,7 +133,7 @@ def fuse(f, *args, ctx=None):
     if ctx is None:
         ctx = get_default_scheduler()
 
-    args = [defer(arg) for arg in args]
+    args = [lazy(arg) for arg in args]
     if len(args) == 1:
         return f(args[0])
     return compute(f(*args), ctx=ctx)

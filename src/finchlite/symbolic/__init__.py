@@ -1,27 +1,32 @@
-from .environment import Context, Namespace, Reflector, ScopedDict
-from .ftype import FType, FTyped, fisinstance, ftype
+from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
+from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
 from .gensym import gensym
 from .rewriters import (
     Chain,
     Fixpoint,
+    Memo,
     PostWalk,
     PreWalk,
     Rewrite,
 )
+from .stage import Form, Stage, UnvalidatedForm
 from .term import (
-    PostOrderDFS,
-    PreOrderDFS,
     Term,
     TermTree,
     literal_repr,
 )
+from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 __all__ = [
+    "BasicBlock",
     "Chain",
     "Context",
-    "FType",
-    "FTyped",
+    "ControlFlowGraph",
+    "DataFlowAnalysis",
     "Fixpoint",
+    "Form",
+    "Memo",
+    "NamedTerm",
     "Namespace",
     "PostOrderDFS",
     "PostWalk",
@@ -30,10 +35,12 @@ __all__ = [
     "Reflector",
     "Rewrite",
     "ScopedDict",
+    "Stage",
     "Term",
     "TermTree",
-    "fisinstance",
-    "ftype",
+    "UnvalidatedForm",
     "gensym",
+    "intree",
+    "isdescendant",
     "literal_repr",
 ]

@@ -1,18 +1,19 @@
-from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 from .lower import (
+    AssemblyContext,
     Extent,
     ExtentFType,
+    LoopletContext,
     NotationCompiler,
-    NotationContext,
     dimension,
+    make_extent,
 )
 
 __all__ = [
-    "BufferizedNDArray",
-    "BufferizedNDArrayFType",
+    "AssemblyContext",
     "Extent",
     "ExtentFType",
+    "LoopletContext",
     "NotationCompiler",
-    "NotationContext",
     "dimension",
+    "make_extent",
 ]

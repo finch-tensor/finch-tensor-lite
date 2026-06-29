@@ -9,7 +9,7 @@ struct CNumpyBuffer {
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-int64_t finch_access(struct CNumpyBuffer* a, uint64_t idx) {
+int64_t finch_access(struct CNumpyBuffer* a, int64_t idx) {
     struct CNumpyBuffer* a_ = a;
     int64_t* a__data = (int64_t*)a_->data;
     size_t a__length = a_->length;
@@ -27,7 +27,7 @@ int64_t finch_access(struct CNumpyBuffer* a, uint64_t idx) {
     int64_t val2 = (a__data)[computed_2];
     return val;
 }
-int64_t finch_change(struct CNumpyBuffer* a, uint64_t idx, int64_t val) {
+int64_t finch_change(struct CNumpyBuffer* a, int64_t idx, int64_t val) {
     struct CNumpyBuffer* a_ = a;
     int64_t* a__data_2 = (int64_t*)a_->data;
     size_t a__length_2 = a_->length;

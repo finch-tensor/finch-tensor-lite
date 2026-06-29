@@ -1,0 +1,38 @@
+ENTRY_0: #succs=[matmul_2]
+
+EXIT_1: #succs=[]
+
+matmul_2: #succs=[matmul_4, matmul_5]
+    A_: BufferizedNDArray = unpack(A)
+    B_: BufferizedNDArray = unpack(B)
+    C_: BufferizedNDArray = unpack(C)
+    m: finchlite.int64 = A_.shape[0]
+    n: finchlite.int64 = B_.shape[1]
+    p: finchlite.int64 = A_.shape[1]
+    declare(C_, 0.0, add, ['m', 'n'])
+    make_extent(0, m)
+
+matmul_3: #succs=[EXIT_1]
+
+matmul_4: #succs=[matmul_6, matmul_7]
+    make_extent(0, p)
+
+matmul_5: #succs=[matmul_3]
+    freeze(C_, add)
+    repack(C_, C)
+    return C
+
+matmul_6: #succs=[matmul_8, matmul_9]
+    make_extent(0, n)
+
+matmul_7: #succs=[matmul_4, matmul_5]
+
+matmul_8: #succs=[matmul_8, matmul_9]
+    a_ik: finchlite.float64 = unwrap(read(A_, ['i', 'k']))
+    b_kj: finchlite.float64 = unwrap(read(B_, ['k', 'j']))
+    c_ij: finchlite.float64 = mul(a_ik, b_kj)
+    increment(update(C_, ['i', 'j'], add), c_ij)
+
+matmul_9: #succs=[matmul_6, matmul_7]
+
+matmul_10: #succs=[matmul_3]
