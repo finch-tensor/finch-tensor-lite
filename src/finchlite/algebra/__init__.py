@@ -14,6 +14,8 @@ from .algebra import (
     return_type,
 )
 from .ftypes import (
+    FDTypeSignedInteger,
+    FDTypeUnsignedInteger,
     FType,
     FTyped,
     ImmutableStructFType,
@@ -23,6 +25,7 @@ from .ftypes import (
     TupleFType,
     bool,
     bool_,
+    can_cast,
     complex64,
     complex128,
     complex_,
@@ -55,6 +58,8 @@ from .tensor import (
 )
 
 __all__ = [
+    "FDTypeSignedInteger",
+    "FDTypeUnsignedInteger",
     "FType",
     "FTyped",
     "FinchOperator",
@@ -68,6 +73,7 @@ __all__ = [
     "TupleFType",
     "bool",
     "bool_",
+    "can_cast",
     "cansplitpush",
     "complex64",
     "complex128",

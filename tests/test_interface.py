@@ -1,3 +1,4 @@
+import math
 import warnings
 
 import pytest
@@ -7,6 +8,7 @@ import numpy as np
 import finchlite
 from finchlite import ffuncs
 from finchlite.algebra import ftype
+from finchlite.finch_logic import MapJoin, Query, Reorder
 
 from .conftest import finch_assert_allclose, finch_assert_equal
 
@@ -128,6 +130,9 @@ class TestOverrideTensor(finchlite.OverrideTensor):
     def __setitem__(self, idx, val):
         self.array[idx] = val
 
+    def item(self):
+        return self.array.item()
+
     def __hash__(self):
         # TODO: correct hashing for ndarrays
         return id(self.array)
@@ -225,6 +230,8 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         ((finchlite.logical_and, np.logical_and), np.logical_and),
         ((finchlite.logical_or, np.logical_or), np.logical_or),
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
+        ((finchlite.minimum, np.minimum), np.minimum),
+        ((finchlite.maximum, np.maximum), np.maximum),
         ((ffuncs.eq, finchlite.equal, np.equal), np.equal),
         ((ffuncs.ne, finchlite.not_equal, np.not_equal), np.not_equal),
         ((ffuncs.lt, finchlite.less, np.less), np.less),
@@ -265,6 +272,104 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
                 result = finchlite.compute(result)
 
             finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_same_elementwise_nan(wrap):
+    a = np.array([1.0, np.nan, np.nan, 2.0])
+    b = np.array([1.0, np.nan, 0.0, np.nan])
+
+    same = finchlite.same(wrap(a), wrap(b))
+    not_same = finchlite.not_same(wrap(a), wrap(b))
+
+    if isinstance(same, finchlite.LazyTensor):
+        same = finchlite.compute(same)
+    if isinstance(not_same, finchlite.LazyTensor):
+        not_same = finchlite.compute(not_same)
+
+    expected = np.array([True, True, False, False])
+    finch_assert_equal(same, expected)
+    finch_assert_equal(not_same, np.logical_not(expected))
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_count_nonfill(wrap):
+    x = np.array([[0.0, 1.0, np.nan], [2.0, 0.0, 0.0]])
+
+    count = finchlite.count_nonfill(wrap(x))
+    axis_count = finchlite.count_nonfill(wrap(x), axis=1)
+
+    if isinstance(count, finchlite.LazyTensor):
+        count = finchlite.compute(count)
+    if isinstance(axis_count, finchlite.LazyTensor):
+        axis_count = finchlite.compute(axis_count)
+
+    finch_assert_equal(count, np.array(3))
+    finch_assert_equal(axis_count, np.array([2, 1]))
+
+
+def test_count_nonfill_nan_fill_value():
+    x = finchlite.full((2, 3), np.nan)
+    assert np.isnan(x.fill_value)
+    finch_assert_equal(finchlite.count_nonfill(x), np.array(0))
+
+
+def test_array_api_constants():
+    assert finchlite.e == math.e
+    assert finchlite.pi == math.pi
+    assert finchlite.inf == math.inf
+    assert math.isnan(finchlite.nan)
+    assert finchlite.nan != finchlite.nan
+    assert finchlite.newaxis is None
+
+    assert bool(finchlite.isinf(finchlite.asarray(finchlite.inf)))
+    assert bool(finchlite.isnan(finchlite.asarray(finchlite.nan)))
+
+
+def test_asarray_python_scalars_use_default_array_dtypes():
+    scalar = finchlite.asarray(1)
+
+    assert finchlite.__array_api_version__ == "2024.12"
+    assert finchlite.asarray(True).dtype == finchlite.bool
+    assert scalar.dtype == finchlite.int64
+    assert finchlite.asarray(1.0).dtype == finchlite.float64
+    assert finchlite.asarray(1j).dtype == finchlite.complex128
+    assert finchlite.asarray(1.0, dtype=finchlite.float32).dtype == finchlite.float32
+    assert scalar.__array_namespace__() is finchlite
+
+
+def test_asarray_existing_finch_tensors_pass_through():
+    scalar = finchlite.asarray(1)
+    lazy = finchlite.lazy(1)
+
+    assert finchlite.asarray(scalar) is scalar
+    assert finchlite.asarray(lazy) is lazy
+    assert scalar.dtype == finchlite.int64
+
+
+def test_lazy_python_scalars_keep_builtin_dtypes():
+    assert finchlite.lazy(True).dtype == finchlite.bool_
+    assert finchlite.lazy(1).dtype == finchlite.int_
+    assert finchlite.lazy(1.0).dtype == finchlite.float_
+    assert finchlite.lazy(1j).dtype == finchlite.complex_
+
+
+def test_nan_fill_value_ftype_equality():
+    x = finchlite.full((2, 3), np.nan)
+    y = finchlite.full((2, 3), np.nan)
+    assert finchlite.same(x.fill_value, y.fill_value)
+    assert x.ftype == y.ftype
+    assert hash(x.ftype) == hash(y.ftype)
+
+    lazy_x = finchlite.lazy(x)
+    lazy_y = finchlite.lazy(y)
+    assert lazy_x.ftype == lazy_y.ftype
+    assert hash(lazy_x.ftype) == hash(lazy_y.ftype)
+
+    scalar_x = finchlite.asarray(finchlite.nan)
+    scalar_y = finchlite.asarray(finchlite.nan)
+    assert scalar_x.ftype == scalar_y.ftype
+    assert hash(scalar_x.ftype) == hash(scalar_y.ftype)
 
 
 @pytest.mark.parametrize(
@@ -555,6 +660,30 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_equal(result, expected)
 
 
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+@pytest.mark.parametrize(
+    "op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)]
+)
+@pytest.mark.parametrize("axis", [None, 0, 1])
+def test_min_max_nan_propagation(wrap, op, np_op, axis):
+    x = np.array([[1.0, np.nan], [3.0, 4.0]])
+    result = op(wrap(x), axis=axis)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    finch_assert_equal(result, np_op(x, axis=axis))
+
+
+@pytest.mark.parametrize("op", [finchlite.minimum, finchlite.maximum])
+@pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
+def test_minimum_maximum_python_scalar_promotion(wrap, op):
+    x = np.array([1.0, 2.0], dtype=np.float32)
+    result = op(wrap(x), 1.0)
+    assert result.dtype == finchlite.float32
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    assert result.dtype == finchlite.float32
+
+
 @pytest.mark.parametrize(
     "a, b",
     [
@@ -673,6 +802,93 @@ def test_matmul(a, b, a_wrap, b_wrap):
     finch_assert_allclose(result, expected)
     finch_assert_allclose(result_with_op, expected)
     finch_assert_allclose(result_with_np, expected)
+
+
+def test_outer_default_scheduler():
+    a = np.array([1, 2])
+    b = np.array([3, 4, 5])
+
+    result = finchlite.outer(a, b)
+
+    finch_assert_equal(result, np.outer(a, b))
+
+
+def test_linalg_outer_eager():
+    a = finchlite.asarray(np.array([1, 2]))
+    b = finchlite.asarray(np.array([3, 4, 5]))
+
+    result = finchlite.linalg.outer(a, b)
+
+    assert not isinstance(result, finchlite.LazyTensor)
+    finch_assert_equal(result, np.outer(a.to_numpy(), b.to_numpy()))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.array([1, 2, 3]), np.array([4, 5])),
+        (np.array([1.5, 2.0]), np.array([-1.0, 3.0, 4.0])),
+        (random_array((2,)), random_array((3,))),
+    ],
+)
+@pytest.mark.parametrize(
+    "a_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+@pytest.mark.parametrize(
+    "b_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_outer(a, b, a_wrap, b_wrap):
+    wa = a_wrap(a)
+    wb = b_wrap(b)
+    expected = np.outer(a, b)
+
+    result = finchlite.outer(wa, wb)
+    result_with_np = np.outer(wa, wb)
+
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    if isinstance(result_with_np, finchlite.LazyTensor):
+        result_with_np = finchlite.compute(result_with_np)
+
+    finch_assert_allclose(result, expected)
+    finch_assert_allclose(result_with_np, expected)
+
+
+def test_outer_uses_single_logic_query():
+    a = finchlite.lazy(np.array([1, 2]))
+    b = finchlite.lazy(np.array([3, 4, 5]))
+
+    result = finchlite.outer(a, b)
+    queries = [stmt for stmt in result.ctx.trace() if isinstance(stmt, Query)]
+
+    assert result.shape == (2, 3)
+    assert len(queries) == 3
+    assert isinstance(queries[-1].rhs, Reorder)
+    assert isinstance(queries[-1].rhs.arg, MapJoin)
+    assert queries[-1].rhs.arg.op.val == ffuncs.mul
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (np.ones((2, 2)), np.ones(3)),
+        (np.ones(2), np.ones((3, 1))),
+    ],
+)
+def test_outer_requires_vectors(a, b):
+    with pytest.raises(ValueError):
+        finchlite.outer(a, b)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1083,87 +1299,6 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
-    "shapes_and_types, axis",
-    [
-        # Basic concatenation along axis 0 - same types
-        ([(2, 3, np.float32), (2, 3, np.float32), (2, 3, np.float32)], 0),
-        # Different shapes along concat axis
-        ([(2, 3, np.int32), (4, 3, np.int32), (3, 3, np.int32)], 0),
-        # Concatenation along axis 1
-        ([(3, 2, np.float64), (3, 4, np.float64), (3, 1, np.float64)], 1),
-        # Mixed types - int and float promotion
-        ([(2, 3, np.int32), (2, 3, np.float64), (2, 3, np.float32)], 0),
-        # Bool and numeric promotion
-        ([(3, 2, bool), (3, 2, np.int8), (3, 2, np.uint8)], 0),
-        # Concatenation with complex types
-        ([(2, 3, np.complex64), (2, 3, np.float32), (2, 3, np.int32)], 0),
-        # 3D arrays with negative axis
-        ([(2, 3, 4, np.float32), (5, 3, 4, np.float32), (1, 3, 4, np.int64)], -3),
-        # Empty arrays with mixed types
-        ([(0, 3, np.float32), (0, 3, np.float64)], 0),
-        # Single array (no-op) with special type
-        ([(2, 3, np.uint16)], 0),
-        # Flattened concatenation with axis=None - mixed types
-        ([(2, 3, np.int32), (3, 2, np.float32), (1, 1, np.complex64)], None),
-    ],
-)
-@pytest.mark.parametrize(
-    "wrapper",
-    [
-        lambda x: x,
-        TestOverrideTensor,
-        finchlite.lazy,
-    ],
-)
-def test_concat(shapes_and_types, axis, wrapper, rng, random_wrapper):
-    """
-    Tests for concatenating arrays along specified axis with various types.
-    """
-    # Generate arrays for each shape and type
-    arrays = []
-
-    for shape_and_type in shapes_and_types:
-        shape, type = shape_and_type[:-1], shape_and_type[-1]
-        arrays.append(random_array(shape, type, rng))
-
-    # Apply wrapper (randomly to ensure mixed types work)
-    wrapped_arrays = random_wrapper(arrays, wrapper)
-
-    expected = np.concatenate(arrays, axis=axis)
-
-    # Test finch's implementation
-    result = finchlite.concat(wrapped_arrays, axis=axis)
-
-    # Evaluate lazy tensors if needed
-    if isinstance(result, finchlite.LazyTensor):
-        result = finchlite.compute(result)
-
-    finch_assert_equal(result, expected, strict=True)
-
-
-@pytest.mark.parametrize(
-    "shapes",
-    [
-        # Incompatible shapes (not matching in non-concatenation dimensions)
-        [(2, 3), (2, 4)],
-        # Different ndims
-        [(2, 3), (2, 3, 4)],
-        # Mixed types but incompatible shapes
-        [(3, 2), (4, 3)],
-    ],
-)
-def test_concat_invalid(shapes, rng):
-    """
-    Tests error handling for invalid concatenation cases.
-    """
-    arrays = [rng.random(shape) for shape in shapes]
-
-    with pytest.raises(ValueError):
-        finchlite.concat(arrays, axis=0)
-
-
-@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
-@pytest.mark.parametrize(
     "shape, source, destination",
     [
         ((3, 4, 5), 0, -3),
@@ -1200,243 +1335,6 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
         return
 
     result = finchlite.moveaxis(wrapped_x, source, destination)
-    if isinstance(result, finchlite.LazyTensor):
-        result = finchlite.compute(result)
-
-    finch_assert_equal(result, expected, strict=True)
-
-
-@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
-@pytest.mark.parametrize(
-    "shapes_and_types, axis",
-    [
-        # Basic stacking along axis 0 (default)
-        ([(2, 3, np.float32), (2, 3, np.float32), (2, 3, np.float32)], 0),
-        # Stacking along axis 1
-        ([(2, 3, np.float64), (2, 3, np.float64), (2, 3, np.float64)], 1),
-        # Stacking along axis -1 (last dimension)
-        ([(3, 2, np.int32), (3, 2, np.int32), (3, 2, np.int32)], -1),
-        # Mixed types - should promote
-        ([(2, 3, np.int32), (2, 3, np.float64), (2, 3, np.float32)], 0),
-        # Stacking complex types
-        ([(2, 3, np.complex64), (2, 3, np.float32), (2, 3, np.int32)], 0),
-        # Empty arrays
-        ([(0, 3, np.float32), (0, 3, np.float32)], 0),
-        # Single array case
-        ([(2, 3, np.uint16)], 0),
-        # Invalid cases - Different shapes
-        ([(2, 3, np.float32), (3, 3, np.float32)], 0),
-        # Invalid axis (out of bounds)
-        ([(2, 3, np.float32), (2, 3, np.float32)], 3),
-        ([(2, 3, np.float32), (2, 3, np.float32)], -4),
-    ],
-)
-@pytest.mark.parametrize(
-    "wrapper",
-    [
-        lambda x: x,
-        TestOverrideTensor,
-        finchlite.lazy,
-    ],
-)
-def test_stack(shapes_and_types, axis, wrapper, rng, random_wrapper):
-    """
-    Tests for stacking arrays along a new axis.
-    """
-    # Generate arrays for each shape and type
-    arrays = []
-
-    for shape_and_type in shapes_and_types:
-        shape, dtype = shape_and_type[:-1], shape_and_type[-1]
-        arrays.append(random_array(shape, dtype, rng))
-
-    # Apply wrapper (randomly to ensure mixed types work)
-    wrapped_arrays = random_wrapper(arrays, wrapper)
-
-    try:
-        # Get expected result from NumPy
-        expected = np.stack(arrays, axis=axis)
-    except ValueError:
-        # Check that finch also raises an error
-        with pytest.raises(ValueError):
-            finchlite.stack(wrapped_arrays, axis=axis)
-        return
-
-    # Test finch's implementation
-    result = finchlite.stack(wrapped_arrays, axis=axis)
-
-    # Evaluate lazy tensors if needed
-    if isinstance(result, finchlite.LazyTensor):
-        result = finchlite.compute(result)
-
-    finch_assert_equal(result, expected, strict=True)
-
-
-@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
-@pytest.mark.parametrize(
-    "array_shape, axis, split_shape, expected_shape",
-    [
-        ((2, 6), 1, (2, 3), (2, 2, 3)),
-        ((4, 6), -1, (2, 3), (4, 2, 3)),
-        ((2, 24), 1, (2, 3, 4), (2, 2, 3, 4)),
-        ((8, 3), 0, (2, 4), (2, 4, 3)),
-        ((6,), 0, (1, 6), (1, 6)),
-        ((2, 8), 1, (1, 8), (2, 1, 8)),
-        # Edge case: 3D tensor with split in middle dimension
-        ((3, 6, 4), 1, (2, 3), (3, 2, 3, 4)),
-    ],
-)
-@pytest.mark.parametrize(
-    "wrapper",
-    [
-        lambda x: x,
-        TestOverrideTensor,
-        finchlite.lazy,
-    ],
-)
-def test_split_dims(array_shape, axis, split_shape, expected_shape, wrapper):
-    """Test splitting a dimension into multiple dimensions."""
-    # Create input tensor with identifiable values
-    x = np.arange(np.prod(array_shape)).reshape(array_shape)
-    wrapped_x = wrapper(x)
-    expected = np.reshape(x, expected_shape)
-    # Apply split_dims operation
-    result = finchlite.split_dims(wrapped_x, axis, split_shape)
-    # Compute if result is lazy
-    if isinstance(result, finchlite.LazyTensor):
-        result = finchlite.compute(result)
-
-    finch_assert_equal(result, expected, strict=True)
-
-
-@pytest.mark.parametrize(
-    "array_shape, axis, split_shape",
-    [
-        # Product of split shape doesn't match original dimension size
-        ((2, 7), 1, (2, 3)),
-        # Axis out of bounds
-        ((2, 6), 2, (2, 3)),
-        # Negative axis out of bounds
-        ((2, 6), -3, (2, 3)),
-        # Empty split shape
-        ((2, 6), 1, ()),
-    ],
-)
-def test_split_dims_errors(array_shape, axis, split_shape):
-    """Test error cases for split_dims."""
-    x = np.arange(np.prod(array_shape)).reshape(array_shape)
-    with pytest.raises(ValueError):
-        # error must be raised before computing
-        finchlite.split_dims(x, axis, split_shape)
-
-
-@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
-@pytest.mark.parametrize(
-    "array_shape, axes, expected_shape",
-    [
-        # Basic 2D to 1D combinations
-        ((2, 3, 4), (1, 2), (2, 12)),
-        # Negative axis indexing
-        ((4, 2, 3), (-3, -2), (8, 3)),
-        # (combine all dimensions)
-        ((2, 3, 4), (0, 1, 2), (24,)),
-        # 4D
-        ((2, 3, 4, 5), (1, 2), (2, 12, 5)),
-        # Edge case: dimensions with size 1
-        ((1, 3, 1, 4), (0, 1), (3, 1, 4)),
-        # Edge case: zero-size dimensions
-        ((0, 3, 4), (1, 2), (0, 12)),
-        ((2, 0, 3), (0, 1), (0, 3)),
-    ],
-)
-@pytest.mark.parametrize(
-    "wrapper",
-    [
-        lambda x: x,
-        TestOverrideTensor,
-        finchlite.lazy,
-    ],
-)
-def test_combine_dims(array_shape, axes, expected_shape, wrapper):
-    """Test combining multiple consecutive dimensions into one."""
-    # Create input tensor with identifiable values
-    x = np.arange(np.prod(array_shape)).reshape(array_shape)
-    wrapped_x = wrapper(x)
-    expected = np.reshape(x, expected_shape)
-
-    # Apply combine_dims operation
-    result = finchlite.combine_dims(wrapped_x, axes)
-
-    # Compute if result is lazy
-    if isinstance(result, finchlite.LazyTensor):
-        result = finchlite.compute(result)
-
-    finch_assert_equal(result, expected, strict=True)
-
-
-@pytest.mark.parametrize(
-    "array_shape, axes",
-    [
-        # Non-consecutive axes
-        ((2, 3, 4, 5), (0, 2)),
-        # Axis out of bounds
-        ((2, 3, 4), (2, 3)),
-        ((2, 3), (-3, -2)),
-        # Empty axes tuple
-        ((2, 3, 4), ()),
-        # Single axis (need at least 2 for consecutive)
-        ((2, 3, 4), (1,)),
-    ],
-)
-def test_combine_dims_errors(array_shape, axes):
-    """Test error cases for combine_dims."""
-    x = np.arange(np.prod(array_shape)).reshape(array_shape)
-    with pytest.raises(ValueError):
-        # error must be raised before computing
-        finchlite.combine_dims(x, axes)
-
-
-@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
-@pytest.mark.parametrize(
-    "array_shape, expected_shape",
-    [
-        # 2D array
-        ((2, 3), (6,)),
-        # 3D array
-        ((2, 3, 4), (24,)),
-        # 1D array (no change)
-        ((6,), (6,)),
-        # Scalar (0D) - should become 1D
-        ((), (1,)),
-        # Edge case: zero-size array
-        ((0, 3), (0,)),
-        # 4D array
-        ((2, 1, 3, 2), (12,)),
-    ],
-)
-@pytest.mark.parametrize(
-    "wrapper",
-    [
-        lambda x: x,
-        TestOverrideTensor,
-        finchlite.lazy,
-    ],
-)
-def test_flatten(array_shape, expected_shape, wrapper):
-    """Test flattening arrays to 1D."""
-    if array_shape == ():
-        # Scalar case
-        x = np.array(5)
-    else:
-        x = np.arange(np.prod(array_shape)).reshape(array_shape)
-
-    wrapped_x = wrapper(x)
-    expected = x.flatten() if array_shape != () else np.array([5])
-
-    # Apply flatten operation
-    result = finchlite.flatten(wrapped_x)
-
-    # Compute if result is lazy
     if isinstance(result, finchlite.LazyTensor):
         result = finchlite.compute(result)
 

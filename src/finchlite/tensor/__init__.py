@@ -12,6 +12,7 @@ from .level import (
     sparse_list,
 )
 from .override_tensor import OverrideTensor
+from .scalar import Scalar, ScalarFType
 
 __all__ = [
     "BufferizedNDArray",
@@ -25,6 +26,8 @@ __all__ = [
     "Level",
     "LevelFType",
     "OverrideTensor",
+    "Scalar",
+    "ScalarFType",
     "SparseListLevel",
     "SparseListLevelFType",
     "dense",

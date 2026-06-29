@@ -102,4 +102,5 @@ class DefaultLogicFormatter(LogicFormatter):
             buffer_type=NumpyBufferFType(fill_ftype),
             ndim=len(shape_type),
             dimension_type=TupleFType.from_tuple(shape_type),
+            fill_value=fill_value,
         )

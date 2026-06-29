@@ -78,3 +78,8 @@ class NumPyWrapper(Tensor):
     def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor."""
         return self.ftype.shape_type
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self._data.item()

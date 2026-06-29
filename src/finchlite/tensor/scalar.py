@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from finchlite.algebra import FType, TensorFType, ftype
+import numpy as np
+
+from finchlite.algebra import FType, TensorFType, ffuncs, ftype
 from finchlite.algebra.ftypes import FDType
 
 from .override_tensor import OverrideTensor
@@ -18,14 +20,13 @@ class ScalarFType(TensorFType):
 
     def __eq__(self, other):
         if isinstance(other, ScalarFType):
-            return (
-                self._element_type == other._element_type
-                and self._fill_value == other._fill_value
+            return self._element_type == other._element_type and ffuncs.same(
+                self._fill_value, other._fill_value
             )
         return False
 
     def __hash__(self):
-        return hash((self._element_type, self._fill_value))
+        return hash((self._element_type, ffuncs.samehash(self._fill_value)))
 
     def construct(self, shape: tuple) -> Scalar:
         if shape != ():
@@ -94,8 +95,18 @@ class Scalar(OverrideTensor):
         """Shape type of the scalar."""
         return self.ftype.shape_type
 
+    def item(self):
+        return self.val.item() if hasattr(self.val, "item") else self.val
+
+    def __array__(self, dtype=None, copy=None):
+        if copy is None:
+            return np.asarray(self.val, dtype=dtype)
+        return np.array(self.val, dtype=dtype, copy=copy)
+
     def __getitem__(self, idx):
-        return self.val
+        if idx == () or idx is Ellipsis or idx == (...,):
+            return self
+        raise IndexError("Too many indices for scalar tensor.")
 
     def __str__(self):
         return str(self.val)
