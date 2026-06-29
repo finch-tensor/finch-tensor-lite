@@ -39,9 +39,13 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             ("stride", self.dimension_type),
         ]
     
-    def size_level(self,fields,stats,stats_factory,num_pos,l)->float:
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, l):
         n = stats.get_dim_size(fields[l])
-        return self.lvl_t.size_level(fields,stats,stats_factory,num_pos*n,l+1)
+        return num_pos*n + self.lvl_t.level_iter_cost(fields,stats,stats_factory,num_pos*n,l+1)
+    
+    def level_cost(self,fields,stats,stats_factory,num_pos,l)->float:
+        n = stats.get_dim_size(fields[l])
+        return self.lvl_t.level_cost(fields,stats,stats_factory,num_pos*n,l+1)
 
 
     def __post_init__(self):

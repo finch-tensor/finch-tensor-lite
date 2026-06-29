@@ -101,8 +101,8 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def idx_type(self):
         return self.buffer_factory(self.dimension_type)
     
-    def size_level(self,fields,stats,stats_factory,num_pos,l)->float:
-        pos_size = np.dtype(self.position_type.dtype).itemsize#check if works self.position_type.dtype shouldn't this be enough
+    def level_cost(self,fields,stats,stats_factory,num_pos,l)->float:
+        pos_size = np.dtype(self.position_type.dtype).itemsize
         size_ptr = (num_pos+1)*pos_size
         reduce_fields = fields[l+1:]
         if reduce_fields:
@@ -112,9 +112,8 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         nnz_prefix = reduced_stats.estimate_non_fill_values()
         size_idx = nnz_prefix*pos_size
 
-        return size_ptr + size_idx + self.lvl_t.size_level(fields,stats,stats_factory,nnz_prefix,l+1)
+        return size_ptr + size_idx + self.lvl_t.level_cost(fields,stats,stats_factory,nnz_prefix,l+1)
 
-        ...
 
     def construct(self, *, shape):
         """

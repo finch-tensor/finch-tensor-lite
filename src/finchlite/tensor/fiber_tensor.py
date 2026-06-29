@@ -77,9 +77,21 @@ class LevelFType(FType, ABC):
         Get the nested level.
         """
         ...
+    
+    @abstractmethod
+    def level_iter_cost(self,fields,stats,stats_factory,num_pos,l)->float:
+        """
+        Returns the cost of iterating this level.
+        fields : tuple of fields for each dimension
+        stats : stats object for the tensor
+        stats_factory : to compute using stats
+        num_pos : positions recieved from parent level
+        l : current level index
+        """
+        ...
 
     @abstractmethod
-    def size_level(self,fields,stats,stats_factory,num_pos,l)->float:
+    def level_cost(self,fields,stats,stats_factory,num_pos,l)->float:
         """
         Returns estimated memory cost of this level and all inner levels
         fields : tuple of fields for each dimension

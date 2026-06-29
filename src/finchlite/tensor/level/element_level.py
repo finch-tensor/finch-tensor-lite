@@ -33,7 +33,11 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             ("val", self.buffer_type),
         ]
     
-    def size_level(self,fields,stats,stats_factory,num_pos,l)->float:
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, l):
+        #no iteration here
+        return 0
+    
+    def level_cost(self,fields,stats,stats_factory,num_pos,l)->float:
         #no inner level
         #cost = num_pos * bytes per value
         val_size = np.dtype(self.element_type.dtype).itemsize
