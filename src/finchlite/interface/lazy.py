@@ -1075,10 +1075,10 @@ def matrix_power(x, n) -> LazyTensor:
         n //= 2
         if n > 0:
             base = matmul(base, base)
-        
+
     if result is None:
         raise RuntimeError("matrix_power failed to produce a result")
-        
+
     return result
 
 
