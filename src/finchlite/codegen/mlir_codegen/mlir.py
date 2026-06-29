@@ -8,8 +8,6 @@ from finchlite import finch_assembly as asm
 from finchlite.algebra import FType, ffuncs
 from finchlite.symbolic import Context, ScopedDict
 
-from .mlir_scansearch import MLIR_HELPERS
-
 
 class MLIROperator(ABC):
     @staticmethod
@@ -93,10 +91,6 @@ def mlir_function_name(op, arg: FType) -> str:
             if MLIROperator.is_unsigned(arg):
                 return "arith.shrui"
             return "arith.shrsi"
-        case ffuncs.trunc:
-            if MLIROperator.is_float(arg):
-                return "arith.truncf"
-            return "arith.trunci"
         case ffuncs.eq:
             if MLIROperator.is_float(arg):
                 return "arith.cmpf oeq,"
@@ -155,17 +149,6 @@ def mlir_binary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
     av, bv = ctx(a), ctx(b)
     res = ctx.new_ssa()
     ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {mlir_type(a.result_type)}")
-    return res
-
-
-def mlir_call_function_call(mlir_name: str, ctx: Any, ret_t: str, *args: Any) -> str:
-    vs = [ctx(a) for a in args]
-    ts = [mlir_type(a.result_type) for a in args]
-    res = ctx.new_ssa()
-    ctx.exec(
-        f"{ctx.feed}{res} = func.call @{mlir_name}({', '.join(vs)}) "
-        f": ({', '.join(ts)}) -> {ret_t}"
-    )
     return res
 
 
@@ -287,8 +270,7 @@ class MLIRContext(Context):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def emit_global(self):
-        body = "\n".join([*MLIR_HELPERS.values(), self.emit()])
-        return f"module {{\n{body}\n}}\n"
+        return "\n".join([*self.headers, self.emit()])
 
     def block(self) -> "MLIRContext":
         blk = super().block()
