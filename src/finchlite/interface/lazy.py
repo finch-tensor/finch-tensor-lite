@@ -10,7 +10,7 @@ from itertools import accumulate, zip_longest
 from typing import Any
 
 import numpy as np
-from numpy.lib.array_utils import normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from finchlite import finch_einsum as ein
 from finchlite.algebra import (
@@ -820,49 +820,20 @@ def prod(
     return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
-#######################################
-@dataclass(frozen=True)
-class LinearIndicesTensorFType(TensorFType):
-    _shape_type: tuple[type, ...]
-    _element_type: Any = int
-    _fill_value: Any = 0
-
-    @property
-    def shape_type(self) -> tuple[type, ...]:
-        return self._shape_type
-
-    @property
-    def element_type(self):
-        return self._element_type
-
-    @property
-    def fill_value(self):
-        return self._fill_value
-
-
-class LinearIndicesTensor(Tensor):
-    def __init__(self, shape):
-        self.shape_ = shape
-
-    def __getitem__(self, idxs):
-        flat_index = idxs[0]
-        for i in range(1, self.ndim):
-            flat_index = flat_index * self.shape_[i] + idxs[i]
-        return flat_index
-
-    @property
-    def shape(self):
-        return self.shape_
-
-    @property
-    def ftype(self):
-        shape_type = tuple(type(dim) for dim in self.shape)
-        return LinearIndicesTensorFType(shape_type, int, 0)
-
 @dataclass(frozen=True, eq=False)
 class IndexTensorFType(TensorFType):
     _element_type: FType
-    _shape_type: tuple
+    _shape_type: tuple[FType, ...]
+
+    def __init__(
+        self,
+        _element_type: FType | type = np.intp,
+        _shape_type: tuple[FType | type, ...] = (),
+    ):
+        object.__setattr__(self, "_element_type", ftype(_element_type))
+        object.__setattr__(
+            self, "_shape_type", tuple(ftype(dim_t) for dim_t in _shape_type)
+        )
 
     @property
     def fill_value(self):
@@ -883,18 +854,18 @@ class IndexTensorFType(TensorFType):
         if not isinstance(other, IndexTensorFType):
             return False
         return (
-            ffuncs.same(self._fill_value, other._fill_value)
+            ffuncs.same(self.fill_value, other.fill_value)
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
         return hash(
-            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+            (ffuncs.samehash(self.fill_value), self._element_type, self._shape_type)
         )
 
     def construct(self, shape: tuple) -> IndexTensor:
-        return IndexTensor(shape, self.fill_value)
+        return IndexTensor(shape, self.element_type)
 
     def __call__(self, val: Any) -> IndexTensor:
         """
@@ -914,16 +885,28 @@ class IndexTensor(Tensor):
     A tensor that has a specific shape and returns the linear (flattened) index used to access it.
     """
 
-    def __init__(self, shape):
-        self._shape = shape
+    def __init__(self, shape, element_type: FType | type = np.intp):
+        self._shape = tuple(shape)
+        self._element_type = ftype(element_type)
 
     def __getitem__(self, idxs):
-        return Scalar(self._fill_value, fill_value=self._fill_value)
+        if self.ndim == 0 and idxs in ((), Ellipsis, (...,)):
+            return Scalar(self.fill_value, fill_value=self.fill_value)
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        idxs = tuple(idx for idx in idxs if idx is not Ellipsis)
+        if len(idxs) != self.ndim:
+            raise IndexError("Incorrect number of indices for IndexTensor.")
+        flat_index = 0
+        for idx, dim in zip(idxs, self.shape, strict=True):
+            flat_index = flat_index * dim + idx
+        flat_index = self._element_type(flat_index)
+        return Scalar(flat_index, fill_value=self.fill_value)
 
     def item(self):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-        return self._fill_value
+        return self.fill_value
 
     @property
     def shape(self):
@@ -947,8 +930,7 @@ class IndexTensor(Tensor):
     @property
     def ftype(self):
         return IndexTensorFType(
-            self._fill_value,
-            ftype(self._fill_value),
+            self._element_type,
             tuple(ftype(dim) for dim in self.shape),
         )
 
