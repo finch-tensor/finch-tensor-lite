@@ -31,6 +31,44 @@ from .standardize import concordize, flatten_plans, push_fields
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
+"""Julia port """
+def _transpose_penalty(
+    expr: LogicExpression,
+    loop_prefix: tuple[Field, ...],
+    stats_factory: StatsFactory,
+    stats_bindings: dict[Alias, TensorStats],
+) -> float:
+    penalty = 0.0
+    for node in PostOrderDFS(expr):
+        match node:
+            case Table(Alias() as tns, idxs):
+                base = stats_bindings.get(tns)
+                st = stats_factory.relabel(base, tuple(idxs))
+                if not is_subsequence(tuple(idxs), loop_prefix):
+                    penalty += st.estimate_non_fill_values()
+            case _:
+                pass
+    return penalty
+
+
+def loop_order_cost(
+    expr: LogicExpression,
+    loop_order: tuple[Field, ...],
+    stats_factory: StatsFactory,
+    stats_bindings: dict[Alias, TensorStats],
+) -> float:
+    full_stats = insert_statistics(
+        stats_factory, expr, stats_bindings.copy(), replace=False, cache={}
+    )
+    cost = 0.0
+    for j in range(1, len(loop_order) + 1):
+        prefix = set(loop_order[:j])
+        reduce_idxs = tuple(f for f in full_stats.index_order if f not in prefix)
+        projected = stats_factory.aggregate(ffuncs.or_, False, reduce_idxs, full_stats)
+        cost += projected.estimate_non_fill_values()
+    cost += _transpose_penalty(expr, loop_order, stats_factory, stats_bindings)
+    return cost
+
 
 def add_output_orders(prgm: LogicStatement) -> LogicStatement:
     produced_aliases: set[Alias] = set()
