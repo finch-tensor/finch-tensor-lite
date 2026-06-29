@@ -255,6 +255,7 @@ def matrix_transpose(x, /):
         return lazy.matrix_transpose(x)
     return compute(lazy.matrix_transpose(x))
 
+
 def matrix_power(x, n, /):
     """
     Computes the power of a matrix.
