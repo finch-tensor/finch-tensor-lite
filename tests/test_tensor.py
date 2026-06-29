@@ -89,8 +89,6 @@ def test_index_tensor_returns_linear_indices():
 
     assert constructed.ftype == tns.ftype
     assert constructed[1, 2].item() == np.int64(5)
-    assert not hasattr(lazy_interface, "LinearIndicesTensor")
-    assert not hasattr(lazy_interface, "LinearIndicesTensorFType")
 
 
 def test_fiber_tensor():

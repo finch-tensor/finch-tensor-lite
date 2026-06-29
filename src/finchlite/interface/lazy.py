@@ -869,16 +869,17 @@ class IndexTensorFType(TensorFType):
 
     def __call__(self, val: Any) -> IndexTensor:
         """
-        Convert a tensor to this fill tensor type.
+        Convert a tensor to this index tensor type.
 
         Args:
             val: A tensor to convert to this type.
         Returns:
-            A IndexTensor instance of this type.
+            An IndexTensor instance of this type.
         """
         raise NotImplementedError(
             f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
+
 
 class IndexTensor(Tensor):
     """
@@ -952,8 +953,8 @@ def argmin(
             )
         sentinel = np.intp(x.shape[axis])
     else:
-        sentinel = np.intp(np.prod(x.shape))
-        indices = lazy(np.arange(sentinel, dtype=np.intp).reshape(x.shape))
+        sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
+        indices = lazy(IndexTensor(x.shape, np.intp))
 
     return reduce(
         ffuncs.min,
@@ -985,8 +986,8 @@ def argmax(
             )
         sentinel = np.intp(x.shape[axis])
     else:
-        sentinel = np.intp(np.prod(x.shape))
-        indices = lazy(np.arange(sentinel, dtype=np.intp).reshape(x.shape))
+        sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
+        indices = lazy(IndexTensor(x.shape, np.intp))
 
     return reduce(
         ffuncs.min,
