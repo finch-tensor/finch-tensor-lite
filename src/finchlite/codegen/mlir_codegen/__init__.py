@@ -13,11 +13,9 @@ from .mlir import (
     mlir_type,
     numpy_to_mlir_types,
 )
-from .mlir_scansearch import MLIR_HELPERS
 from .stages import MLIRCode, MLIRLowerer
 
 __all__ = [
-    "MLIR_HELPERS",
     "MLIRArgumentFType",
     "MLIRBinaryOperator",
     "MLIRCode",
