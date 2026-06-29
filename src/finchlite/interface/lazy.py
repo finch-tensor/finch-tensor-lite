@@ -7,10 +7,10 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
-from numpy.lib.array_utils import normalize_axis_tuple
+from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from finchlite import finch_einsum as ein
 from finchlite.algebra import (
@@ -348,7 +348,15 @@ def asarray(
     return format(obj)
 
 
-def lazy(arr) -> LazyTensor | tuple:
+@overload
+def lazy(arr: tuple[Any, ...]) -> tuple[Any, ...]: ...
+
+
+@overload
+def lazy(arr: Any) -> LazyTensor: ...
+
+
+def lazy(arr: Any) -> LazyTensor | tuple[Any, ...]:
     """
     - lazy(arr) -> LazyTensor:
     Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
@@ -818,6 +826,189 @@ def prod(
 ):
     x = lazy(x)
     return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
+
+
+@dataclass(frozen=True, eq=False)
+class IndexTensorFType(TensorFType):
+    _element_type: FType
+    _shape_type: tuple[FType, ...]
+
+    def __init__(
+        self,
+        _element_type: FType | type = np.intp,
+        _shape_type: tuple[FType | type, ...] = (),
+    ):
+        object.__setattr__(self, "_element_type", ftype(_element_type))
+        object.__setattr__(
+            self, "_shape_type", tuple(ftype(dim_t) for dim_t in _shape_type)
+        )
+
+    @property
+    def fill_value(self):
+        return self._element_type(0)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, IndexTensorFType):
+            return False
+        return (
+            ffuncs.same(self.fill_value, other.fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash(
+            (ffuncs.samehash(self.fill_value), self._element_type, self._shape_type)
+        )
+
+    def construct(self, shape: tuple) -> IndexTensor:
+        return IndexTensor(shape, self.element_type)
+
+    def __call__(self, val: Any) -> IndexTensor:
+        """
+        Convert a tensor to this index tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            An IndexTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class IndexTensor(Tensor):
+    """
+    A tensor that has a specific shape and returns the linear (flattened) index used
+    to access it.
+    """
+
+    def __init__(self, shape, element_type: FType | type = np.intp):
+        self._shape = tuple(shape)
+        self._element_type = ftype(element_type)
+
+    def __getitem__(self, idxs):
+        if self.ndim == 0 and idxs in ((), Ellipsis, (...,)):
+            return Scalar(self.fill_value, fill_value=self.fill_value)
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        idxs = tuple(idx for idx in idxs if idx is not Ellipsis)
+        if len(idxs) != self.ndim:
+            raise IndexError("Incorrect number of indices for IndexTensor.")
+        flat_index = 0
+        for idx, dim in zip(idxs, self.shape, strict=True):
+            flat_index = flat_index * dim + idx
+        flat_index = self._element_type(flat_index)
+        return Scalar(flat_index, fill_value=self.fill_value)
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.fill_value
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default fill value."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor's elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return IndexTensorFType(
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+        )
+
+
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    x = lazy(x)
+    if axis is not None:
+        axis = normalize_axis_index(axis, x.ndim)
+        indices = arange(x.shape[axis], dtype=np.intp)
+        if x.ndim > 1:
+            indices = expand_dims(
+                indices, axis=tuple(i for i in range(x.ndim) if i != axis)
+            )
+        sentinel = np.intp(x.shape[axis])
+    else:
+        sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
+        indices = lazy(IndexTensor(x.shape, np.intp))
+
+    return reduce(
+        ffuncs.min,
+        where(
+            equal(x, reduce(ffuncs.min, x, axis=axis, keepdims=True)),
+            indices,
+            sentinel,
+        ),
+        axis=axis,
+        keepdims=keepdims,
+        init=sentinel,
+    )
+
+
+def argmax(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    x = lazy(x)
+    if axis is not None:
+        axis = normalize_axis_index(axis, x.ndim)
+        indices = arange(x.shape[axis], dtype=np.intp)
+        if x.ndim > 1:
+            indices = expand_dims(
+                indices, axis=tuple(i for i in range(x.ndim) if i != axis)
+            )
+        sentinel = np.intp(x.shape[axis])
+    else:
+        sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
+        indices = lazy(IndexTensor(x.shape, np.intp))
+
+    return reduce(
+        ffuncs.min,
+        where(
+            equal(x, reduce(ffuncs.max, x, axis=axis, keepdims=True)),
+            indices,
+            sentinel,
+        ),
+        axis=axis,
+        keepdims=keepdims,
+        init=sentinel,
+    )
 
 
 def any(

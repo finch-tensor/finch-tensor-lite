@@ -926,7 +926,10 @@ class _GreaterEqual(ComparisonFinchOperator):
 
 class _Where(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
-        return np.where(a, b, c)
+        res = np.where(a, b, c)
+        if isinstance(res, np.ndarray) and res.shape == ():
+            return res[()]
+        return res
 
     def return_type(self, cond: FDType, x1: FDType, x2: FDType) -> FDType:  # type: ignore[override]
         return promote_type(x1, x2)

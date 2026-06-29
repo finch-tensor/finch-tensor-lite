@@ -174,6 +174,30 @@ def prod(
     return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
 
 
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmin(x, axis=axis, keepdims=keepdims))
+
+
+def argmax(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmax(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
+
+
 def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
