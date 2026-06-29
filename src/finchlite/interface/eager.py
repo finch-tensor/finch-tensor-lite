@@ -255,6 +255,14 @@ def matrix_transpose(x, /):
         return lazy.matrix_transpose(x)
     return compute(lazy.matrix_transpose(x))
 
+def matrix_power(x, n, /):
+    """
+    Computes the power of a matrix.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.matrix_power(x, n)
+    return compute(lazy.matrix_power(x, n))
+
 
 def bitwise_invert(x):
     if isinstance(x, lazy.LazyTensor):

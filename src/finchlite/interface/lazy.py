@@ -1049,6 +1049,33 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
+def matrix_power(x, n) -> LazyTensor:
+      x = lazy(x)
+
+      if x.ndim < 2:
+          raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+      if x.shape[-1] != x.shape[-2]:
+          raise ValueError(f"x must be a square matrix in inner dimensions, got shape {x.shape}")
+      if not isinstance(n, int):
+          raise ValueError(f"n must be an integer, got {type(n)}")
+      if n < 0:
+          raise ValueError("n must be a non-negative integer")
+
+      if n == 0:
+        identity = lazy(np.eye(x.shape[-1], dtype=_np_dtype(x.element_type)))
+        return broadcast_to(identity, x.shape)
+
+      result = None
+      base = x
+      while n > 0:
+          if n % 2 == 1:
+              result = base if result is None else matmul(result, base)
+          n //= 2
+          if n > 0:
+            base = matmul(base, base)
+      return result
+
+
 def bitwise_invert(x) -> LazyTensor:
     return elementwise(ffuncs.invert, lazy(x))
 
