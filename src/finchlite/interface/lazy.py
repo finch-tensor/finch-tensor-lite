@@ -820,6 +820,139 @@ def prod(
     return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
+#######################################
+@dataclass(frozen=True)
+class LinearIndicesTensorFType(TensorFType):
+    _shape_type: tuple[type, ...]
+    _element_type: Any = int
+    _fill_value: Any = 0
+
+    @property
+    def shape_type(self) -> tuple[type, ...]:
+        return self._shape_type
+
+    @property
+    def element_type(self):
+        return self._element_type
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+
+class LinearIndicesTensor(Tensor):
+    def __init__(self, shape):
+        self.shape_ = shape
+
+    def __getitem__(self, idxs):
+        flat_index = idxs[0]
+        for i in range(1, self.ndim):
+            flat_index = flat_index * self.shape_[i] + idxs[i]
+        return flat_index
+
+    @property
+    def shape(self):
+        return self.shape_
+
+    @property
+    def ftype(self):
+        shape_type = tuple(type(dim) for dim in self.shape)
+        return LinearIndicesTensorFType(shape_type, int, 0)
+
+@dataclass(frozen=True, eq=False)
+class IndexTensorFType(TensorFType):
+    _element_type: FType
+    _shape_type: tuple
+
+    @property
+    def fill_value(self):
+        return self._element_type(0)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, IndexTensorFType):
+            return False
+        return (
+            ffuncs.same(self._fill_value, other._fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+        )
+
+    def __hash__(self):
+        return hash(
+            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+        )
+
+    def construct(self, shape: tuple) -> IndexTensor:
+        return IndexTensor(shape, self.fill_value)
+
+    def __call__(self, val: Any) -> IndexTensor:
+        """
+        Convert a tensor to this fill tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A IndexTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+class IndexTensor(Tensor):
+    """
+    A tensor that has a specific shape and returns the linear (flattened) index used to access it.
+    """
+
+    def __init__(self, shape):
+        self._shape = shape
+
+    def __getitem__(self, idxs):
+        return Scalar(self._fill_value, fill_value=self._fill_value)
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self._fill_value
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        """Default fill value."""
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        """Data type of the tensor's elements."""
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        """Shape type of the tensor."""
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return IndexTensorFType(
+            self._fill_value,
+            ftype(self._fill_value),
+            tuple(ftype(dim) for dim in self.shape),
+        )
+
+
 def argmin(
     x,
     /,
