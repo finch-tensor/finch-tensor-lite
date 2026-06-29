@@ -813,7 +813,6 @@ def argmin(
             indices = expand_dims(
                 indices, axis=tuple(i for i in range(x.ndim) if i != axis)
             )
-        indices = broadcast_to(indices, x.shape)
         sentinel = np.intp(x.shape[axis])
     else:
         sentinel = np.intp(np.prod(x.shape))
@@ -847,7 +846,6 @@ def argmax(
             indices = expand_dims(
                 indices, axis=tuple(i for i in range(x.ndim) if i != axis)
             )
-        indices = broadcast_to(indices, x.shape)
         sentinel = np.intp(x.shape[axis])
     else:
         sentinel = np.intp(np.prod(x.shape))
