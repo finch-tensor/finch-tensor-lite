@@ -47,6 +47,12 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def lvl_t(self):
         return self.body.lvl_t
 
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, l):
+        ...
+    
+    def level_cost(self, fields, stats, stats_factory, num_pos, l):
+        ...
+        
     def construct(self, shape):
         return LoTriMask(self.lvl_t.construct(shape=shape))
 

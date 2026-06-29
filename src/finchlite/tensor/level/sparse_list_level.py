@@ -101,6 +101,25 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def idx_type(self):
         return self.buffer_factory(self.dimension_type)
     
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, l):
+       """
+       We will iterate over ptr first to get the pos to iterate over for idx
+       So for each parent position we do 1 read on ptr for ptr[pos] and ptr[pos+1], so this is done num_pos times 
+       And then for each of above we go through idx: nnz_prefix no. of times
+
+       Cost = num_pos + nnz_prefix 
+       For iterating over all the nnz's
+       """
+       reduce_fields = fields[l+1:]
+       if reduce_fields:
+           reduced_stats = stats_factory.aggregate(ffuncs.or_,False,reduce_fields,stats)
+       else :
+           reduced_stats = stats
+       nnz_prefix = reduced_stats.estimate_non_fill_values()
+
+       cost_sparse = num_pos + nnz_prefix
+       return cost_sparse + self.lvl_t.level_iter_cost(fields,stats,stats_factory,nnz_prefix,l+1)
+    
     def level_cost(self,fields,stats,stats_factory,num_pos,l)->float:
         pos_size = np.dtype(self.position_type.dtype).itemsize
         size_ptr = (num_pos+1)*pos_size
@@ -374,9 +393,9 @@ class SparseListLevel(Level):
 
     def __post_init__(self):
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
+            self.ptr = self.lvl.buffer_type(len=0, element_type=self.lvl.position_type)
         if self.idx is None:
-            self.idx = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
+            self.idx = self.lvl.buffer_type(len=0, element_type=self.lvl.position_type)
         ...
     @property
     def stride(self) -> np.integer:

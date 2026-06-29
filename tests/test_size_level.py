@@ -68,26 +68,26 @@ def elem_ftype():
 def test_dense_dense_element(dc_stats, fields_2d, elem_ftype):
     stats, factory = dc_stats
     ftype = DenseLevelFType(_lvl_t=DenseLevelFType(_lvl_t=elem_ftype))
-    cost = ftype.size_level(fields_2d, stats, factory, 1, 0)
+    cost = ftype.level_cost(fields_2d, stats, factory, 1, 0)
     assert cost == 4 * 4 * 8
 
 
 def test_dense_sparse_element(dc_stats, fields_2d, elem_ftype):
     stats, factory = dc_stats
     ftype = DenseLevelFType(_lvl_t=SparseListLevelFType(_lvl_t=elem_ftype))
-    cost = ftype.size_level(fields_2d, stats, factory, 1, 0)
+    cost = ftype.level_cost(fields_2d, stats, factory, 1, 0)
     assert cost == (4 + 1) * 8 + 4 * 8 + 4 * 8  
 
 
 def test_sparse_dense_element(dc_stats, fields_2d, elem_ftype):
     stats, factory = dc_stats
     ftype = SparseListLevelFType(_lvl_t=DenseLevelFType(_lvl_t=elem_ftype))
-    cost = ftype.size_level(fields_2d, stats, factory, 1, 0)
+    cost = ftype.level_cost(fields_2d, stats, factory, 1, 0)
     assert cost == 2 * 8 + 3 * 8 + 3 * 4 * 8  
 
 def test_sparse_sparse_element(dc_stats, fields_2d, elem_ftype):
     stats, factory = dc_stats
     ftype = SparseListLevelFType(_lvl_t=SparseListLevelFType(_lvl_t=elem_ftype))
-    cost = ftype.size_level(fields_2d, stats, factory, 1, 0)
+    cost = ftype.level_cost(fields_2d, stats, factory, 1, 0)
     assert cost == 2 * 8 + 3 * 8 + (3 + 1) * 8 + 4 * 8 + 4 * 8  
 

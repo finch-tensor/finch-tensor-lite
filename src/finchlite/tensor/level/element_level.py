@@ -218,7 +218,7 @@ class ElementLevel(Level):
     def __post_init__(self):
         if self._val is None:
             self._val = self._format.buffer_type(
-                len=0, dtype=self._format.element_type()
+                len=0, element_type=self._format.element_type
             )
 
     @property

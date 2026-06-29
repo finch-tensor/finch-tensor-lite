@@ -16,6 +16,9 @@ from finchlite.finch_logic import (
 )
 from finchlite.tensor import BufferizedNDArrayFType
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
+import random
+from finchlite.tensor.level import DenseLevelFType, SparseListLevelFType,ElementLevelFType
+from finchlite.tensor.fiber_tensor import FiberTensorFType
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -103,3 +106,18 @@ class DefaultLogicFormatter(LogicFormatter):
             ndim=len(shape_type),
             dimension_type=TupleFType.from_tuple(shape_type),
         )
+    
+class RandomLogicFormatter(LogicFormatter):
+    def get_output_tns_ftype(self, fill_value, shape_type):
+        fill_ftype = ftype(fill_value.dtype if isinstance(fill_value,np.ndarray) else fill_value)
+        elem = ElementLevelFType(fill_value=fill_value,element_type=fill_ftype,buffer_type=NumpyBufferFType(fill_ftype))
+        fmt = elem
+        for _ in reversed(shape_type):
+            if random.random()<0.5:
+                fmt = DenseLevelFType(_lvl_t=fmt)
+            else :
+                fmt = SparseListLevelFType(_lvl_t=fmt)
+        
+        return FiberTensorFType(fmt)
+
+        

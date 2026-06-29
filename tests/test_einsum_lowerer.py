@@ -5,7 +5,7 @@ import numpy as np
 import finchlite
 from finchlite.autoschedule.einsum import LogicEinsumLoader
 from finchlite.autoschedule.executor import LogicExecutor
-from finchlite.autoschedule.formatter import DefaultLogicFormatter
+from finchlite.autoschedule.formatter import DefaultLogicFormatter, RandomLogicFormatter
 from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.finch_einsum import MockEinsumLoader
 from finchlite.interface.fuse import compute
@@ -26,6 +26,21 @@ def ctx():
             DefaultLogicFormatter(LogicEinsumLoader(ctx_load=MockEinsumLoader()))
         )
     )
+@pytest.fixture
+def random_ctx():
+    return LogicExecutor(
+        LogicStandardizer(
+            RandomLogicFormatter(LogicEinsumLoader(ctx_load=MockEinsumLoader()))
+        )
+    )
+
+def test_add_random_format(rng,random_ctx):
+    A = lazy(rng.random((3,3)))
+    B = lazy(rng.random((3,3)))
+    C = finchlite.add(A,B)
+    result = compute(C,ctx=random_ctx)
+    expected = compute(A+B)
+    finch_assert_allclose(result,expected)
 
 
 def test_simple_addition(rng, ctx):
@@ -113,3 +128,4 @@ def test_minimum_reduction(rng, ctx):
     result = compute(B, ctx=ctx)
     expected = compute(B)
     finch_assert_allclose(result, expected)
+
