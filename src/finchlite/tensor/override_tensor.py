@@ -267,7 +267,7 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to complex.")
         # dispatch to the scalar value's `__complex__` method
-        return complex(self[()])
+        return complex(self.item())
 
     def __float__(self):
         """
@@ -276,7 +276,7 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to float.")
         # dispatch to the scalar value's `__float__` method
-        return float(self[()])
+        return float(self.item())
 
     def __int__(self):
         """
@@ -285,7 +285,7 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to int.")
         # dispatch to the scalar value's `__int__` method
-        return int(self[()])
+        return int(self.item())
 
     def __bool__(self):
         """
@@ -294,12 +294,12 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to bool.")
         # dispatch to the scalar value's `__bool__` method
-        return bool(self[()])
+        return bool(self.item())
 
     def __index__(self) -> int:
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to index.")
-        return operator.index(self.__int__())
+        return operator.index(self.item())
 
     def __log__(self):
         return self.mod.log(self)

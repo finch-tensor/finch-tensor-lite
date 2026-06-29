@@ -137,19 +137,28 @@ class TensorView(Tensor):
         """
         return TensorView(idxs=self.idxs + idxs, tns=self.tns, op=op)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.unwrap()
+
     def unwrap(self):
         """
-        Unwrap the tensor view to get the underlying tensor.
-        This returns the original tensor from which the view was created.
+        Unwrap the tensor view to get a scalar.
         """
-        return self.tns[*self.idxs]
+        val = self.tns[*self.idxs]
+        assert isinstance(val, Tensor) and val.ndim == 0
+        return val.item()
 
     def increment(self, val):
         """
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        self.tns[*self.idxs] = self.op(self.tns[*self.idxs], val)
+        lhs = self.tns[*self.idxs]
+        assert isinstance(lhs, Tensor) and lhs.ndim == 0
+        lhs = lhs.item()
+        self.tns[*self.idxs] = self.op(lhs, val)
         return
 
 
