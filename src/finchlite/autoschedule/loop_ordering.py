@@ -2,8 +2,10 @@ import logging
 from functools import reduce
 from itertools import chain as join_chains
 
+from finchlite.algebra import ffuncs
 from finchlite.algebra.tensor import TensorFType
-from finchlite.algebra.utils import intersect
+from finchlite.algebra.utils import intersect, is_subsequence
+from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -32,6 +34,8 @@ from .standardize import concordize, flatten_plans, push_fields
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 """Julia port """
+
+
 def _transpose_penalty(
     expr: LogicExpression,
     loop_prefix: tuple[Field, ...],
@@ -68,6 +72,9 @@ def loop_order_cost(
         cost += projected.estimate_non_fill_values()
     cost += _transpose_penalty(expr, loop_order, stats_factory, stats_bindings)
     return cost
+
+
+""" End Julia port """
 
 
 def add_output_orders(prgm: LogicStatement) -> LogicStatement:

@@ -1,7 +1,8 @@
 from collections import OrderedDict
 
-import numpy as np
 import pytest
+
+import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
