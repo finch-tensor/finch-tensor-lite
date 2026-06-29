@@ -216,12 +216,14 @@ class NotationContext:
         }
         ctx = PointwiseContext(self)
         rhs = ctx(agg_arg.arg, loops)
-        lhs_idxs = tuple(
-            loops[idx]
-            if idx in loops
-            else ntn.Literal(self.shape_types[query_lhs][n](0))
-            for n, idx in enumerate(output_idxs)
-        )
+
+        def lhs_idx(n, idx):
+            if idx in loops:
+                return loops[idx]
+            shape_type = self.shape_types[query_lhs][n] or ftypes.intp
+            return ntn.Literal(shape_type(0))
+
+        lhs_idxs = tuple(lhs_idx(n, idx) for n, idx in enumerate(output_idxs))
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(agg_op)),
