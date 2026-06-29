@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any
+from typing import Any, overload
 
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
@@ -348,7 +348,15 @@ def asarray(
     return format(obj)
 
 
-def lazy(arr) -> LazyTensor | tuple:
+@overload
+def lazy(arr: tuple[Any, ...]) -> tuple[Any, ...]: ...
+
+
+@overload
+def lazy(arr: Any) -> LazyTensor: ...
+
+
+def lazy(arr: Any) -> LazyTensor | tuple[Any, ...]:
     """
     - lazy(arr) -> LazyTensor:
     Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
