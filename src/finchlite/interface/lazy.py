@@ -883,7 +883,8 @@ class IndexTensorFType(TensorFType):
 
 class IndexTensor(Tensor):
     """
-    A tensor that has a specific shape and returns the linear (flattened) index used to access it.
+    A tensor that has a specific shape and returns the linear (flattened) index used
+    to access it.
     """
 
     def __init__(self, shape, element_type: FType | type = np.intp):
