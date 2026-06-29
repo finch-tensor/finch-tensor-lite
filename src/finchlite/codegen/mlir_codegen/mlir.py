@@ -270,7 +270,7 @@ class MLIRContext(Context):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def emit_global(self):
-        return "\n".join([*self.headers, self.emit()])
+        return f"module {{\n{self.emit()}\n}}\n"
 
     def block(self) -> "MLIRContext":
         blk = super().block()
