@@ -8,7 +8,13 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        environment: [test, mindeps]
+        suite:
+          - environment: test
+            task: test
+          - environment: mindeps
+            task: test
+          - environment: test-c
+            task: test-c
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -19,9 +25,9 @@ jobs:
           pixi-version: v0.71.3
           environments: >-
             default
-            ${{ matrix.environment }}
+            ${{ matrix.suite.environment }}
       - name: Run tests
-        run: pixi run -e ${{ matrix.environment }} test --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.environment }}.xml
+        run: pixi run -e ${{ matrix.suite.environment }} ${{ matrix.suite.task }} --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.suite.environment }}.xml
       - uses: codecov/codecov-action@v5
 
 on:

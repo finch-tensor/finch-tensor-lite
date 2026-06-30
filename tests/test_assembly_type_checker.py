@@ -695,7 +695,10 @@ def test_simple_struct():
 
 @pytest.mark.parametrize(
     ["constructor"],
-    [(CHashTable,), (NumbaHashTable,)],
+    [
+        pytest.param(CHashTable, marks=pytest.mark.c_backend),
+        (NumbaHashTable,),
+    ],
 )
 def test_hashtable(constructor):
     table = constructor(
@@ -749,7 +752,10 @@ def test_hashtable(constructor):
 
 @pytest.mark.parametrize(
     ["constructor"],
-    [(CHashTable,), (NumbaHashTable,)],
+    [
+        pytest.param(CHashTable, marks=pytest.mark.c_backend),
+        (NumbaHashTable,),
+    ],
 )
 def test_hashtable_fail(constructor):
     table = constructor(

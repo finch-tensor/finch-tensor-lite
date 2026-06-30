@@ -9,6 +9,7 @@ preview = ["pixi-build"]
 
 [environments]
 test = { features = ["test"], solve-group = "default" }
+test-c = { features = ["test", "c"], solve-group = "default" }
 mindeps = { features = ["test", "mindeps"], solve-group = "default" }
 benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 c = { features = ["c"], solve-group = "default" }
@@ -56,9 +57,14 @@ pytest-mypy = "*"
 pytest-regressions = "*"
 
 [feature.test.tasks.test]
-cmd = "pytest"
+cmd = "pytest -m 'not c_backend'"
 depends-on = ["compile"]
 default-environment = "test"
+
+[feature.test.tasks.test-c]
+cmd = "pytest -m c_backend"
+depends-on = ["compile"]
+default-environment = "test-c"
 
 [feature.test.tasks.type-check]
 cmd = "mypy ."
