@@ -11,6 +11,9 @@ preview = ["pixi-build"]
 test = { features = ["test"], solve-group = "default" }
 mindeps = { features = ["test", "mindeps"], solve-group = "default" }
 benchmark = { features = ["test", "benchmark"], solve-group = "default" }
+c = { features = ["c"], solve-group = "default" }
+c-gcc = { features = ["c-gcc"], solve-group = "default" }
+c-clang = { features = ["c-clang"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 # finch-tensor-lite package definition #
@@ -66,6 +69,21 @@ python = "3.11.*"
 
 [feature.benchmark.dependencies]
 pytest-codspeed = "*"
+
+[feature.c.dependencies]
+c-compiler = "*"
+
+[feature.c-gcc.dependencies]
+gcc = "*"
+
+[feature.c-gcc.activation.env]
+CC = "gcc"
+
+[feature.c-clang.dependencies]
+clang = "*"
+
+[feature.c-clang.activation.env]
+CC = "clang"
 
 [feature.pre-commit.dependencies]
 pre-commit = "*"
