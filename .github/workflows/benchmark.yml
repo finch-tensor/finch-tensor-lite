@@ -17,11 +17,16 @@ jobs:
             poetry env use python3.12
       - name: Install package
         run: |
-          poetry install --extras benchmark
-      - name: Run benchmarks
+          poetry install --extras benchmark --extras test
+      - name: Install debug symbols
         run: |
-          poetry run asv machine --yes
-          poetry run asv continuous origin/main HEAD -f 1.25 --show-stderr
+          sudo apt-get update && sudo apt-get install -y libc6-dbg
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: walltime,memory
+          run: |
+            poetry run pytest benchmarks/ --codspeed -vvv
 
 on:
   pull_request:
