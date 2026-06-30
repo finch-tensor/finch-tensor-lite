@@ -280,3 +280,15 @@ class BlockedStats(NumericStats):
         size_part = np.log2(sizes)
 
         return np.concatenate([size_part, dense_part])
+
+    def copy(self) -> BlockedStats:
+        new_blocks = np.empty_like(self.blocks)
+        for i in range(self.blocks.size):
+            new_blocks.flat[i] = self.stats_factory.copy(self.blocks.flat[i])
+
+        return BlockedStats(
+            new_blocks,
+            self.blocks_per_dim.copy(),
+            self,
+            self.stats_factory,
+        )

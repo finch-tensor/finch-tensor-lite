@@ -1206,18 +1206,6 @@ def test_set_fill_value():
     assert td2.fill_value == 7
 
 
-def test_add_dummy_idx():
-    td = BaseTensorStats.from_fields(
-        index_order=(Field("i"),), dim_sizes={Field("i"): 3.0}, fill_value=0
-    )
-    td2 = td.add_dummy_idx(Field("j"))
-    assert td2.index_order == (Field("i"), Field("j"))
-    assert td2.get_dim_size(Field("j")) == 1.0
-
-    td3 = td2.add_dummy_idx(Field("j"))
-    assert td3.index_order == (Field("i"), Field("j"))
-
-
 @pytest.mark.parametrize(
     "defs, func, expected_axes, expected_dims, expected_fill",
     [

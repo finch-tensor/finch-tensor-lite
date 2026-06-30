@@ -82,22 +82,6 @@ class BaseTensorStats(TensorStats):
             self._index_order, self._dim_sizes, fill_value
         )
 
-    def add_dummy_idx(self, idx: Field) -> BaseTensorStats:
-        """Return a new definition with a size-1 axis ``idx`` appended.
-
-        If ``idx`` already exists, the object is returned unchanged.
-        """
-        if idx in self.index_order:
-            return self
-
-        new_index_order = self.index_order + (idx,)
-        new_dim_sizes = dict(self.dim_sizes)
-        new_dim_sizes[idx] = 1.0
-
-        return BaseTensorStats.from_fields(
-            new_index_order, new_dim_sizes, self.fill_value
-        )
-
     @property
     def dim_sizes(self) -> Mapping[Field, float]:
         return self._dim_sizes

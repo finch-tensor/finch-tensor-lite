@@ -18,21 +18,11 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
     def _mapjoin_union(
         self, new_def: BaseTensorStats, op: FinchOperator, union_args: list[DenseStats]
     ) -> DenseStats:
-        axes_set = [set(s.index_order) for s in union_args]
-        same_axes = all(axes_set[0] == axes for axes in axes_set)
-
-        if not same_axes:
-            new_def.fill_value = 0.0
         return DenseStats.from_def(new_def)
 
     def _mapjoin_join(
         self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[DenseStats]
     ) -> DenseStats:
-        axes_set = [set(s.index_order) for s in join_args]
-        same_axes = all(axes_set[0] == axes for axes in axes_set)
-
-        if not same_axes:
-            new_def.fill_value = 0.0
         return DenseStats.from_def(new_def)
 
     def aggregate(
