@@ -92,22 +92,6 @@ def test_fiber_tensor():
             lambda: finchlite.eye(3, 4, k=1, dtype=np.int32),
             np.eye(3, 4, k=1, dtype=np.int32),
         ),
-        (
-            lambda: finchlite.upper_triangle((3, 4), dtype=np.int32),
-            np.triu(np.ones((3, 4), dtype=np.int32)),
-        ),
-        (
-            lambda: finchlite.upper_triangle((3, 4), k=1, dtype=np.int32),
-            np.triu(np.ones((3, 4), dtype=np.int32), k=1),
-        ),
-        (
-            lambda: finchlite.lower_triangle((3, 4), dtype=np.int32),
-            np.tril(np.ones((3, 4), dtype=np.int32)),
-        ),
-        (
-            lambda: finchlite.lower_triangle((3, 4), k=-1, dtype=np.int32),
-            np.tril(np.ones((3, 4), dtype=np.int32), k=-1),
-        ),
     ],
 )
 def test_matrix_pattern_tensors(make_tensor, expected):

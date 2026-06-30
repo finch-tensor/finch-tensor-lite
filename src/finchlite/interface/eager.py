@@ -41,26 +41,6 @@ def eye(
     return compute(lazy.eye(n_rows, n_cols, k=k, dtype=dtype, device=device))
 
 
-def upper_triangle(
-    shape: int | tuple[int, int],
-    *,
-    k: int = 0,
-    dtype: Any | None = None,
-    device=None,
-):
-    return compute(lazy.upper_triangle(shape, k=k, dtype=dtype))
-
-
-def lower_triangle(
-    shape: int | tuple[int, int],
-    *,
-    k: int = 0,
-    dtype: Any | None = None,
-    device=None,
-):
-    return compute(lazy.lower_triangle(shape, k=k, dtype=dtype))
-
-
 def triu(x, /, *, k: int = 0):
     if isinstance(x, lazy.LazyTensor):
         return lazy.triu(x, k=k)

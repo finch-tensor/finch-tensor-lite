@@ -1064,7 +1064,7 @@ def matrix_power(x, n) -> LazyTensor:
         raise ValueError("n must be a non-negative integer")
 
     if n == 0:
-        identity = lazy(np.eye(x.shape[-1], dtype=_np_dtype(x.element_type)))
+        identity = eye(x.shape[-1], dtype=x.element_type)
         return broadcast_to(identity, x.shape)
 
     result = None
@@ -1518,24 +1518,17 @@ def eye(
     )
 
 
-def upper_triangle(
-    shape: int | tuple[int, int], *, k: int = 0, dtype=None
-) -> LazyTensor:
-    return cast(LazyTensor, lazy(UpperTriangleTensor(shape, k=k, dtype=dtype)))
-
-
-def lower_triangle(
-    shape: int | tuple[int, int], *, k: int = 0, dtype=None
-) -> LazyTensor:
-    return cast(LazyTensor, lazy(LowerTriangleTensor(shape, k=k, dtype=dtype)))
-
-
 def triu(x, /, *, k: int = 0) -> LazyTensor:
     x = lazy(x)
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     mask = UpperTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
-    return where(mask, x, full(x.shape, 0, dtype=x.element_type))
+    return elementwise(
+        ffuncs.where,
+        mask,
+        x,
+        FillTensor(x.shape, x.element_type(0)),
+    )
 
 
 def tril(x, /, *, k: int = 0) -> LazyTensor:
@@ -1543,7 +1536,12 @@ def tril(x, /, *, k: int = 0) -> LazyTensor:
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     mask = LowerTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
-    return where(mask, x, full(x.shape, 0, dtype=x.element_type))
+    return elementwise(
+        ffuncs.where,
+        mask,
+        x,
+        FillTensor(x.shape, x.element_type(0)),
+    )
 
 
 def diag(x, /, *, k: int = 0) -> LazyTensor:

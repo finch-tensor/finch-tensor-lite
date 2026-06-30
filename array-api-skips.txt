@@ -17,7 +17,6 @@ array_api_tests/test_signatures.py::test_func_signature[unique_inverse]
 array_api_tests/test_signatures.py::test_func_signature[unique_values]
 # creation functions
 array_api_tests/test_signatures.py::test_func_signature[meshgrid]
-array_api_tests/test_signatures.py::test_func_signature[triu]
 # inspection functions
 array_api_tests/test_signatures.py::test_func_signature[result_type]
 # other functions
@@ -64,7 +63,6 @@ array_api_tests/test_signatures.py::test_extension_func_signature[linalg.trace]
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack__]
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack_device__]
 
-array_api_tests/test_creation_functions.py::test_eye
 # not implemented
 array_api_tests/test_creation_functions.py::test_meshgrid
 array_api_tests/test_creation_functions.py::test_empty_like
@@ -101,7 +99,6 @@ array_api_tests/test_data_type_functions.py::TestResultType::test_arrays_and_dty
 # test_has_names
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
-array_api_tests/test_has_names.py::test_has_names[creation-eye]
 array_api_tests/test_has_names.py::test_has_names[creation-empty_like]
 array_api_tests/test_has_names.py::test_has_names[linalg-cholesky]
 array_api_tests/test_has_names.py::test_has_names[linalg-cross]
@@ -131,8 +128,6 @@ array_api_tests/test_has_names.py::test_has_names[searching-argmin]
 array_api_tests/test_has_names.py::test_has_names[searching-searchsorted]
 array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
 array_api_tests/test_has_names.py::test_has_names[creation-meshgrid]
-array_api_tests/test_has_names.py::test_has_names[creation-tril]
-array_api_tests/test_has_names.py::test_has_names[creation-triu]
 array_api_tests/test_has_names.py::test_has_names[manipulation-flip]
 array_api_tests/test_has_names.py::test_has_names[manipulation-repeat]
 array_api_tests/test_has_names.py::test_has_names[manipulation-roll]
@@ -339,9 +334,6 @@ array_api_tests/test_has_names.py::test_has_names[array_attribute-size]
 # issue: nonzero-signature — nonzero signature mismatch
 array_api_tests/test_has_names.py::test_has_names[searching-nonzero]
 array_api_tests/test_signatures.py::test_func_signature[nonzero]
-
-# issue: missing-eye-signature — eye exists but signature does not match spec
-array_api_tests/test_signatures.py::test_func_signature[eye]
 
 # issue: missing-empty_like-signature — empty_like exists in skips but signature test also fails
 array_api_tests/test_signatures.py::test_func_signature[empty_like]
