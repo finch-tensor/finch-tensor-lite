@@ -15,12 +15,12 @@ from finchlite.finch_fused.cfg_builder import (
     fused_desugar,
     number_statements,
 )
-from finchlite.finch_fused.dataflow import LivenessAnalysis
+from finchlite.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
 from finchlite.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
 )
-from finchlite.interface import add, asarray, matmul
+from finchlite.interface import add, asarray, matmul, sum
 from tests.conftest import finch_assert_allclose
 
 
@@ -218,6 +218,11 @@ def _all_live_names(liveness, cfg):
     return names
 
 
+def _transformed_jit_source(fn):
+    transformed_fn = insert_lazy_and_compute(parse_fused_function(fn))
+    return ast.unparse(fused_function_to_python_ast(transformed_fn)) + "\n"
+
+
 def test_liveness_straight_line():
     """Parameters must appear live at the function entry block."""
 
@@ -325,6 +330,14 @@ def test_jit_straight_line():
     finch_assert_allclose(opt_fn(A, B), simple_fn(A, B))
 
 
+def test_jit_straight_line_inserted_code(file_regression):
+    def opt_fn(A, B):
+        C = matmul(A, B)
+        return C  # noqa: RET504
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
 def test_jit_return_expr():
     """A jit function with no loops should produce the same result as eager."""
 
@@ -339,6 +352,13 @@ def test_jit_return_expr():
     B = asarray(np.array([[5, 6], [7, 8]]))
 
     finch_assert_allclose(opt_fn(A, B), simple_fn(A, B))
+
+
+def test_jit_return_expr_inserted_code(file_regression):
+    def opt_fn(A, B):
+        return matmul(A, B), matmul(A, B)
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
 def test_jit_two_independent_ops():
@@ -364,6 +384,16 @@ def test_jit_two_independent_ops():
     finch_assert_allclose(opt_fn(A, B, C), simple_fn(A, B, C))
 
 
+def test_jit_two_independent_ops_inserted_code(file_regression):
+    def opt_fn(A, B, C):
+        D = matmul(A, B)
+        E = add(A, C)
+        F = add(D, E)
+        return F  # noqa: RET504
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
 def test_jit_scalar_loop():
     """A loop with a scalar iteration count and tensor accumulation."""
 
@@ -385,25 +415,45 @@ def test_jit_scalar_loop():
     finch_assert_allclose(opt_fn(A, 3), simple_fn(A, 3))
 
 
+def test_jit_scalar_loop_inserted_code(file_regression):
+    def opt_fn(A, n):
+        B = A
+        for _i in range(n):
+            B = add(B, A)
+        return B
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
 def test_jit_dependent_loop():
     """A loop with an iterator that depends on a computation."""
 
     def simple_fn(A, n):
         B = A
-        for _i in range(sum(B)):
+        for _i in range(sum(B).item()):
             B = add(B, A)
         return B
 
     @jit
     def opt_fn(A, n):
         B = A
-        for _i in range(sum(B)):
+        for _i in range(sum(B).item()):
             B = add(B, A)
         return B
 
     A = asarray(np.array([[1, 0], [0, 1]], dtype=int))
 
     finch_assert_allclose(opt_fn(A, 3), simple_fn(A, 3))
+
+
+def test_jit_dependent_loop_inserted_code(file_regression):
+    def opt_fn(A, n):
+        B = A
+        for _i in range(sum(B).item()):
+            B = add(B, A)
+        return B
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
 def test_jit_if_branch():
@@ -431,6 +481,17 @@ def test_jit_if_branch():
     finch_assert_allclose(opt_fn(A, B, False), simple_fn(A, B, False))
 
 
+def test_jit_if_branch_inserted_code(file_regression):
+    def opt_fn(A, B, use_matmul):
+        if use_matmul:  # noqa: SIM108
+            result = matmul(A, B)
+        else:
+            result = add(A, B)
+        return result
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
 def test_jit_while():
     """A jit function with a while loop."""
 
@@ -454,6 +515,17 @@ def test_jit_while():
     n = 3
 
     finch_assert_allclose(opt_fn(A, B, n), simple_fn(A, B, n))
+
+
+def test_jit_while_inserted_code(file_regression):
+    def opt_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = add(C, B)
+            n = n - 1
+        return C
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
 def test_jit_module_function():
@@ -481,6 +553,17 @@ def test_jit_module_function():
     finch_assert_allclose(opt_fn(A, B, n), simple_fn(A, B, n))
 
 
+def test_jit_module_function_inserted_code(file_regression):
+    def opt_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = finchlite.interface.add(C, B)
+            n = n - 1
+        return C
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
 def test_jit_local_module_function():
     """A jit function with a function from a module."""
 
@@ -506,3 +589,16 @@ def test_jit_local_module_function():
     n = 3
 
     finch_assert_allclose(simple_fn(A, B, n), opt_fn(A, B, n))
+
+
+def test_jit_local_module_function_inserted_code(file_regression):
+    xp = finchlite.interface
+
+    def opt_fn(A, B, n):
+        C = A
+        while n > 0:
+            C = xp.add(C, B)
+            n = n - 1
+        return C
+
+    file_regression.check(_transformed_jit_source(opt_fn), extension=".py")

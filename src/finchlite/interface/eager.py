@@ -101,6 +101,12 @@ def squeeze(
     return compute(lazy.squeeze(x, axis=axis))
 
 
+def astype(x, dtype, /, *, copy=True, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.astype(x, dtype, copy=copy, device=device)
+    return compute(lazy.astype(x, dtype, copy=copy, device=device))
+
+
 def reduce(
     op: FinchOperator,
     x,
@@ -168,6 +174,30 @@ def prod(
     return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
 
 
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmin(x, axis=axis, keepdims=keepdims))
+
+
+def argmax(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmax(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
+
+
 def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
@@ -196,6 +226,12 @@ def multiply(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.multiply(x1, x2)
     return compute(lazy.multiply(x1, x2))
+
+
+def outer(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.outer(x1, x2)
+    return compute(lazy.outer(x1, x2))
 
 
 def divide(x1, x2):
@@ -385,7 +421,10 @@ def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.min(x, axis=axis, keepdims=keepdims))
 
 
-minimum = min
+def minimum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.minimum(x1, x2)
+    return compute(lazy.minimum(x1, x2))
 
 
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -394,10 +433,13 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
 
 
-maximum = max
+def maximum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.maximum(x1, x2)
+    return compute(lazy.maximum(x1, x2))
 
 
-def clip(x, /, *, min=None, max=None):
+def clip(x, /, min=None, max=None):
     if (
         isinstance(x, lazy.LazyTensor)
         or isinstance(min, lazy.LazyTensor)
@@ -478,29 +520,6 @@ def broadcast_arrays(*args):
     return compute(lazy.broadcast_arrays(*args))
 
 
-def concat(arrays: tuple | list, /, *, axis: int | None = 0):
-    """
-    Concatenates a sequence of arrays along an existing axis.
-
-    Parameters
-    ----------
-    arrays: tuple or list
-        A sequence of arrays to concatenate. Arrays must have the same shape
-        except in the dimension corresponding to the specified axis.
-    axis: int, optional
-        The axis along which to concatenate the arrays. Default is 0. If None,
-        the arrays are flattened before concatenation.
-
-    Returns
-    -------
-    out: array
-        A new concatenated array.
-    """
-    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
-        return lazy.concat(arrays, axis=axis)
-    return compute(lazy.concat(arrays, axis=axis))
-
-
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
     """
     Moves array axes (dimensions) to new positions,
@@ -520,122 +539,6 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     if isinstance(x, lazy.LazyTensor):
         return lazy.moveaxis(x, source, destination)
     return compute(lazy.moveaxis(x, source, destination))
-
-
-def stack(arrays: Sequence, /, *, axis: int = 0):
-    """
-    Stacks a sequence of arrays along a new axis.
-
-    Parameters
-    ----------
-    arrays: Sequence
-        A sequence of arrays to stack. All arrays must have the same shape.
-    axis: int, optional
-        The axis along which to stack the arrays. Default is 0.
-
-    Returns
-    -------
-    out: array
-        A new array with the stacked arrays along the specified axis.
-    """
-    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
-        return lazy.stack(arrays, axis=axis)
-    return compute(lazy.stack(arrays, axis=axis))
-
-
-def split_dims(x, axis: int, shape: tuple):
-    """
-    Split a dimension into multiple dimensions. The product
-    of the sizes in the `shape` tuple must equal the size
-    of the dimension being split.
-
-    Parameters
-    ----------
-    x: array
-        The input tensor to split
-    axis: int
-        The axis to split
-    shape: tuple
-        The new shape for the split dimensions
-
-    Returns
-    -------
-    out: array
-        A tensor with the specified dimension split into multiple dimensions
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> x = np.arange(12).reshape(2, 6)  # shape (2, 6)
-    >>> result = split_dims(x, axis=1, shape=(2, 3))
-    >>> result.shape
-    (2, 2, 3)
-    """
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.split_dims(x, axis, shape)
-    return compute(lazy.split_dims(x, axis, shape))
-
-
-def combine_dims(x, axes: tuple[int, ...]):
-    """
-    Combine multiple consecutive dimensions into a single dimension.
-    The resulting axis will have a size equal to the product of the
-    sizes of the combined axes.
-
-    Parameters
-    ----------
-    x: array
-        The input tensor
-    axes: tuple[int, ...]
-        Consecutive axes to combine.
-
-        The axes will be considered in increasing order.
-        So passing axes=(2, 1, 3) will be equivalent to
-        passing axes=(1, 2, 3).
-
-    Returns
-    -------
-    out: array
-        A tensor with the specified dimensions combined into one
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
-    >>> result = combine_dims(x, axes=(1, 2))
-    >>> result.shape
-    (2, 12)
-    """
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.combine_dims(x, axes)
-    return compute(lazy.combine_dims(x, axes))
-
-
-def flatten(x):
-    """
-    Flattens the input tensor into a 1D tensor.
-
-    Parameters
-    ----------
-    x: array
-        The input tensor to be flattened.
-
-    Returns
-    -------
-    out: array
-        A new tensor that is a flattened version of the input.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
-    >>> result = flatten(x)
-    >>> result.shape
-    (24,)
-    """
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.flatten(x)
-    return compute(lazy.flatten(x))
 
 
 # trigonometric functions:
@@ -771,6 +674,22 @@ def copysign(x1, x2):
     return compute(lazy.copysign(x1, x2))
 
 
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonzero(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonzero(x, axis=axis, keepdims=keepdims))
+
+
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonfill(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonfill(x, axis=axis, keepdims=keepdims))
+
+
 def nextafter(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.nextafter(x1, x2)
@@ -855,10 +774,22 @@ def equal(x1, x2):
     return compute(lazy.equal(x1, x2))
 
 
+def same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.same(x1, x2)
+    return compute(lazy.same(x1, x2))
+
+
 def not_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.not_equal(x1, x2)
     return compute(lazy.not_equal(x1, x2))
+
+
+def not_same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.not_same(x1, x2)
+    return compute(lazy.not_same(x1, x2))
 
 
 def where(condition, x1, x2):

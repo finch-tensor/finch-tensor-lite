@@ -272,6 +272,11 @@ class FiberTensor(OverrideTensor):
         # TODO: temporary for dense only. TBD in sparse_level PR
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.to_numpy().item()
+
 
 @dataclass(unsafe_hash=True)
 class FiberTensorFields:

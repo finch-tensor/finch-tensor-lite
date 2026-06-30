@@ -313,9 +313,9 @@ class _FusedToPythonAST:
 
     def _stmt_to_ast(self, stmt: fzd.FusedStatement) -> ast.stmt:
         match stmt:
-            case fzd.Assign(lhs=fzd.Variable(name=name), rhs=rhs):
+            case fzd.Assign(lhs=lhs, rhs=rhs):
                 return ast.Assign(
-                    targets=[ast.Name(id=name, ctx=ast.Store())],
+                    targets=[self._target_to_ast(lhs)],
                     value=self._expr_to_ast(rhs),
                 )
             case fzd.ExprStmt(value=value):
@@ -356,6 +356,20 @@ class _FusedToPythonAST:
             case _:
                 raise ValueError(
                     f"Unsupported fused statement type: {type(stmt).__name__}"
+                )
+
+    def _target_to_ast(self, target: fzd.FusedExpression) -> ast.expr:
+        match target:
+            case fzd.Variable(name=name):
+                return ast.Name(id=name, ctx=ast.Store())
+            case fzd.Call(fn=fzd.Literal(val=fn), args=args) if fn is tuple:
+                return ast.Tuple(
+                    elts=[self._target_to_ast(arg) for arg in args],
+                    ctx=ast.Store(),
+                )
+            case _:
+                raise ValueError(
+                    f"Unsupported fused assignment target: {type(target).__name__}"
                 )
 
     def _block_to_ast(self, block: fzd.Block) -> list[ast.stmt]:

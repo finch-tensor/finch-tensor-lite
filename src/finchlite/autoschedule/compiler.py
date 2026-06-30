@@ -22,6 +22,7 @@ from finchlite.symbolic import gensym
 from finchlite.symbolic.traversal import PostOrderDFS
 from finchlite.util.logging import LOG_NOTATION
 
+from .loop_ordering import CycleInFields, toposort
 from .stages import FormattedForm, LogicNotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
@@ -198,24 +199,38 @@ class NotationContext:
         # Build a dict mapping fields to their shapes
         arg_dims = agg_arg.dimmap(merge_shapes, self.shapes)
         shapes_map = dict(zip(agg_arg.idxs, arg_dims, strict=True))
-        shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in agg_arg.idxs}
+        # Reorders may add output-only dimensions; those are singleton axes.
+        try:
+            loop_idxs = toposort([list(agg_arg.idxs), list(output_idxs)])
+        except CycleInFields:
+            raise ValueError(
+                "Cannot choose a loop order that preserves both aggregate "
+                "and output indices."
+            ) from None
+        shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in loop_idxs}
         arg_types = agg_arg.shape_type(self.shape_types)
         shape_type_map = dict(zip(agg_arg.idxs, arg_types, strict=True))
-        shape_type = {
-            idx: shape_type_map.get(idx) or ftypes.intp for idx in agg_arg.idxs
-        }
+        shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_idxs}
         loops = {
-            idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in agg_arg.idxs
+            idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in loop_idxs
         }
         ctx = PointwiseContext(self)
         rhs = ctx(agg_arg.arg, loops)
+
+        def lhs_idx(n, idx):
+            if idx in loops:
+                return loops[idx]
+            shape_type = self.shape_types[query_lhs][n] or ftypes.intp
+            return ntn.Literal(shape_type(0))
+
+        lhs_idxs = tuple(lhs_idx(n, idx) for n, idx in enumerate(output_idxs))
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(agg_op)),
-            tuple(loops[idx] for idx in output_idxs),
+            lhs_idxs,
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
-        for idx in reversed(agg_arg.idxs):
+        for idx in reversed(loop_idxs):
             ext = ntn.Call(
                 ntn.Literal(make_extent),
                 (ntn.Literal(shape_type[idx](0)), shapes[idx]),
