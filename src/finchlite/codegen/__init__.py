@@ -19,6 +19,7 @@ from .c_codegen import (
     CKernel,
     CLibrary,
     CLowerer,
+    PrintableCFType,
 )
 from .numba_codegen import (
     NumbaBinaryOperator,
@@ -31,6 +32,7 @@ from .numba_codegen import (
     NumbaNAryOperator,
     NumbaOperator,
     NumbaUnaryOperator,
+    PrintableNumbaFType,
 )
 
 __all__ = [
@@ -64,6 +66,8 @@ __all__ = [
     "NumbaUnaryOperator",
     "NumpyBuffer",
     "NumpyBufferFType",
+    "PrintableCFType",
+    "PrintableNumbaFType",
     "SafeBuffer",
     "SafeBufferFType",
 ]

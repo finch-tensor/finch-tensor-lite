@@ -482,9 +482,9 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 
 
 ctype_print_fmt: dict[Any, str] = {
-    ctypes.c_bool: "%u",
-    ctypes.c_char: "%d",
-    ctypes.c_wchar: "%d",
+    ctypes.c_bool: "%d",
+    ctypes.c_char: "%c",
+    ctypes.c_wchar: "%lc",
     ctypes.c_byte: "%d",
     ctypes.c_ubyte: "%d",
     ctypes.c_int8: "%d",
@@ -496,25 +496,84 @@ ctype_print_fmt: dict[Any, str] = {
     ctypes.c_uint32: "%u",
     ctypes.c_uint64: "%lu",
     ctypes.c_char_p: "%s",
-    ctypes.c_wchar_p: "%s",
-    # use standard types instead of aliases
-    # ctypes.c_short: "",
-    # ctypes.c_ushort: "",
-    # ctypes.c_int: "",
-    # ctypes.c_uint: "",
-    # ctypes.c_long: "",
-    # ctypes.c_ulong: "",
-    # ctypes.c_longlong: "",
-    # ctypes.c_ulonglong: "",
-    # ctypes.c_size_t: "",
-    # ctypes.c_ssize_t: "",
+    ctypes.c_wchar_p: "%ls",
     ctypes.c_float: "%f",
     ctypes.c_double: "%f",
-    # ctypes.c_char_p: "",
-    # ctypes.c_wchar_p: "",
-    # ctypes.c_void_p: "",
-    # ctypes.py_object: "",
 }
+
+
+class PrintableCFType(ABC):
+    @abstractmethod
+    def c_print(self, ctx, obj) -> tuple[str, tuple[str, ...]]:
+        """
+        Return a printf format fragment and the C expressions it consumes.
+        """
+        ...
+
+
+def c_print(fmt: FType, ctx, obj) -> tuple[str, tuple[str, ...]]:
+    match fmt:
+        case PrintableCFType():
+            return fmt.c_print(ctx, obj)
+        case (
+            algebra.ftypes.FDTypeNumpy()
+            | algebra.int_
+            | algebra.float_
+            | algebra.bool_
+            | algebra.str_
+        ):
+            return c_print_scalar(fmt, ctx, obj)
+        case TupleFType():
+            return c_print_tuple(fmt, ctx, obj)
+        case StructFType():
+            return c_print_struct(fmt, ctx, obj)
+        case _:
+            raise NotImplementedError(f"No C print mapping for {fmt}")
+
+
+def c_print_scalar(fmt: FType, ctx, obj) -> tuple[str, tuple[str, ...]]:
+    ctype = c_type(fmt)
+    if ctype not in ctype_print_fmt:
+        raise NotImplementedError(f"No C print mapping for {fmt}")
+    if isinstance(fmt, algebra.ftypes.FDTypeBoolean):
+        return ctype_print_fmt[ctype], (f"(int){obj}",)
+    return ctype_print_fmt[ctype], (obj,)
+
+
+def c_print_tuple(fmt: TupleFType, ctx, obj) -> tuple[str, tuple[str, ...]]:
+    fields = fmt.struct_fields
+    if not fields:
+        return "()", ()
+
+    pieces: list[str] = ["("]
+    args: list[str] = []
+    for field_idx, (field, field_t) in enumerate(fields):
+        if field_idx > 0:
+            pieces.append(", ")
+        field_fmt, field_args = c_print(field_t, ctx, c_getattr(fmt, ctx, obj, field))
+        pieces.append(field_fmt)
+        args.extend(field_args)
+    if len(fields) == 1:
+        pieces.append(",")
+    pieces.append(")")
+    return "".join(pieces), tuple(args)
+
+
+def c_print_struct(fmt: StructFType, ctx, obj) -> tuple[str, tuple[str, ...]]:
+    pieces: list[str] = [f"{fmt.struct_name}("]
+    args: list[str] = []
+    for field_idx, (field, field_t) in enumerate(fmt.struct_fields):
+        if field_idx > 0:
+            pieces.append(", ")
+        field_fmt, field_args = c_print(field_t, ctx, c_getattr(fmt, ctx, obj, field))
+        pieces.extend((f"{field}=", field_fmt))
+        args.extend(field_args)
+    pieces.append(")")
+    return "".join(pieces), tuple(args)
+
+
+def c_string_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 class CGenerator(UnvalidatedForm, CLowerer):
@@ -907,20 +966,21 @@ class CContext(Context):
                 return None
             case asm.Print(args):
                 self.add_header("#include <stdio.h>")
-                args_value_str = ""
-                fmt_str = ""
-                for arg in args:
-                    if c_type(arg.type) in ctype_print_fmt:
-                        fmt_str = fmt_str + f"{ctype_print_fmt[c_type(arg.type)]},"
-                        args_value_str = args_value_str + f"{self(arg)},"
-                    else:
-                        fmt_str = fmt_str + "%s,"
-                        args_value_str = (
-                            args_value_str + f'"{self.ctype_name(c_type(arg.type))}",'
-                        )
-                fmt_str = fmt_str[:-1]
-                args_value_str = args_value_str[:-1]
-                self.exec(f'{feed}printf("{fmt_str}\\n", {args_value_str});')
+                pieces: list[str] = []
+                print_args: list[str] = []
+                for arg_idx, arg in enumerate(args):
+                    if arg_idx > 0:
+                        pieces.append(" ")
+                    arg_fmt, arg_args = c_print(arg.result_type, self, self(arg))
+                    pieces.append(arg_fmt)
+                    print_args.extend(arg_args)
+                fmt_str = c_string_literal("".join(pieces) + "\n")
+                if print_args:
+                    self.exec(
+                        f'{feed}printf("{fmt_str}", {", ".join(print_args)});'
+                    )
+                else:
+                    self.exec(f'{feed}printf("{fmt_str}");')
                 return None
             case _:
                 raise NotImplementedError(

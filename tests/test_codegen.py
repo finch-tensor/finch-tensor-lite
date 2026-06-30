@@ -1,6 +1,5 @@
 import ctypes
 import ctypes.util
-import operator
 import os
 import re
 import subprocess
@@ -1187,19 +1186,19 @@ def test_print(compiler, capfd, file_regression):
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", np.float64)
+    res_var = asm.Variable("res", ftype(np.float64))
 
-    i16_var = asm.Variable("i16_var", np.int16)
-    i32_var = asm.Variable("i32_var", np.int32)
-    i64_var = asm.Variable("i64_var", np.int64)
-    f32_var = asm.Variable("f32_var", np.float32)
-    f64_var = asm.Variable("f64_var", np.float64)
+    i16_var = asm.Variable("i16_var", ftype(np.int16))
+    i32_var = asm.Variable("i32_var", ftype(np.int32))
+    i64_var = asm.Variable("i64_var", ftype(np.int64))
+    f32_var = asm.Variable("f32_var", ftype(np.float32))
+    f64_var = asm.Variable("f64_var", ftype(np.float64))
 
     prgm = compiler(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", np.float64),
+                    asm.Variable("simple_struct", ftype(np.float64)),
                     (p_var, x_var),
                     asm.Block(
                         (
@@ -1221,7 +1220,7 @@ def test_print(compiler, capfd, file_regression):
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.mul),
+                                    asm.Literal(ffuncs.mul),
                                     (
                                         asm.GetAttr(p_var, asm.Literal("x")),
                                         asm.GetAttr(x_var, asm.Literal("element_0")),
@@ -1231,11 +1230,11 @@ def test_print(compiler, capfd, file_regression):
                             asm.Assign(
                                 res_var,
                                 asm.Call(
-                                    asm.Literal(operator.add),
+                                    asm.Literal(ffuncs.add),
                                     (
                                         res_var,
                                         asm.Call(
-                                            asm.Literal(operator.mul),
+                                            asm.Literal(ffuncs.mul),
                                             (
                                                 asm.GetAttr(p_var, asm.Literal("y")),
                                                 asm.GetAttr(

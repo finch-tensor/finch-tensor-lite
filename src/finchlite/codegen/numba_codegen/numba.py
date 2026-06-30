@@ -207,6 +207,23 @@ class NumbaArgumentFType(ABC):
         ...
 
 
+class PrintableNumbaFType(ABC):
+    @abstractmethod
+    def numba_print(self, ctx, obj) -> tuple[str, ...]:
+        """
+        Return expressions to pass to Numba's print for this object.
+        """
+        ...
+
+
+def numba_print(fmt: FType, ctx, obj) -> tuple[str, ...]:
+    match fmt:
+        case PrintableNumbaFType():
+            return fmt.numba_print(ctx, obj)
+        case _:
+            return (ctx(obj),)
+
+
 def to_numpy_type(t: FType) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
@@ -875,8 +892,12 @@ class NumbaContext(Context):
                     self(func)
                 return None
             case asm.Print(args):
-                for arg in args:
-                    self.exec(f"{feed}print({self(arg)})")
+                print_args = [
+                    expr
+                    for arg in args
+                    for expr in numba_print(arg.result_type, self, arg)
+                ]
+                self.exec(f"{feed}print({', '.join(print_args)})")
                 return None
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
