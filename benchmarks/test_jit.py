@@ -19,7 +19,7 @@ def mat_chain(dims: list[int]):
 
 
 def _f1_jit(A, B, C, D, E):
-    matmul(A, matmul(B, matmul(C, matmul(D, E))))
+    return matmul(A, matmul(B, matmul(C, matmul(D, E))))
 
 
 def test_f1_jit(scheduler, benchmark):
