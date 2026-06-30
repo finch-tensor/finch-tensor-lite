@@ -18,15 +18,10 @@ jobs:
       - name: Install package
         run: |
           poetry install --extras benchmark --extras test
-      - name: Run time benchmarks
+      - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
-          mode: simulation
-          run: poetry run pytest benchmarks/ --codspeed -vvv
-      - name: Run memory benchmarks
-        uses: CodSpeedHQ/action@v4
-        with:
-          mode: memory
+          mode: walltime,memory
           run: poetry run pytest benchmarks/ --codspeed -vvv
 
 on:
