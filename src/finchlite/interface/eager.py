@@ -30,6 +30,34 @@ def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None
     return compute(lazy.empty(shape, dtype=dtype))
 
 
+def eye(n: int, m: int | None = None, *, dtype: Any | None = None, device=None):
+    return compute(lazy.eye(n, m, dtype=dtype))
+
+
+def upper_triangle(
+    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
+):
+    return compute(lazy.upper_triangle(shape, dtype=dtype))
+
+
+def strict_upper_triangle(
+    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
+):
+    return compute(lazy.strict_upper_triangle(shape, dtype=dtype))
+
+
+def lower_triangle(
+    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
+):
+    return compute(lazy.lower_triangle(shape, dtype=dtype))
+
+
+def strict_lower_triangle(
+    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
+):
+    return compute(lazy.strict_lower_triangle(shape, dtype=dtype))
+
+
 def full_like(
     x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
 ):

@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_tuple
@@ -1357,6 +1357,171 @@ class FillTensor(Tensor):
             ftype(self._fill_value),
             tuple(ftype(dim) for dim in self.shape),
         )
+
+
+@dataclass(frozen=True, eq=False)
+class MatrixPatternTensorFType(TensorFType):
+    _fill_value: Any
+    _element_type: FType
+    _shape_type: tuple
+    _tensor_type: type[MatrixPatternTensor]
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, MatrixPatternTensorFType):
+            return False
+        return (
+            ffuncs.same(self._fill_value, other._fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+            and self._tensor_type == other._tensor_type
+        )
+
+    def __hash__(self):
+        return hash(
+            (
+                ffuncs.samehash(self._fill_value),
+                self._element_type,
+                self._shape_type,
+                self._tensor_type,
+            )
+        )
+
+    def construct(self, shape: tuple) -> MatrixPatternTensor:
+        return self._tensor_type(shape, dtype=self.element_type)
+
+    def __call__(self, val: Any) -> MatrixPatternTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class MatrixPatternTensor(Tensor):
+    def __init__(self, shape, *, dtype=None):
+        shape = _matrix_shape(shape)
+        self._shape = shape
+        self._element_type = ftype(dtype if dtype is not None else np.float64)
+        self._fill_value = self._element_type(0)
+        self._one_value = self._element_type(1)
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != 2:
+            raise ValueError("Matrix pattern tensors require two indices.")
+        val = self._one_value if self._contains(*idxs) else self._fill_value
+        return Scalar(val, fill_value=self._fill_value)
+
+    def _contains(self, i, j) -> bool:
+        raise NotImplementedError
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
+        for i in range(self.shape[0]):
+            for j in range(self.shape[1]):
+                arr[i, j] = (
+                    self._one_value if self._contains(i, j) else self._fill_value
+                )
+        return arr
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return MatrixPatternTensorFType(
+            self._fill_value,
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            type(self),
+        )
+
+
+class EyeTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return i == j
+
+
+class UpperTriangleTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return i <= j
+
+
+class StrictUpperTriangleTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return i < j
+
+
+class LowerTriangleTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return i >= j
+
+
+class StrictLowerTriangleTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return i > j
+
+
+def _matrix_shape(shape: int | tuple[int, int]) -> tuple[int, int]:
+    if isinstance(shape, int):
+        return (shape, shape)
+    shape_tuple = tuple(shape)
+    if len(shape_tuple) != 2:
+        raise ValueError(f"Expected a 2D shape, got {shape_tuple}")
+    return shape_tuple
+
+
+def eye(n: int, m: int | None = None, *, dtype=None) -> LazyTensor:
+    return cast(
+        LazyTensor,
+        lazy(EyeTensor((n, n if m is None else m), dtype=dtype)),
+    )
+
+
+def upper_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
+    return cast(LazyTensor, lazy(UpperTriangleTensor(shape, dtype=dtype)))
+
+
+def strict_upper_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
+    return cast(LazyTensor, lazy(StrictUpperTriangleTensor(shape, dtype=dtype)))
+
+
+def lower_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
+    return cast(LazyTensor, lazy(LowerTriangleTensor(shape, dtype=dtype)))
+
+
+def strict_lower_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
+    return cast(LazyTensor, lazy(StrictLowerTriangleTensor(shape, dtype=dtype)))
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:

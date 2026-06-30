@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import finchlite
 from finchlite import (
@@ -8,6 +9,7 @@ from finchlite import (
     element,
     fiber_tensor,
 )
+from finchlite.interface.lazy import EyeTensor
 from finchlite.tensor import BufferizedNDArray
 
 
@@ -80,3 +82,42 @@ def test_fiber_tensor():
     )
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)
+
+
+@pytest.mark.parametrize(
+    "make_tensor, expected",
+    [
+        (lambda: finchlite.eye(3, 4, dtype=np.int32), np.eye(3, 4, dtype=np.int32)),
+        (
+            lambda: finchlite.upper_triangle((3, 4), dtype=np.int32),
+            np.triu(np.ones((3, 4), dtype=np.int32)),
+        ),
+        (
+            lambda: finchlite.strict_upper_triangle((3, 4), dtype=np.int32),
+            np.triu(np.ones((3, 4), dtype=np.int32), k=1),
+        ),
+        (
+            lambda: finchlite.lower_triangle((3, 4), dtype=np.int32),
+            np.tril(np.ones((3, 4), dtype=np.int32)),
+        ),
+        (
+            lambda: finchlite.strict_lower_triangle((3, 4), dtype=np.int32),
+            np.tril(np.ones((3, 4), dtype=np.int32), k=-1),
+        ),
+    ],
+)
+def test_matrix_pattern_tensors(make_tensor, expected):
+    tensor = make_tensor()
+
+    assert tensor.shape == expected.shape
+    assert tensor.fill_value.dtype == expected.dtype
+    np.testing.assert_array_equal(tensor.to_numpy(), expected)
+
+
+def test_lazy_matrix_pattern_tensor_compute():
+    tensor = finchlite.lazy(EyeTensor((2, 3), dtype=np.int32))
+    result = finchlite.compute(tensor)
+
+    assert tensor.shape == (2, 3)
+    assert result.fill_value.dtype == np.dtype(np.int32)
+    np.testing.assert_array_equal(result.to_numpy(), np.eye(2, 3, dtype=np.int32))
