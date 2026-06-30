@@ -27,7 +27,7 @@ test = [
 ]
 benchmark = [
     "pytest-codspeed>=5",
-    "aspectlib",
+    "finch-tensor-lite[test]",
 ]
 
 [build-system]
