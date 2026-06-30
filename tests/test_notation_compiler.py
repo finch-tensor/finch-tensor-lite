@@ -1,20 +1,17 @@
-import operator
-
 import pytest
 
 import numpy as np
 
 import finchlite
 import finchlite.finch_notation as ntn
-from finchlite import ftype
+from finchlite import ffuncs, ftype
 from finchlite.compile import (
-    BufferizedNDArray,
-    ExtentFType,
     NotationCompiler,
-    dimension,
+    make_extent,
 )
 from finchlite.finch_assembly import AssemblyInterpreter
 from finchlite.symbolic import Reflector
+from finchlite.tensor import BufferizedNDArray
 
 from .conftest import finch_assert_equal
 
@@ -33,9 +30,9 @@ from .conftest import finch_assert_equal
     ],
 )
 def test_matrix_multiplication(a, b):
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
     a_buf = BufferizedNDArray.from_numpy(a)
     b_buf = BufferizedNDArray.from_numpy(b)
@@ -49,13 +46,26 @@ def test_matrix_multiplication(a, b):
     B_ = ntn.Slot("B_", a_format)
     C_ = ntn.Slot("C_", a_format)
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
 
-    m = ntn.Variable("m", ExtentFType(np.int64, np.int64))
-    n = ntn.Variable("n", ExtentFType(np.int64, np.int64))
-    p = ntn.Variable("p", ExtentFType(np.int64, np.int64))
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
+
+    m_ext = ntn.Call(
+        ntn.Literal(make_extent),
+        (ntn.Literal(np.int64(0)), ntn.Variable("m", finchlite.int64)),
+    )
+    n_ext = ntn.Call(
+        ntn.Literal(make_extent),
+        (ntn.Literal(np.int64(0)), ntn.Variable("n", finchlite.int64)),
+    )
+    p_ext = ntn.Call(
+        ntn.Literal(make_extent),
+        (ntn.Literal(np.int64(0)), ntn.Variable("p", finchlite.int64)),
+    )
 
     prgm = ntn.Module(
         (
@@ -64,30 +74,24 @@ def test_matrix_multiplication(a, b):
                 (C, A, B),
                 ntn.Block(
                     (
-                        ntn.Assign(
-                            m, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0)))
-                        ),
-                        ntn.Assign(
-                            n, ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1)))
-                        ),
-                        ntn.Assign(
-                            p, ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1)))
-                        ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
-                            C_, ntn.Literal(0.0), ntn.Literal(operator.add), (m, n)
+                            C_, ntn.Literal(0.0), ntn.Literal(ffuncs.add), (m, n)
                         ),
                         ntn.Loop(
                             i,
-                            m,
+                            m_ext,
                             ntn.Loop(
                                 k,
-                                p,
+                                p_ext,
                                 ntn.Loop(
                                     j,
-                                    n,
+                                    n_ext,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -105,16 +109,14 @@ def test_matrix_multiplication(a, b):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.mul),
+                                                    ntn.Literal(ffuncs.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(operator.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffuncs.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -124,7 +126,7 @@ def test_matrix_multiplication(a, b):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
@@ -136,7 +138,7 @@ def test_matrix_multiplication(a, b):
     # NOTATION
     ntn_mod = ntn.NotationInterpreter()(prgm)
 
-    c_buf = finchlite.compile.BufferizedNDArray.from_numpy(
+    c_buf = BufferizedNDArray.from_numpy(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
@@ -148,7 +150,7 @@ def test_matrix_multiplication(a, b):
     asm_program = NotationCompiler(Reflector())(prgm)
     asm_mod = AssemblyInterpreter()(asm_program)
 
-    c_buf = finchlite.compile.BufferizedNDArray.from_numpy(
+    c_buf = BufferizedNDArray.from_numpy(
         np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     )
 
@@ -159,11 +161,11 @@ def test_matrix_multiplication(a, b):
 
 def test_matrix_multiplication_regression(file_regression):
     a = np.array([[2, 0], [1, 3]], dtype=np.float64)
-    i = ntn.Variable("i", np.int64)
-    j = ntn.Variable("j", np.int64)
-    k = ntn.Variable("k", np.int64)
+    i = ntn.Variable("i", finchlite.int64)
+    j = ntn.Variable("j", finchlite.int64)
+    k = ntn.Variable("k", finchlite.int64)
 
-    a_buf = finchlite.compile.BufferizedNDArray.from_numpy(a)
+    a_buf = BufferizedNDArray.from_numpy(a)
     a_format = ftype(a_buf)
 
     A = ntn.Variable("A", a_format)
@@ -173,13 +175,17 @@ def test_matrix_multiplication_regression(file_regression):
     B_ = ntn.Slot("B_", a_format)
     C_ = ntn.Slot("C_", a_format)
 
-    a_ik = ntn.Variable("a_ik", np.float64)
-    b_kj = ntn.Variable("b_kj", np.float64)
-    c_ij = ntn.Variable("c_ij", np.float64)
+    a_ik = ntn.Variable("a_ik", finchlite.float64)
+    b_kj = ntn.Variable("b_kj", finchlite.float64)
+    c_ij = ntn.Variable("c_ij", finchlite.float64)
 
-    m = ntn.Variable("m", ExtentFType(np.int64, np.int64))
-    n = ntn.Variable("n", ExtentFType(np.int64, np.int64))
-    p = ntn.Variable("p", ExtentFType(np.int64, np.int64))
+    m = ntn.Variable("m", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    p = ntn.Variable("p", finchlite.int64)
+
+    m_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), m))
+    n_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), n))
+    p_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), p))
 
     prgm = ntn.Module(
         (
@@ -188,36 +194,27 @@ def test_matrix_multiplication_regression(file_regression):
                 (C, A, B),
                 ntn.Block(
                     (
-                        ntn.Assign(
-                            m,
-                            ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(0))),
-                        ),
-                        ntn.Assign(
-                            n,
-                            ntn.Call(ntn.Literal(dimension), (B, ntn.Literal(1))),
-                        ),
-                        ntn.Assign(
-                            p,
-                            ntn.Call(ntn.Literal(dimension), (A, ntn.Literal(1))),
-                        ),
                         ntn.Unpack(A_, A),
                         ntn.Unpack(B_, B),
                         ntn.Unpack(C_, C),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(B_, ntn.Literal(1))),
+                        ntn.Assign(p, ntn.Dimension(A_, ntn.Literal(1))),
                         ntn.Declare(
                             C_,
                             ntn.Literal(0.0),
-                            ntn.Literal(operator.add),
+                            ntn.Literal(ffuncs.add),
                             (m, n),
                         ),
                         ntn.Loop(
                             i,
-                            m,
+                            m_ext,
                             ntn.Loop(
                                 k,
-                                p,
+                                p_ext,
                                 ntn.Loop(
                                     j,
-                                    n,
+                                    n_ext,
                                     ntn.Block(
                                         (
                                             ntn.Assign(
@@ -235,16 +232,14 @@ def test_matrix_multiplication_regression(file_regression):
                                             ntn.Assign(
                                                 c_ij,
                                                 ntn.Call(
-                                                    ntn.Literal(operator.mul),
+                                                    ntn.Literal(ffuncs.mul),
                                                     (a_ik, b_kj),
                                                 ),
                                             ),
                                             ntn.Increment(
                                                 ntn.Access(
                                                     C_,
-                                                    ntn.Update(
-                                                        ntn.Literal(operator.add)
-                                                    ),
+                                                    ntn.Update(ntn.Literal(ffuncs.add)),
                                                     (i, j),
                                                 ),
                                                 c_ij,
@@ -254,7 +249,7 @@ def test_matrix_multiplication_regression(file_regression):
                                 ),
                             ),
                         ),
-                        ntn.Freeze(C_, ntn.Literal(operator.add)),
+                        ntn.Freeze(C_, ntn.Literal(ffuncs.add)),
                         ntn.Repack(C_, C),
                         ntn.Return(C),
                     )
@@ -265,3 +260,98 @@ def test_matrix_multiplication_regression(file_regression):
 
     asm_program = NotationCompiler(Reflector())(prgm)
     file_regression.check(str(asm_program), extension=".txt")
+
+
+def test_if_in_loop_is_lowered():
+    """An ``If`` nested inside a ``Loop`` must survive notation->assembly
+    lowering.
+
+    Regression test: the ``If``/``IfElse`` lowering used to emit the statement
+    into a throwaway block that was never spliced back into the enclosing scope,
+    so conditional writes inside loops silently disappeared. This is exactly the
+    shape produced when a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = ...``), which made transposes compile to
+    all-zero results on every assembly backend while the notation interpreter
+    stayed correct.
+    """
+    a = np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float64)
+    half = np.int64(2)
+    # Only the first ``half`` elements are copied; the rest keep the fill value.
+    expected = np.array([10.0, 20.0, 0.0, 0.0], dtype=np.float64)
+
+    a_buf = BufferizedNDArray.from_numpy(a)
+    vec_format = ftype(a_buf)
+
+    i = ntn.Variable("i", finchlite.int64)
+    n = ntn.Variable("n", finchlite.int64)
+    A = ntn.Variable("A", vec_format)
+    OUT = ntn.Variable("OUT", vec_format)
+    A_ = ntn.Slot("A_", vec_format)
+    OUT_ = ntn.Slot("OUT_", vec_format)
+    a_i = ntn.Variable("a_i", finchlite.float64)
+
+    n_ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(np.int64(0)), n))
+
+    prgm = ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable("masked_copy", vec_format),
+                (OUT, A),
+                ntn.Block(
+                    (
+                        ntn.Unpack(A_, A),
+                        ntn.Unpack(OUT_, OUT),
+                        ntn.Assign(n, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Declare(
+                            OUT_, ntn.Literal(0.0), ntn.Literal(ffuncs.overwrite), (n,)
+                        ),
+                        ntn.Loop(
+                            i,
+                            n_ext,
+                            ntn.If(
+                                ntn.Call(
+                                    ntn.Literal(ffuncs.lt), (i, ntn.Literal(half))
+                                ),
+                                ntn.Block(
+                                    (
+                                        ntn.Assign(
+                                            a_i,
+                                            ntn.Unwrap(
+                                                ntn.Access(A_, ntn.Read(), (i,))
+                                            ),
+                                        ),
+                                        ntn.Increment(
+                                            ntn.Access(
+                                                OUT_,
+                                                ntn.Update(
+                                                    ntn.Literal(ffuncs.overwrite)
+                                                ),
+                                                (i,),
+                                            ),
+                                            a_i,
+                                        ),
+                                    )
+                                ),
+                            ),
+                        ),
+                        ntn.Freeze(OUT_, ntn.Literal(ffuncs.overwrite)),
+                        ntn.Repack(OUT_, OUT),
+                        ntn.Return(OUT),
+                    )
+                ),
+            ),
+        )
+    )
+
+    # NOTATION interpreter is the reference semantics.
+    ntn_mod = ntn.NotationInterpreter()(prgm)
+    out_buf = BufferizedNDArray.from_numpy(np.zeros_like(a))
+    ntn_result = ntn_mod.masked_copy(out_buf, a_buf).to_numpy()
+    finch_assert_equal(ntn_result, expected)
+
+    # ASSEMBLY path must agree (this is what regressed).
+    asm_program = NotationCompiler(Reflector())(prgm)
+    asm_mod = AssemblyInterpreter()(asm_program)
+    out_buf = BufferizedNDArray.from_numpy(np.zeros_like(a))
+    asm_result = asm_mod.masked_copy(out_buf, a_buf).to_numpy()
+    finch_assert_equal(asm_result, expected)

@@ -1,231 +1,11 @@
 import builtins
-import sys
-from abc import ABC
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
-from ..algebra import register_property
+from finchlite.algebra import FinchOperator
+
 from . import lazy
 from .fuse import compute
-from .overrides import OverrideTensor
-
-
-class EagerTensor(OverrideTensor, ABC):
-    def override_module(self):
-        return sys.modules[__name__]
-
-    def __add__(self, other):
-        return add(self, other)
-
-    def __radd__(self, other):
-        return add(other, self)
-
-    def __sub__(self, other):
-        return subtract(self, other)
-
-    def __rsub__(self, other):
-        return subtract(other, self)
-
-    def __mul__(self, other):
-        return multiply(self, other)
-
-    def __rmul__(self, other):
-        return multiply(other, self)
-
-    def __abs__(self):
-        return abs(self)
-
-    def __pos__(self):
-        return positive(self)
-
-    def __neg__(self):
-        return negative(self)
-
-    def __invert__(self):
-        return bitwise_inverse(self)
-
-    def __and__(self, other):
-        return bitwise_and(self, other)
-
-    def __rand__(self, other):
-        return bitwise_and(other, self)
-
-    def __lshift__(self, other):
-        return bitwise_left_shift(self, other)
-
-    def __rlshift__(self, other):
-        return bitwise_left_shift(other, self)
-
-    def __or__(self, other):
-        return bitwise_or(self, other)
-
-    def __ror__(self, other):
-        return bitwise_or(other, self)
-
-    def __rshift__(self, other):
-        return bitwise_right_shift(self, other)
-
-    def __rrshift__(self, other):
-        return bitwise_right_shift(other, self)
-
-    def __xor__(self, other):
-        return bitwise_xor(self, other)
-
-    def __rxor__(self, other):
-        return bitwise_xor(other, self)
-
-    def __truediv__(self, other):
-        return truediv(self, other)
-
-    def __rtruediv__(self, other):
-        return truediv(other, self)
-
-    def __floordiv__(self, other):
-        return floordiv(self, other)
-
-    def __rfloordiv__(self, other):
-        return floordiv(other, self)
-
-    def __mod__(self, other):
-        return mod(self, other)
-
-    def __rmod__(self, other):
-        return mod(other, self)
-
-    def __pow__(self, other):
-        return power(self, other)
-
-    def __rpow__(self, other):
-        return power(other, self)
-
-    def __matmul__(self, other):
-        return matmul(self, other)
-
-    def __rmatmul__(self, other):
-        return matmul(other, self)
-
-    def __sin__(self):
-        return sin(self)
-
-    def __sinh__(self):
-        return sinh(self)
-
-    def __cos__(self):
-        return cos(self)
-
-    def __cosh__(self):
-        return cosh(self)
-
-    def __tan__(self):
-        return tan(self)
-
-    def __tanh__(self):
-        return tanh(self)
-
-    def __asin__(self):
-        return asin(self)
-
-    def __asinh__(self):
-        return asinh(self)
-
-    def __acos__(self):
-        return acos(self)
-
-    def __acosh__(self):
-        return acosh(self)
-
-    def __atan__(self):
-        return atan(self)
-
-    def __atanh__(self):
-        return atanh(self)
-
-    def __atan2__(self, other):
-        return atan2(self, other)
-
-    def __complex__(self):
-        """
-        Converts a zero-dimensional array to a Python `complex` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to complex.")
-        # dispatch to the scalar value's `__complex__` method
-        return complex(self[()])
-
-    def __float__(self):
-        """
-        Converts a zero-dimensional array to a Python `float` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to float.")
-        # dispatch to the scalar value's `__float__` method
-        return float(self[()])
-
-    def __int__(self):
-        """
-        Converts a zero-dimensional array to a Python `int` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to int.")
-        # dispatch to the scalar value's `__int__` method
-        return int(self[()])
-
-    def __bool__(self):
-        """
-        Converts a zero-dimensional array to a Python `bool` object.
-        """
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to bool.")
-        # dispatch to the scalar value's `__bool__` method
-        return bool(self[()])
-
-    def __log__(self):
-        return log(self)
-
-    def __log1p__(self):
-        return log1p(self)
-
-    def __log2__(self):
-        return log2(self)
-
-    def __log10__(self):
-        return log10(self)
-
-    def __logaddexp__(self, other):
-        return logaddexp(self, other)
-
-    def __logical_and__(self, other):
-        return logical_and(self, other)
-
-    def __logical_or__(self, other):
-        return logical_or(self, other)
-
-    def __logical_xor__(self, other):
-        return logical_xor(self, other)
-
-    def __logical_not__(self):
-        return logical_not(self)
-
-    def __lt__(self, other):
-        return less(self, other)
-
-    def __le__(self, other):
-        return less_equal(self, other)
-
-    def __gt__(self, other):
-        return greater(self, other)
-
-    def __ge__(self, other):
-        return greater_equal(self, other)
-
-    def __eq__(self, other):
-        return equal(self, other)
-
-    def __ne__(self, other):
-        return not_equal(self, other)
-
-
-register_property(EagerTensor, "asarray", "__attr__", lambda x: x)
 
 
 def full(
@@ -233,36 +13,72 @@ def full(
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
+    device=None,
 ):
-    """
-    Returns a new array having a specified shape and filled with fill_value.
-
-    Parameters:
-    - shape (Union[int, Tuple[int, ...]]): output array shape.
-    - fill_value (Union[bool, int, float, complex]): fill value.
-    - dtype (Optional[dtype]): output array data type. If dtype is None, the
-    output array data type must be inferred from fill_value according to the
-    following rules:
-        * If the fill value is an int, the output array data type must be the
-            default integer data type.
-        * If the fill value is a float, the output array data type must be the
-            default real-valued floating-point data type.
-        * If the fill value is a complex number, the output array data type must
-            be the default complex floating-point data type.
-        * If the fill value is a bool, the output array must have a boolean data
-            type. Default: None.
-
-    Returns:
-
-    - out (array): an array where every element is equal to fill_value.
-    """
     return compute(lazy.full(shape, fill_value, dtype=dtype))
 
 
-def permute_dims(arg, /, axis: tuple[int, ...]):
+def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.zeros(shape, dtype=dtype))
+
+
+def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.ones(shape, dtype=dtype))
+
+
+def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+    return compute(lazy.empty(shape, dtype=dtype))
+
+
+def full_like(
+    x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.full_like(x, fill_value, dtype=dtype)
+    return compute(lazy.full_like(x, fill_value, dtype=dtype))
+
+
+def zeros_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.zeros_like(x, dtype=dtype)
+    return full_like(x, 0, dtype=dtype)
+
+
+def ones_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.ones_like(x, dtype=dtype)
+    return full_like(x, 1, dtype=dtype)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype: Any | None = None,
+    device=None,
+):
+    return compute(lazy.arange(start, stop, step, dtype=dtype))
+
+
+def linspace(
+    start: float,
+    stop: float,
+    /,
+    num: int,
+    *,
+    dtype: Any | None = None,
+    device=None,
+    endpoint: bool = True,
+):
+    return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
+
+
+def permute_dims(arg, /, axes: tuple[int, ...]):
     if isinstance(arg, lazy.LazyTensor):
-        return lazy.permute_dims(arg, axis=axis)
-    return compute(lazy.permute_dims(arg, axis=axis))
+        return lazy.permute_dims(arg, axes=axes)
+    return compute(lazy.permute_dims(arg, axes=axes))
 
 
 def expand_dims(
@@ -285,8 +101,14 @@ def squeeze(
     return compute(lazy.squeeze(x, axis=axis))
 
 
+def astype(x, dtype, /, *, copy=True, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.astype(x, dtype, copy=copy, device=device)
+    return compute(lazy.astype(x, dtype, copy=copy, device=device))
+
+
 def reduce(
-    op: Callable,
+    op: FinchOperator,
     x,
     /,
     *,
@@ -352,7 +174,31 @@ def prod(
     return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
 
 
-def elementwise(f: Callable, *args):
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmin(x, axis=axis, keepdims=keepdims))
+
+
+def argmax(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmax(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
+
+
+def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
     return compute(lazy.elementwise(f, *args))
@@ -380,6 +226,12 @@ def multiply(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.multiply(x1, x2)
     return compute(lazy.multiply(x1, x2))
+
+
+def outer(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.outer(x1, x2)
+    return compute(lazy.outer(x1, x2))
 
 
 def divide(x1, x2):
@@ -428,10 +280,10 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
-def bitwise_inverse(x):
+def bitwise_invert(x):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.bitwise_inverse(x)
-    return compute(lazy.bitwise_inverse(x))
+        return lazy.bitwise_invert(x)
+    return compute(lazy.bitwise_invert(x))
 
 
 def bitwise_and(x1, x2):
@@ -470,10 +322,10 @@ def truediv(x1, x2):
     return compute(lazy.truediv(x1, x2))
 
 
-def floordiv(x1, x2):
+def floor_divide(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
-        return lazy.floordiv(x1, x2)
-    return compute(lazy.floordiv(x1, x2))
+        return lazy.floor_divide(x1, x2)
+    return compute(lazy.floor_divide(x1, x2))
 
 
 def mod(x1, x2):
@@ -557,13 +409,22 @@ def imag(x):
     return compute(lazy.imag(x))
 
 
+def conj(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.conj(x)
+    return compute(lazy.conj(x))
+
+
 def min(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.min(x, axis=axis, keepdims=keepdims)
     return compute(lazy.min(x, axis=axis, keepdims=keepdims))
 
 
-minimum = min
+def minimum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.minimum(x1, x2)
+    return compute(lazy.minimum(x1, x2))
 
 
 def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -572,10 +433,13 @@ def max(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fal
     return compute(lazy.max(x, axis=axis, keepdims=keepdims))
 
 
-maximum = max
+def maximum(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.maximum(x1, x2)
+    return compute(lazy.maximum(x1, x2))
 
 
-def clip(x, /, *, min=None, max=None):
+def clip(x, /, min=None, max=None):
     if (
         isinstance(x, lazy.LazyTensor)
         or isinstance(min, lazy.LazyTensor)
@@ -656,29 +520,6 @@ def broadcast_arrays(*args):
     return compute(lazy.broadcast_arrays(*args))
 
 
-def concat(arrays: tuple | list, /, *, axis: int | None = 0):
-    """
-    Concatenates a sequence of arrays along an existing axis.
-
-    Parameters
-    ----------
-    arrays: tuple or list
-        A sequence of arrays to concatenate. Arrays must have the same shape
-        except in the dimension corresponding to the specified axis.
-    axis: int, optional
-        The axis along which to concatenate the arrays. Default is 0. If None,
-        the arrays are flattened before concatenation.
-
-    Returns
-    -------
-    out: array
-        A new concatenated array.
-    """
-    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
-        return lazy.concat(arrays, axis=axis)
-    return compute(lazy.concat(arrays, axis=axis))
-
-
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
     """
     Moves array axes (dimensions) to new positions,
@@ -698,122 +539,6 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     if isinstance(x, lazy.LazyTensor):
         return lazy.moveaxis(x, source, destination)
     return compute(lazy.moveaxis(x, source, destination))
-
-
-def stack(arrays: Sequence, /, *, axis: int = 0):
-    """
-    Stacks a sequence of arrays along a new axis.
-
-    Parameters
-    ----------
-    arrays: Sequence
-        A sequence of arrays to stack. All arrays must have the same shape.
-    axis: int, optional
-        The axis along which to stack the arrays. Default is 0.
-
-    Returns
-    -------
-    out: array
-        A new array with the stacked arrays along the specified axis.
-    """
-    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
-        return lazy.stack(arrays, axis=axis)
-    return compute(lazy.stack(arrays, axis=axis))
-
-
-def split_dims(x, axis: int, shape: tuple):
-    """
-    Split a dimension into multiple dimensions. The product
-    of the sizes in the `shape` tuple must equal the size
-    of the dimension being split.
-
-    Parameters
-    ----------
-    x: array
-        The input tensor to split
-    axis: int
-        The axis to split
-    shape: tuple
-        The new shape for the split dimensions
-
-    Returns
-    -------
-    out: array
-        A tensor with the specified dimension split into multiple dimensions
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> x = np.arange(12).reshape(2, 6)  # shape (2, 6)
-    >>> result = split_dims(x, axis=1, shape=(2, 3))
-    >>> result.shape
-    (2, 2, 3)
-    """
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.split_dims(x, axis, shape)
-    return compute(lazy.split_dims(x, axis, shape))
-
-
-def combine_dims(x, axes: tuple[int, ...]):
-    """
-    Combine multiple consecutive dimensions into a single dimension.
-    The resulting axis will have a size equal to the product of the
-    sizes of the combined axes.
-
-    Parameters
-    ----------
-    x: array
-        The input tensor
-    axes: tuple[int, ...]
-        Consecutive axes to combine.
-
-        The axes will be considered in increasing order.
-        So passing axes=(2, 1, 3) will be equivalent to
-        passing axes=(1, 2, 3).
-
-    Returns
-    -------
-    out: array
-        A tensor with the specified dimensions combined into one
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
-    >>> result = combine_dims(x, axes=(1, 2))
-    >>> result.shape
-    (2, 12)
-    """
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.combine_dims(x, axes)
-    return compute(lazy.combine_dims(x, axes))
-
-
-def flatten(x):
-    """
-    Flattens the input tensor into a 1D tensor.
-
-    Parameters
-    ----------
-    x: array
-        The input tensor to be flattened.
-
-    Returns
-    -------
-    out: array
-        A new tensor that is a flattened version of the input.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> x = np.arange(24).reshape(2, 3, 4)  # shape (2, 3, 4)
-    >>> result = flatten(x)
-    >>> result.shape
-    (24,)
-    """
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.flatten(x)
-    return compute(lazy.flatten(x))
 
 
 # trigonometric functions:
@@ -949,6 +674,22 @@ def copysign(x1, x2):
     return compute(lazy.copysign(x1, x2))
 
 
+def count_nonzero(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonzero(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonzero(x, axis=axis, keepdims=keepdims))
+
+
+def count_nonfill(
+    x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.count_nonfill(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.count_nonfill(x, axis=axis, keepdims=keepdims))
+
+
 def nextafter(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.nextafter(x1, x2)
@@ -971,6 +712,12 @@ def isnan(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.isnan(x)
     return compute(lazy.isnan(x))
+
+
+def iscomplexobj(x):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.iscomplexobj(x)
+    return compute(lazy.iscomplexobj(x))
 
 
 def logical_and(x1, x2):
@@ -1027,16 +774,44 @@ def equal(x1, x2):
     return compute(lazy.equal(x1, x2))
 
 
+def same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.same(x1, x2)
+    return compute(lazy.same(x1, x2))
+
+
 def not_equal(x1, x2):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.not_equal(x1, x2)
     return compute(lazy.not_equal(x1, x2))
 
 
+def not_same(x1, x2):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.not_same(x1, x2)
+    return compute(lazy.not_same(x1, x2))
+
+
+def where(condition, x1, x2):
+    if (
+        isinstance(condition, lazy.LazyTensor)
+        or isinstance(x1, lazy.LazyTensor)
+        or isinstance(x2, lazy.LazyTensor)
+    ):
+        return lazy.where(condition, x1, x2)
+    return compute(lazy.where(condition, x1, x2))
+
+
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     if isinstance(x, lazy.LazyTensor):
         return lazy.mean(x, axis=axis, keepdims=keepdims)
     return compute(lazy.mean(x, axis=axis, keepdims=keepdims))
+
+
+def reshape(x, /, shape: tuple, *, copy=None):
+    if not hasattr(x, "reshape"):
+        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
+    return x.reshape(shape, copy=copy)
 
 
 def var(

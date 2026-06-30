@@ -1,7 +1,6 @@
-import operator
-
 import numpy as np
 
+from finchlite import ffuncs
 from finchlite.finch_assembly import (
     Assign,
     Block,
@@ -42,7 +41,7 @@ def test_for_loop():
                 args=(
                     Variable(name="lvl_ptr", type=np.ndarray),
                     Call(
-                        op=Literal(val=operator.add),
+                        op=Literal(val=ffuncs.add),
                         args=(Variable(name="pos_stop", type=int), Literal(val=1)),
                     ),
                 ),
@@ -56,18 +55,18 @@ def test_for_loop():
                         Store(
                             buffer=Variable(name="lvl_ptr", type=np.ndarray),
                             index=Call(
-                                op=Literal(val=operator.add),
+                                op=Literal(val=ffuncs.add),
                                 args=(Variable(name="p", type=int), Literal(val=1)),
                             ),
                             value=Call(
-                                op=Literal(val=operator.add),
+                                op=Literal(val=ffuncs.add),
                                 args=(
                                     Load(
                                         buffer=Variable(
                                             name="lvl_ptr", type=np.ndarray
                                         ),
                                         index=Call(
-                                            op=Literal(val=operator.add),
+                                            op=Literal(val=ffuncs.add),
                                             args=(
                                                 Variable(name="p", type=int),
                                                 Literal(val=1),
@@ -89,7 +88,7 @@ def test_for_loop():
             Assign(
                 lhs=Variable(name="qos_stop", type=int),
                 rhs=Call(
-                    op=Literal(val=operator.sub),
+                    op=Literal(val=ffuncs.sub),
                     args=(
                         Load(
                             buffer=Variable(name="lvl_ptr", type=np.ndarray),
@@ -140,10 +139,10 @@ def test_if_statement():
             Assign(q, Load(lvl_ptr, pos)),
             Assign(
                 q_stop,
-                Load(lvl_ptr, Call(Literal(operator.add), (pos, Literal(np.intp(1))))),
+                Load(lvl_ptr, Call(Literal(ffuncs.add), (pos, Literal(np.intp(1))))),
             ),
             IfElse(
-                Call(Literal(operator.lt), (q, q_stop)),
+                Call(Literal(ffuncs.lt), (q, q_stop)),
                 Block(
                     (
                         Assign(i, Load(lvl_idx, q)),
@@ -152,7 +151,7 @@ def test_if_statement():
                             Load(
                                 lvl_idx,
                                 Call(
-                                    Literal(operator.sub), (q_stop, Literal(np.intp(1)))
+                                    Literal(ffuncs.sub), (q_stop, Literal(np.intp(1)))
                                 ),
                             ),
                         ),

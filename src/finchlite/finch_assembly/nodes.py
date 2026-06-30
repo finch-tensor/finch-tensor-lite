@@ -2,9 +2,11 @@ from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from ..algebra import return_type
-from ..symbolic import Context, NamedTerm, Term, TermTree, ftype, literal_repr
-from ..util import qual_str
+from finchlite.algebra import ftype, ftypes, return_type
+from finchlite.algebra.ftypes import FType
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
+
 from .buffer import length_type
 
 
@@ -59,7 +61,7 @@ class AssemblyExpression(AssemblyNode):
 
     @property
     @abstractmethod
-    def result_format(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         ...
 
@@ -85,12 +87,15 @@ class Literal(AssemblyExpression):
     val: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
         return ftype(self.val)
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, asdict(self))
+        return literal_repr(type(self).__name__, {"val": self.val})
+
+
+L = Literal
 
 
 @dataclass(eq=True, frozen=True)
@@ -105,10 +110,10 @@ class Variable(AssemblyExpression, NamedTerm):
     """
 
     name: str
-    type: Any
+    type: FType
 
     @property
-    def result_format(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         return self.type
 
@@ -132,10 +137,10 @@ class Stack(AssemblyExpression):
     """
 
     obj: Any
-    type: Any
+    type: FType
 
     @property
-    def result_format(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         return self.type
 
@@ -155,7 +160,7 @@ class Slot(AssemblyExpression):
     type: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
         return self.type
 
@@ -244,9 +249,9 @@ class GetAttr(AssemblyExpression, AssemblyTree):
         return [self.obj, self.attr]
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        return dict(self.obj.result_format.struct_fields)[self.attr.val]
+        return dict(self.obj.result_type.struct_fields)[self.attr.val]
 
 
 @dataclass(eq=True, frozen=True)
@@ -292,9 +297,9 @@ class Call(AssemblyExpression, AssemblyTree):
         return cls(op, args)
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        arg_types = [arg.result_format for arg in self.args]
+        arg_types = [arg.result_type for arg in self.args]
         return return_type(self.op.val, *arg_types)
 
 
@@ -316,9 +321,9 @@ class Load(AssemblyExpression, AssemblyTree):
         return [self.buffer, self.index]
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        return self.buffer.result_format.element_type
+        return self.buffer.result_type.element_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -358,8 +363,8 @@ class ExistsDict(AssemblyExpression, AssemblyTree):
     def children(self):
         return [self.map, self.index]
 
-    def result_format(self):
-        return bool
+    def result_type(self):
+        return ftypes.bool
 
 
 @dataclass(eq=True, frozen=True)
@@ -379,8 +384,8 @@ class LoadDict(AssemblyExpression, AssemblyTree):
     def children(self):
         return [self.dct, self.index]
 
-    def result_format(self):
-        return self.dct.result_format.value_type
+    def result_type(self):
+        return self.dct.result_type.value_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -437,9 +442,9 @@ class Length(AssemblyExpression, AssemblyTree):
         return [self.buffer]
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
-        return length_type(self.buffer.result_format)
+        return length_type(self.buffer.result_type)
 
 
 @dataclass(eq=True, frozen=True)

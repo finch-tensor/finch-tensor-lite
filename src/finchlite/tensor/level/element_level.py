@@ -1,12 +1,14 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 import numpy as np
 
-from ... import finch_assembly as asm
-from ...codegen import NumpyBufferFType
-from ...symbolic import FType, ftype
-from ..fiber_tensor import FiberTensorFields, Level, LevelFType
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, ImmutableStructFType, ftype
+from finchlite.codegen import NumpyBufferFType
+from finchlite.compile.lower import AssemblyContext
+from finchlite.tensor.fiber_tensor import FiberTensorFields, Level, LevelFType
 
 
 class ElementLevelFields(NamedTuple):
@@ -14,10 +16,10 @@ class ElementLevelFields(NamedTuple):
 
 
 @dataclass(unsafe_hash=True)
-class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
+class ElementLevelFType(LevelFType, ImmutableStructFType):
     fill_value: Any = None
-    element_type: type | FType | None = None
-    position_type: type | FType | None = None
+    element_type: FType | None = None
+    position_type: FType | None = None
     buffer_factory: Any = NumpyBufferFType
     buffer_type: Any = None
 
@@ -32,16 +34,24 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         ]
 
     def __post_init__(self):
+        # Ensure element_type is an FType
         if self.element_type is None:
+            assert self.fill_value is not None, (
+                "Must provide either element_type or fill_value."
+            )
             self.element_type = ftype(self.fill_value)
+        assert isinstance(self.element_type, FType), (
+            "element_type must be an instance of FType"
+        )
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
             self.position_type = np.intp
+        self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape=(), val=None):
+    def construct(self, shape, *, val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
@@ -53,12 +63,25 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         """
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):
-            from ...codegen import NumpyBuffer
+            from finchlite.codegen import NumpyBuffer
 
             val = NumpyBuffer(np.asarray(val).reshape(-1))
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         return ElementLevel(self, val)
+
+    def __call__(self, val: Any) -> "ElementLevel":
+        """
+        Convert a level to this element level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            An ElementLevel instance of this type.
+        """
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"ElementLevelFType(fv={self.fill_value})"
@@ -78,12 +101,13 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
     def from_fields(self, val=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):
-            from ...codegen import NumpyBuffer
+            from finchlite.codegen import NumpyBuffer
 
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    def _get_buf_s(self, lvl_fields) -> asm.Slot:
+    @staticmethod
+    def _get_buf_s(lvl_fields) -> asm.Slot:
         assert isinstance(lvl_fields, ElementLevelFields)
         return lvl_fields.buf_s
 
@@ -95,9 +119,8 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         ctx.exec(asm.Unpack(buf_s, buf))
         return ElementLevelFields(buf_s)
 
-    def level_asm_repack(self, ctx, lvl_fields):
-        buf_s = self._get_buf_s(lvl_fields)
-        ctx.exec(asm.Repack(buf_s))
+    def level_asm_repack(self, ctx, lvl_fields: ElementLevelFields):
+        ctx.exec(asm.Repack(lvl_fields.buf_s))
 
     def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
         buf_s = self._get_buf_s(lvl_fields)
@@ -109,17 +132,21 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         buf_s = self._get_buf_s(obj.lvl_fields)
         return asm.Load(buf_s, pos)
 
-    def level_lower_increment(self, ctx, obj: FiberTensorFields, op, val, pos):
+    def level_lower_increment(
+        self,
+        ctx: AssemblyContext,
+        obj: FiberTensorFields,
+        op: ntn.Literal,
+        val: ntn.NotationExpression,
+        pos: ntn.Variable,
+    ):
         buf_s = self._get_buf_s(obj.lvl_fields)
-        lowered_pos = asm.Variable(pos.name, pos.type)
+        pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
                 buf_s,
-                lowered_pos,
-                asm.Call(
-                    asm.Literal(op.val),
-                    (asm.Load(buf_s, lowered_pos), val),
-                ),
+                pos_e,
+                asm.Call(op_e, (asm.Load(buf_s, pos_e), val_e)),
             )
         )
 
@@ -136,7 +163,7 @@ class ElementLevelFType(LevelFType, asm.AssemblyStructFType):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def from_numpy(self, shape, val):
-        return self(shape=shape, val=val)
+        return self.construct(shape, val=val)
 
 
 def element(
@@ -174,7 +201,7 @@ class ElementLevel(Level):
     A class representing the leaf level of Finch tensors.
     """
 
-    _format: ElementLevelFType
+    _format: ElementLevelFType = field(repr=False)
     _val: Any | None = None
 
     def __post_init__(self):
@@ -198,9 +225,6 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
-
-    def __repr__(self):
-        return f"ElementLevel(val={self._val})"
 
     def __str__(self):
         return f"ElementLevel(val={self._val})"

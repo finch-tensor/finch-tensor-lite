@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..algebra import return_type
-from ..finch_assembly import AssemblyNode
-from ..symbolic import Context, FType, NamedTerm, Term, TermTree, ftype, literal_repr
-from ..util import qual_str
+from finchlite.algebra import FType, ftype, return_type
+from finchlite.finch_assembly import AssemblyNode
+from finchlite.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finchlite.util import qual_str
 
 
 @dataclass(eq=True, frozen=True)
@@ -55,7 +55,7 @@ class NotationExpression(NotationNode):
 
     @property
     @abstractmethod
-    def result_format(self) -> Any:
+    def result_type(self) -> FType:
         """
         Get the type of the expression.
         """
@@ -80,11 +80,14 @@ class Literal(NotationExpression):
     val: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         return ftype(self.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"val": self.val})
+
+
+L = Literal
 
 
 @dataclass(eq=True, frozen=True)
@@ -95,10 +98,10 @@ class Value(NotationExpression):
     """
 
     ex: AssemblyNode
-    type_: Any
+    type_: FType
 
     @property
-    def result_format(self):
+    def result_type(self):
         return self.type_
 
     def __repr__(self) -> str:
@@ -116,10 +119,14 @@ class Variable(NotationExpression, NamedTerm):
     """
 
     name: str
-    type_: Any = None
+    type_: FType | None = None
+
+    def __post_init__(self):
+        if self.type_ is not None:
+            assert isinstance(self.type_, FType)
 
     @property
-    def result_format(self):
+    def result_type(self):
         return self.type_
 
     def __repr__(self) -> str:
@@ -143,8 +150,8 @@ class Call(NotationTree, NotationExpression):
     args: tuple[NotationExpression, ...]
 
     @property
-    def result_format(self):
-        arg_types = [a.result_format for a in self.args]
+    def result_type(self):
+        arg_types = [a.result_type for a in self.args]
         return return_type(self.op.val, *arg_types)
 
     @classmethod
@@ -195,7 +202,7 @@ class Dimension(NotationTree, NotationExpression):
     r: Literal
 
     @property
-    def result_format(self):
+    def result_type(self):
         return self.tns.shape_type[self.r.val]
 
     @classmethod
@@ -219,10 +226,10 @@ class Access(NotationTree, NotationExpression):
     idxs: tuple[NotationExpression, ...]
 
     @property
-    def result_format(self):
+    def result_type(self):
         if len(self.idxs) == 0:
-            return self.tns.result_format
-        return AccessFType(self.tns.result_format)
+            return self.tns.result_type
+        return AccessFType(self.tns.result_type)
 
     @classmethod
     def from_children(cls, tns, mode, *idxs):
@@ -252,7 +259,7 @@ class Update(AccessMode, NotationTree):
     mode allows reading and modifying the value of a tensor.  Increment
     operations are allowed in this mode, and will use the update operation `op`
     to increment `ref` with `val` as `ref = op(ref, val)`.  To overwrite the
-    value of a tensor, use the ops `algebra.overwrite` or `algebra.InitWrite`.
+    value of a tensor, use the ops `algebra.overwrite` or `algebra.init_write`.
     Attributes:
         op: The operation used to update the value of the tensor.
     """
@@ -291,11 +298,11 @@ class Unwrap(NotationTree, NotationExpression):
     def children(self):
         return [self.arg]
 
-    def result_format(self):
+    def result_type(self):
         """
         Returns the type of the unwrapped value.
         """
-        return self.arg.result_format.element_type
+        return self.arg.result_type.element_type
 
 
 @dataclass(eq=True, frozen=True)
@@ -312,8 +319,8 @@ class Cached(NotationTree, NotationExpression):
     ref: NotationExpression
 
     @property
-    def result_format(self):
-        return self.arg.result_format
+    def result_type(self):
+        return self.arg.result_type
 
     @property
     def children(self):
@@ -394,7 +401,7 @@ class Stack(NotationExpression):
     type: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
         return self.type
 
@@ -414,7 +421,7 @@ class Slot(NotationExpression, NamedTerm):
     type: Any
 
     @property
-    def result_format(self):
+    def result_type(self):
         """Returns the type of the expression."""
         return self.type
 
@@ -694,11 +701,14 @@ class NotationPrinterContext(Context):
                     f"{feed}declare({self(tns)}, {self(init)}, {self(op)}, {shape_e})"
                 )
                 return None
+            case Cached(arg, ref):
+                return f"cached({self(arg)}, {self(ref)})"
             case Freeze(tns, op):
                 self.exec(f"{feed}freeze({self(tns)}, {self(op)})")
                 return None
             case Thaw(tns, op):
-                return f"thaw({self(tns)}, {self(op)})"
+                self.exec(f"{feed}thaw({self(tns)}, {self(op)})")
+                return None
             case Unpack(Slot(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = unpack({self(val)})")
                 return None
@@ -755,7 +765,7 @@ class NotationPrinterContext(Context):
                         )
                     self(func)
                 return None
-            case _:
+            case other:
                 raise NotImplementedError(
-                    f"Unrecognized notation node type: {type(prgm)}"
+                    f"Unrecognized notation node type: {type(other)}"
                 )

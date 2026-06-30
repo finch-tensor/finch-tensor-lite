@@ -2,12 +2,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .. import algebra
-from ..symbolic import FType, ScopedDict, ftype
+from finchlite import algebra
+from finchlite.algebra import FType, StructFType, ftype
+from finchlite.algebra.ftypes import FDTypeBoolean, FDTypeInteger, FDTypeNumeric
+from finchlite.algebra.ftypes import bool as finch_bool
+from finchlite.symbolic import ScopedDict
+
 from . import nodes as asm
 from .buffer import BufferFType
 from .dct import DictFType
-from .struct import AssemblyStructFType
 
 
 class AssemblyTypeError(Exception):
@@ -96,15 +99,14 @@ class AssemblyTypeChecker:
 
     def check_struct(self, struct):
         struct_type = self.check_expr(struct)
-        if isinstance(struct_type, AssemblyStructFType):
+        if isinstance(struct_type, (StructFType)):
             return struct_type
         raise AssemblyTypeError(f"Expected struct, got {struct_type}.")
 
     def check_cond(self, cond):
         cond_type = self.check_expr(cond)
-        if isinstance(cond_type, type) and (
-            np.issubdtype(cond_type, np.number) or np.issubdtype(cond_type, np.bool_)
-        ):
+        cond_ftype = ftype(cond_type)
+        if isinstance(cond_ftype, (FDTypeNumeric, FDTypeBoolean)):
             return
         raise AssemblyTypeError("Conditional must be number or boolean.")
 
@@ -145,7 +147,7 @@ class AssemblyTypeChecker:
                 map_type = self.check_dict(dct)
                 index_type = self.check_expr(index)
                 check_type_match(map_type.key_type, index_type)
-                return bool
+                return finch_bool
             case asm.LoadDict(dct, index):
                 map_type = self.check_dict(dct)
                 index_type = self.check_expr(index)
@@ -252,7 +254,7 @@ class AssemblyTypeChecker:
                 return return_type
             case asm.Assert(arg):
                 t = self.check_expr(arg)
-                check_type_match(np.bool_, t)
+                check_type_match(ftype(np.bool_), t)
                 return None
             case asm.Break():
                 if self.loop_state is None:
@@ -325,7 +327,7 @@ class AssemblyTypeChecker:
 
 
 def check_is_index_type(index_type):
-    if not np.issubdtype(index_type, np.integer):
+    if not isinstance(ftype(index_type), FDTypeInteger):
         raise AssemblyTypeError(f"Expected index, got {index_type}.")
 
 

@@ -1,13 +1,16 @@
+import logging
 from itertools import product
 
 import numpy as np
 
 import finchlite
+from finchlite.algebra import fisinstance, fixpoint_type, ftype, return_type
 from finchlite.algebra.tensor import TensorFType
+from finchlite.codegen.numba_codegen import to_numpy_type
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finchlite.symbolic import UnvalidatedForm
+from finchlite.util.logging import LOG_LOGIC_PRE_OPT
 
-from ..algebra import fixpoint_type, return_type
-from ..symbolic import fisinstance
 from . import nodes as lgc
 from .nodes import (
     Aggregate,
@@ -25,39 +28,38 @@ from .nodes import (
     Value,
 )
 from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .tensor_stats import StatsFactory, TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
-    if dtype is None:
-        dtype = type(fill_value)
-    return finchlite.asarray(np.full(shape, fill_value, dtype=dtype))
+    dtype = ftype(fill_value) if dtype is None else ftype(dtype)
+    return finchlite.asarray(
+        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
+    )
 
 
-class LogicInterpreter(LogicEvaluator):
-    def __init__(self, *, make_tensor=make_tensor, verbose=False):
-        self.verbose = verbose
+class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
+    def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def __call__(self, node, bindings=None):
+    def lower(self, node, bindings=None):
         if bindings is None:
             bindings = {}
-        machine = LogicMachine(
-            make_tensor=self.make_tensor, bindings=bindings, verbose=self.verbose
-        )
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
         return machine(node)
 
 
 class LogicMachine:
-    def __init__(self, *, make_tensor=np.full, bindings=None, verbose=False):
-        self.verbose = verbose
+    def __init__(self, *, make_tensor=np.full, bindings=None):
         if bindings is None:
             bindings = {}
         self.bindings = bindings
         self.make_tensor = make_tensor
 
     def __call__(self, node):
-        if self.verbose:
-            print(f"Evaluating: {node}")
+        logger.debug("Evaluating: %s", node)
         match node:
             case Literal(val):
                 return val
@@ -100,7 +102,8 @@ class LogicMachine:
                 for crds in product(*[range(dims[idx]) for idx in idxs]):
                     idx_crds = dict(zip(idxs, crds, strict=True))
                     vals = [
-                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args
+                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]].item()
+                        for arg in args
                     ]
                     result[*crds] = op(*vals)
                 return TableValue(result, tuple(idxs))
@@ -119,7 +122,9 @@ class LogicMachine:
                         for (crd, idx) in zip(crds, arg.idxs, strict=True)
                         if idx not in node.idxs
                     ]
-                    result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
+                    result[*out_crds] = op(
+                        result[*out_crds].item(), arg.tns[*crds].item()
+                    )
                 return TableValue(
                     result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
                 )
@@ -144,7 +149,7 @@ class LogicMachine:
                 for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(zip(idxs, crds, strict=True))
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
-                    result[*crds] = arg.tns[*in_crds]
+                    result[*crds] = arg.tns[*in_crds].item()
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
@@ -157,7 +162,7 @@ class LogicMachine:
                     self.bindings[lhs] = tns
                 lhs = self(lhs)
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
-                    lhs[*crds] = rhs.tns[*crds]
+                    lhs[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case Plan(bodies):
                 res = ()
@@ -204,12 +209,16 @@ class MockLogicLibrary(AssemblyLibrary):
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
 
 
-class MockLogicLoader(LogicLoader):
+class MockLogicLoader(UnvalidatedForm, LogicLoader):
     def __init__(self):
         pass
 
-    def __call__(
-        self, prgm: lgc.LogicStatement, bindings: dict[lgc.Alias, TensorFType]
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],

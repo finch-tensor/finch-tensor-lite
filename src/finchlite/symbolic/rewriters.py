@@ -11,8 +11,7 @@ Classes:
         returned if the rewriter produces no changes.
     PreWalk: Recursively rewrites each node in a term using a pre-order traversal.
     PostWalk: Recursively rewrites each node in a term using a post-order traversal.
-    Chain: Applies a sequence of rewriters to a term, stopping when a rewriter
-        produces a change.
+    Chain: Applies a sequence of rewriters to a term.
     Fixpoint: Repeatedly applies a rewriter to a term until no further changes
         are made.
     Prestep: Recursively rewrites each node in a term, stopping if the rewriter
