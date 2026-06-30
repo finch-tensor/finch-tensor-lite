@@ -1197,15 +1197,6 @@ def test_reorder_def(orig_axes, new_axes):
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
 
-
-def test_set_fill_value():
-    td = BaseTensorStats.from_fields(
-        index_order=(Field("i"),), dim_sizes={Field("i"): 5.0}, fill_value=0
-    )
-    td2 = td.set_fill_value(7)
-    assert td2.fill_value == 7
-
-
 @pytest.mark.parametrize(
     "defs, func, expected_axes, expected_dims, expected_fill",
     [

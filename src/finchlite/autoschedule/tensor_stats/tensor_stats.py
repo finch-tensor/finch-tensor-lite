@@ -76,12 +76,6 @@ class BaseTensorStats(TensorStats):
         new.__dict__ = {name: copy.copy(value) for name, value in self.__dict__.items()}
         return new
 
-    def set_fill_value(self, fill_value: Any) -> BaseTensorStats:
-        """Return a new definition with ``fill_value`` substituted in."""
-        return BaseTensorStats.from_fields(
-            self._index_order, self._dim_sizes, fill_value
-        )
-
     @property
     def dim_sizes(self) -> Mapping[Field, float]:
         return self._dim_sizes
