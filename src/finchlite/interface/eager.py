@@ -2,6 +2,8 @@ import builtins
 from collections.abc import Sequence
 from typing import Any
 
+import numpy as np
+
 from finchlite.algebra import FinchOperator
 
 from . import lazy
@@ -28,6 +30,47 @@ def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None)
 
 def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
     return compute(lazy.empty(shape, dtype=dtype))
+
+
+def eye(
+    n_rows: int,
+    n_cols: int | None = None,
+    *,
+    k: int = 0,
+    dtype: Any | None = None,
+    device=None,
+):
+    return compute(lazy.eye(n_rows, n_cols, k=k, dtype=dtype, device=device))
+
+
+def triu(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.triu(x, k=k)
+    return compute(lazy.triu(x, k=k))
+
+
+def tril(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tril(x, k=k)
+    return compute(lazy.tril(x, k=k))
+
+
+def diag(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.diag(x, k=k)
+    return compute(lazy.diag(x, k=k))
+
+
+def diagonal(x, /, *, offset: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.diagonal(x, offset=offset)
+    return compute(lazy.diagonal(x, offset=offset))
+
+
+def trace(x, /, *, offset: int = 0, dtype=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.trace(x, offset=offset, dtype=dtype)
+    return compute(lazy.trace(x, offset=offset, dtype=dtype))
 
 
 def full_like(
@@ -278,6 +321,26 @@ def matrix_transpose(x, /):
     if isinstance(x, lazy.LazyTensor):
         return lazy.matrix_transpose(x)
     return compute(lazy.matrix_transpose(x))
+
+
+def inv(x, /):
+    if isinstance(x, lazy.LazyTensor):
+        raise ValueError("inv requires a materialized array; call compute() first")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
+
+
+def matrix_power(x, n, /):
+    """
+    Computes the power of a matrix.
+    """
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.matrix_power(x, n)
+    if isinstance(n, int) and n < 0:
+        return matrix_power(inv(x), -n)
+    return compute(lazy.matrix_power(x, n))
 
 
 def bitwise_invert(x):
