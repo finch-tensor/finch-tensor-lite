@@ -6,8 +6,11 @@ uses a sparse input for the last matrix.
 Run: ``poetry run asv run --bench galley_benchmarks``
 """
 
-import time
 from functools import reduce
+from typing import Literal
+
+import pytest
+from .utils import patch_benchmark
 
 import numpy as np
 
@@ -58,36 +61,29 @@ def _build_expr(empty_last):
     rng = np.random.default_rng(42)
     mats = [rng.standard_normal((MAT_DIM, MAT_DIM)) for _ in range(CHAIN_LEN)]
     if empty_last:
-        mats[-1] = np.zeros((MAT_DIM, MAT_DIM))
+        mats[-1].fill(0)
     lazies = [fl_interface.lazy(fl_interface.asarray(m)) for m in mats]
     return reduce(lambda a, b: a @ b, lazies)
 
 
 def _make_pipeline():
-    optimizer = GalleyLogicalOptimizer(
-        LogicStandardizer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
-    )
+    standardizer = LogicStandardizer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
+    optimizer = GalleyLogicalOptimizer(standardizer)
     executor = LogicExecutor(optimizer, stats_factory=UniformStatsFactory())
-    return LogicNormalizer(executor), optimizer
+    return LogicNormalizer(executor)
 
+@pytest.mark.parametrize("metric", ["optimize", "downstream"])
+@pytest.mark.parametrize("empty_last", [
+    pytest.param(True, id="empty_last"),
+    pytest.param(False, id="dense_last"),
+])
+def test_galley_matmul_chain(benchmark, monkeypatch, empty_last: bool, metric: Literal["optimize", "downstream"]) -> None:
+    import finchlite.autoschedule.galley_optimize as galley
+    if metric == "optimize":
+        patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
+    else:
+        patch_benchmark(benchmark, monkeypatch, LogicStandardizer, "lower")
 
-class GalleyMatmulChain:
-    params = list(CASES.keys())
-    param_names = ["case"]
-
-    def track_optimize_time(self, case):
-        pipeline, optimizer = _make_pipeline()
-        plan = _plan_from_lazy(_build_expr(CASES[case]))
-        pipeline(plan)
-        return optimizer.last_optimize_plan_s or 0.0
-
-    track_optimize_time.unit = "seconds"
-
-    def track_downstream_time(self, case):
-        pipeline, optimizer = _make_pipeline()
-        plan = _plan_from_lazy(_build_expr(CASES[case]))
-        t0 = time.perf_counter()
-        pipeline(plan)
-        return time.perf_counter() - t0 - (optimizer.last_optimize_plan_s or 0.0)
-
-    track_downstream_time.unit = "seconds"
+    pipeline = _make_pipeline()
+    plan = _plan_from_lazy(_build_expr(empty_last))
+    pipeline(plan)

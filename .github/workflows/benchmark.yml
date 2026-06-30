@@ -18,10 +18,18 @@ jobs:
       - name: Install package
         run: |
           poetry install --extras benchmark
-      - name: Run benchmarks
-        run: |
-          poetry run asv machine --yes
-          poetry run asv continuous origin/main HEAD -f 1.25 --show-stderr
+      - name: Run time benchmarks
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: simulation
+          run: pytest benchmarks/ --codspeed
+
+
+      - name: Run memory benchmarks
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: memory
+          run: pytest benchmarks/ --codspeed
 
 on:
   pull_request:

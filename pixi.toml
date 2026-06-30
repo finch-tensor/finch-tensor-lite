@@ -1,4 +1,4 @@
-[project]
+[workspace]
 authors = ["Willow Ahrens <willow.marie.ahrens@gmail.com>"]
 channels = ["conda-forge"]
 description = "Sparse And Structured Tensor Programming"
@@ -13,7 +13,7 @@ compile = "python -c 'import finchlite'"
 python = ">=3.10,<3.13"
 
 [pypi-dependencies]
-finch-tensor-lite = { path = ".", editable = true, extras = ["test"] }
+finch-tensor-lite = { path = ".", editable = true, extras = ["test", "benchmark"] }
 
 [feature.test.tasks]
 test = { cmd = "pytest", depends-on = ["compile"] }

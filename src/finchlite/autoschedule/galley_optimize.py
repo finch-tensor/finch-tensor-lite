@@ -6,7 +6,6 @@ an optional exact branch-and-bound path for query bodies.
 from __future__ import annotations
 
 import logging
-import time
 
 from finchlite.algebra.tensor import TensorFType
 from finchlite.autoschedule.galley.logical_optimizer.annotated_query import (
@@ -116,7 +115,6 @@ class GalleyLogicalOptimizer(LogicFusionOptimizer):
         self.ctx = ctx
         self.use_components = use_components
         self.optimizer = optimizer
-        self.last_optimize_plan_s: float | None = None
 
     def lower(
         self,
@@ -128,7 +126,6 @@ class GalleyLogicalOptimizer(LogicFusionOptimizer):
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
         logger.debug("Optimizing plan: %s", term)
-        t0 = time.perf_counter()
         term = optimize_plan(
             term,
             stats_factory,
@@ -136,5 +133,4 @@ class GalleyLogicalOptimizer(LogicFusionOptimizer):
             use_components=self.use_components,
             optimizer=self.optimizer,
         )
-        self.last_optimize_plan_s = time.perf_counter() - t0
         return self.ctx(term, bindings, stats, stats_factory)
