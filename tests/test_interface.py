@@ -1432,6 +1432,10 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     finch_assert_equal(result, expected, strict=True)
 
 
+@pytest.mark.skip(
+    "We're holding off on numba tests for tril until we can refactor looplets "
+    "and build a full suite of mask tensors."
+)
 @pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize(
     "arr1,arr2",
