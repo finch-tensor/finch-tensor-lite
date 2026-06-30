@@ -9,7 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
-from .stage import Form, Stage, UnvalidatedForm
+from .stage import Form, NoOpStage, Stage, UnvalidatedForm
 from .term import (
     Term,
     TermTree,
@@ -28,6 +28,7 @@ __all__ = [
     "Memo",
     "NamedTerm",
     "Namespace",
+    "NoOpStage",
     "PostOrderDFS",
     "PostWalk",
     "PreOrderDFS",

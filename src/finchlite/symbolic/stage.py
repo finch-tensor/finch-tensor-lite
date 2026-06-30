@@ -34,3 +34,8 @@ class UnvalidatedForm(Form):
     @classmethod
     def validate_inputs(cls, *inputs):
         return
+
+
+class NoOpStage(UnvalidatedForm, Stage):
+    def lower(self, *inputs):
+        return inputs
