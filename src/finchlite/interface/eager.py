@@ -59,6 +59,12 @@ def diag(x, /, *, k: int = 0):
     return compute(lazy.diag(x, k=k))
 
 
+def diagonal(x, /, *, offset: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.diagonal(x, offset=offset)
+    return compute(lazy.diagonal(x, offset=offset))
+
+
 def trace(x, /, *, offset: int = 0, dtype=None):
     if isinstance(x, lazy.LazyTensor):
         return lazy.trace(x, offset=offset, dtype=dtype)
