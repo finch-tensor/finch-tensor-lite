@@ -18,10 +18,10 @@ jobs:
             VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["project"]["version"])')
             if [ $? -ne 0 ]; then exit 1; fi
             echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v1.17
-        with:
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
+      - name: Authenticate with Prefix.dev
+        run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
+      - name: Build and Publish Package
+        run: pixi publish --target-channel https://prefix.dev{{ secrets.PREFIX_CHANNEL_NAME }}
       - name: Create Release
         uses: actions/create-release@v1
         if: success()
