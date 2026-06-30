@@ -360,8 +360,12 @@ class MLIRContext(Context):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
                 return buf_t.mlir_store(self, buffer, index, value)
 
-            # case asm.Block(bodies):
-            #     ...
+            case asm.Block(bodies):
+                ctx_2 = self.block()
+                for body in bodies:
+                    ctx_2(body)
+                self.exec(ctx_2.emit())
+                return None
 
             # case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
             #     ...
@@ -378,8 +382,30 @@ class MLIRContext(Context):
             # case asm.IfElse(cond, body, else_body):
             #     ...
 
-            # case asm.Function(asm.Variable(func_name, return_t), args, body):
-            #     ...
+            case asm.Function(asm.Variable(func_name, return_t), args, body):
+                ctx_2 = self.subblock()
+                statement = []
+                for arg in args:
+                    match arg:
+                        case asm.Variable(name, t):
+                            statement.append(f"%{name}: {mlir_type(t)}")
+                            ctx_2.bindings[name] = (f"%{name}", mlir_type(t))
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {arg}"
+                            )
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                feed = self.feed
+                ret = "" if return_t == algebra.none_ else f" -> {mlir_type(return_t)}"
+
+                self.exec(
+                    f"{feed}func.func @{func_name}({', '.join(statement)}){ret} "
+                    f"attributes {{llvm.emit_c_interface}} {{\n"
+                    f"{body_code}\n"
+                    f"{feed}}}"
+                )
+                return None
 
             case asm.Return(value):
                 if value.result_type == algebra.none_:
