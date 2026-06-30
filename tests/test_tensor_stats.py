@@ -2055,8 +2055,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
         s.dcs = set(dcs)
         stats_objs.append(s)
 
-    new_def = BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0)
-    out = DCStats._merge_dc_join(new_def, stats_objs)
+    out = DCStatsFactory().mapjoin(ffuncs.mul, *stats_objs)
 
     assert out.index_order == (Field("i"),)
     assert out.dim_sizes == dims
@@ -2150,8 +2149,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
         stats_objs.append(DCStats.from_def(td, dcs=set(dcs)))
 
-    new_def = BaseTensorStats.from_fields(frozenset(new_dims.keys()), new_dims, 0)
-    out = DCStats._merge_dc_union(new_def, stats_objs)
+    out = DCStatsFactory().mapjoin(ffuncs.add, *stats_objs)
 
     # Does the order matter here ? - > Changed tuple to set as throwing assert error
     assert set(out.index_order) == set(new_dims.keys())
