@@ -10,7 +10,6 @@ from functools import reduce
 from typing import Literal
 
 import pytest
-from .utils import patch_benchmark
 
 import numpy as np
 
@@ -28,6 +27,8 @@ from finchlite.autoschedule.tensor_stats import UniformStatsFactory
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.finch_notation.interpreter import NotationInterpreter
 from finchlite.symbolic import gensym
+
+from .utils import patch_benchmark
 
 CHAIN_LEN = 10
 MAT_DIM = 8
@@ -78,13 +79,20 @@ def _make_pipeline():
     executor = LogicExecutor(optimizer, stats_factory=UniformStatsFactory())
     return LogicNormalizer(executor)
 
+
 @pytest.mark.parametrize("metric", ["optimize", "downstream"])
-@pytest.mark.parametrize("empty_last", [
-    pytest.param(True, id="empty_last"),
-    pytest.param(False, id="dense_last"),
-])
-def test_galley_matmul_chain(benchmark, monkeypatch, empty_last: bool, metric: Literal["optimize", "downstream"]) -> None:
+@pytest.mark.parametrize(
+    "empty_last",
+    [
+        pytest.param(True, id="empty_last"),
+        pytest.param(False, id="dense_last"),
+    ],
+)
+def test_galley_matmul_chain(
+    benchmark, monkeypatch, empty_last: bool, metric: Literal["optimize", "downstream"]
+) -> None:
     import finchlite.autoschedule.galley_optimize as galley
+
     if metric == "optimize":
         patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
     else:

@@ -20,18 +20,25 @@ def integer_arrays():
     return a, b
 
 
-@pytest.mark.parametrize("op", [
-    pytest.param(fl.matmul, id="matmul"),
-    pytest.param(fl.add, id="add"),
-    pytest.param(fl.multiply, id="multiply"),
-])
+@pytest.mark.parametrize(
+    "op",
+    [
+        pytest.param(fl.matmul, id="matmul"),
+        pytest.param(fl.add, id="add"),
+        pytest.param(fl.multiply, id="multiply"),
+    ],
+)
 def test_ops_binary(integer_arrays, scheduler, benchmark, op):
     a, b = integer_arrays
     benchmark(op, a, b)
 
-@pytest.mark.parametrize("op", [
-    pytest.param(fl.sum, id="sum"),
-])
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        pytest.param(fl.sum, id="sum"),
+    ],
+)
 def test_ops_reduction(integer_arrays, scheduler, benchmark, op):
     a, _ = integer_arrays
     benchmark(op, a)
