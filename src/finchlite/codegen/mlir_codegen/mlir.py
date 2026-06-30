@@ -10,6 +10,12 @@ from finchlite.symbolic import Context, ScopedDict
 
 
 class MLIROperator(ABC):
+    @abstractmethod
+    def mlir_name(self) -> str: ...
+
+    @abstractmethod
+    def mlir_function_call(self, ctx: Any, *args: Any) -> Any: ...
+
     @staticmethod
     def is_float(arg) -> bool:
         return algebra.isdtype(arg, "real floating")
@@ -17,12 +23,6 @@ class MLIROperator(ABC):
     @staticmethod
     def is_unsigned(arg) -> bool:
         return algebra.isdtype(arg, "unsigned integer")
-
-    @abstractmethod
-    def mlir_name(self) -> str: ...
-
-    @abstractmethod
-    def mlir_function_call(self, ctx: Any, *args: Any) -> Any: ...
 
 
 class MLIRNAryOperator(MLIROperator):
@@ -304,8 +304,10 @@ class MLIRContext(Context):
                     raise ValueError(f"Variable does not exist: {name!r}")
                 return self.bindings[name][0]
 
-            # case asm.Assign(asm.Variable(var_n, var_t) as var, val):
-            #     ...
+            case asm.Assign(asm.Variable(var_n, var_t), val):
+                v = self(val)
+                self.bindings[var_n] = (v, mlir_type(var_t))
+                return None
 
             case asm.Call(asm.Literal(op), args):
                 return mlir_function_call(op, self, *args)
