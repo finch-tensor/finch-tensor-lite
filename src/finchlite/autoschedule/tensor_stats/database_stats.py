@@ -10,26 +10,20 @@ from finchlite.finch_logic import Field
 
 from .dc_stats import DCStats
 from .numeric_stats import NumericStats
-from .tensor_def import TensorDef
-from .tensor_stats import BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
 class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
     def __init__(self):
         super().__init__(DatabaseStats)
 
-    def copy_stats(self, stat: DatabaseStats) -> DatabaseStats:
-        if not isinstance(stat, DatabaseStats):
-            raise TypeError("copy_stats expected a DatabaseStats instance")
-        return DatabaseStats.from_def(stat.tensordef.copy(), stat.nnz, stat.V.copy())
-
     def _merge_join(
-        self, new_def: TensorDef, all_stats: list[DatabaseStats]
+        self, new_def: BaseTensorStats, all_stats: list[DatabaseStats]
     ) -> DatabaseStats:
 
         if len(all_stats) == 1:
             return DatabaseStats.from_def(
-                new_def, all_stats[0].nnz, dict(all_stats[0].V)
+                new_def, nnz=all_stats[0].nnz, V=dict(all_stats[0].V)
             )
 
         cur_nnz = all_stats[0].nnz
@@ -67,15 +61,15 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             cur_V = new_V
             cur_indices = set(i.index_order).union(cur_indices)
 
-        return DatabaseStats.from_def(new_def, new_nnz, new_V)
+        return DatabaseStats.from_def(new_def, nnz=new_nnz, V=new_V)
 
     def _merge_union(
-        self, new_def: TensorDef, all_stats: list[DatabaseStats]
+        self, new_def: BaseTensorStats, all_stats: list[DatabaseStats]
     ) -> DatabaseStats:
 
         if len(all_stats) == 1:
             return DatabaseStats.from_def(
-                new_def, all_stats[0].nnz, dict(all_stats[0].V)
+                new_def, nnz=all_stats[0].nnz, V=dict(all_stats[0].V)
             )
 
         cur_nnz = all_stats[0].nnz
@@ -121,21 +115,27 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             cur_V = new_V
             cur_indices = set(i.index_order).union(cur_indices)
 
-        return DatabaseStats.from_def(new_def, cur_nnz, new_V)
+        return DatabaseStats.from_def(new_def, nnz=cur_nnz, V=new_V)
 
     def _mapjoin_union(
-        self, new_def: TensorDef, op: FinchOperator, union_args: list[DatabaseStats]
+        self,
+        new_def: BaseTensorStats,
+        op: FinchOperator,
+        union_args: list[DatabaseStats],
     ) -> DatabaseStats:
 
         return self._merge_union(new_def, union_args)
 
     def _mapjoin_join(
-        self, new_def: TensorDef, op: FinchOperator, join_args: list[DatabaseStats]
+        self,
+        new_def: BaseTensorStats,
+        op: FinchOperator,
+        join_args: list[DatabaseStats],
     ) -> DatabaseStats:
 
         if not join_args:
-            return DatabaseStats.from_def(new_def, 0.0, {})
-        join_cover = set().union(*(s.tensordef.index_order for s in join_args))
+            return DatabaseStats.from_def(new_def, nnz=0.0, V={})
+        join_cover = set().union(*(s.index_order for s in join_args))
         if join_cover == set(new_def.index_order):
             return self._merge_join(new_def, join_args)
         return self._merge_union(new_def, join_args)
@@ -150,7 +150,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for aggregate")
 
-        new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
+        new_def = super().aggregate(op, init, reduce_indices, stats)
         new_nnz = min(
             stats.nnz,
             math.prod(
@@ -165,31 +165,31 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             # V(C,i) = V(A,i)
             new_V[idx] = stats.V[idx]
 
-        return DatabaseStats.from_def(new_def, new_nnz, new_V)
+        return DatabaseStats.from_def(new_def, nnz=new_nnz, V=new_V)
 
     def relabel(
         self, stats: DatabaseStats, relabel_indices: tuple[Field, ...]
     ) -> DatabaseStats:
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for relabel")
-        new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
+        new_def = super().relabel(stats, relabel_indices)
         V = {}
         for old, new in zip(stats.index_order, relabel_indices, strict=True):
             V[new] = stats.V[old]
-        return DatabaseStats.from_def(new_def, stats.nnz, V)
+        return DatabaseStats.from_def(new_def, nnz=stats.nnz, V=V)
 
     def reorder(
         self, stats: DatabaseStats, reorder_indices: tuple[Field, ...]
     ) -> DatabaseStats:
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for reorder")
-        new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
-        return DatabaseStats.from_def(new_def, stats.nnz, stats.V.copy())
+        new_def = super().reorder(stats, reorder_indices)
+        return DatabaseStats.from_def(new_def, nnz=stats.nnz, V=stats.V.copy())
 
 
 class DatabaseStats(NumericStats):
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):
-        self.tensordef = TensorDef.from_tensor(tensor, fields)
+        super().__init__(tensor, fields)
         val = tensor
 
         if hasattr(val, "tns"):
@@ -210,16 +210,6 @@ class DatabaseStats(NumericStats):
             for d in dc.dcs:
                 if d.from_indices == frozenset() and d.to_indices == frozenset({idx}):
                     self.V[idx] = d.value
-
-    @classmethod
-    def from_def(
-        cls, tensordef: TensorDef, nnz: float, V: dict[Field, float]
-    ) -> DatabaseStats:
-        obj = object.__new__(cls)
-        obj.tensordef = tensordef
-        obj.nnz = nnz
-        obj.V = V
-        return obj
 
     def estimate_non_fill_values(self) -> float:
         return self.nnz

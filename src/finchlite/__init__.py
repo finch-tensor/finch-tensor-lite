@@ -53,7 +53,6 @@ from .autoschedule.tensor_stats import (
     BlockedStats,
     DCStats,
     DenseStats,
-    TensorDef,
     UniformStats,
 )
 from .codegen import (
@@ -262,7 +261,6 @@ __all__ = [
     "SparseListLevel",
     "SparseListLevelFType",
     "Tensor",
-    "TensorDef",
     "TensorFType",
     "UniformStats",
     "__array_api_version__",

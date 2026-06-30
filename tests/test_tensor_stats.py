@@ -10,6 +10,8 @@ from finchlite import ffuncs
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.autoschedule.tensor_stats import (
     DC,
+    BaseTensorStats,
+    BaseTensorStatsFactory,
     BlockedStats,
     BlockedStatsFactory,
     DatabaseStatsFactory,
@@ -18,7 +20,6 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
-    TensorDef,
     UniformStats,
     UniformStatsFactory,
 )
@@ -30,6 +31,19 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+
+
+def _overwrite_def(stat, td: BaseTensorStats):
+    """Overwrite a stat's BaseTensorStats state in place.
+
+    Stats now inherit from :class:`BaseTensorStats`, so there is no ``tensordef``
+    member to replace; instead we copy ``td``'s state onto the stat directly.
+    """
+    stat.index_order = td.index_order
+    stat.dim_sizes = td.dim_sizes
+    stat.fill_value = td.fill_value
+    return stat
+
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
 
@@ -504,7 +518,7 @@ def test_dummy_aggregate():
     assert stats.get_dim_size(i) == 10.0
 
 
-def test_dummy_copy_stats():
+def test_dummy_copy():
     node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
 
     stats = insert_statistics(
@@ -514,7 +528,7 @@ def test_dummy_copy_stats():
         replace=False,
         cache={},
     )
-    copy = DummyStatsFactory().copy_stats(stats)
+    copy = DummyStatsFactory().copy(stats)
 
     assert copy.dim_sizes == stats.dim_sizes
     assert copy.index_order == stats.index_order
@@ -746,7 +760,7 @@ def test_database_aggregate():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_copy_stats():
+def test_database_copy():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
@@ -757,7 +771,7 @@ def test_database_copy_stats():
         replace=False,
         cache={},
     )
-    copy = DatabaseStatsFactory().copy_stats(stats)
+    copy = DatabaseStatsFactory().copy(stats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
     assert copy is not stats
@@ -1149,11 +1163,11 @@ def test_benchmark_structured_comparison():
         print("-" * 85)
 
 
-# ─────────────────────────────── TensorDef tests ─────────────────────────────────
+# ─────────────────────────── BaseTensorStats def tests ───────────────────────────
 
 
 def test_copy_and_getters():
-    td = TensorDef(
+    td = BaseTensorStats.from_fields(
         index_order=(Field("i"), Field("j")),
         dim_sizes={Field("i"): 2.0, Field("j"): 3.0},
         fill_value=42,
@@ -1175,21 +1189,27 @@ def test_copy_and_getters():
 )
 def test_reorder_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
-    td = TensorDef(index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0)
-    td2 = TensorDef.reorder(td, tuple(new_axes))
+    td = BaseTensorStats.from_fields(
+        index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0
+    )
+    td2 = BaseTensorStatsFactory.reorder(td, tuple(new_axes))
     assert td2.index_order == tuple(new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
 
 
 def test_set_fill_value():
-    td = TensorDef(index_order=(Field("i"),), dim_sizes={Field("i"): 5.0}, fill_value=0)
+    td = BaseTensorStats.from_fields(
+        index_order=(Field("i"),), dim_sizes={Field("i"): 5.0}, fill_value=0
+    )
     td2 = td.set_fill_value(7)
     assert td2.fill_value == 7
 
 
 def test_add_dummy_idx():
-    td = TensorDef(index_order=(Field("i"),), dim_sizes={Field("i"): 3.0}, fill_value=0)
+    td = BaseTensorStats.from_fields(
+        index_order=(Field("i"),), dim_sizes={Field("i"): 3.0}, fill_value=0
+    )
     td2 = td.add_dummy_idx(Field("j"))
     assert td2.index_order == (Field("i"), Field("j"))
     assert td2.get_dim_size(Field("j")) == 1.0
@@ -1238,8 +1258,8 @@ def test_add_dummy_idx():
     ],
 )
 def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
-    objs = [TensorDef(ax, dims, fv) for (ax, dims, fv) in defs]
-    out = TensorDef.mapjoin(func, *objs)
+    objs = [BaseTensorStats.from_fields(ax, dims, fv) for (ax, dims, fv) in defs]
+    out = BaseTensorStatsFactory.merge_defs(func, *objs)
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
     assert out.fill_value == expected_fill
@@ -1335,8 +1355,10 @@ def test_tensordef_aggregate(
     expected_dims,
     expected_fill,
 ):
-    d = TensorDef(index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value)
-    out = TensorDef.aggregate(op_func, None, reduce_fields, d)
+    d = BaseTensorStats.from_fields(
+        index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value
+    )
+    out = BaseTensorStatsFactory.aggregate(op_func, None, reduce_fields, d)
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
@@ -1828,7 +1850,9 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims, 0)
+    _overwrite_def(
+        stat, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims, 0)
+    )
     stat.dcs = set(dcs)
 
     assert stat.estimate_non_fill_values() == expected_nnz
@@ -1861,7 +1885,12 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+        ),
+    )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -1894,8 +1923,11 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(
-        frozenset([Field("i"), Field("j"), Field("k"), Field("l")]), dims, 0
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k"), Field("l")]), dims, 0
+        ),
     )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
@@ -1935,7 +1967,12 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+        ),
+    )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -1974,7 +2011,12 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+        ),
+    )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -2029,15 +2071,15 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
             replace=False,
             cache={},
         )
-        s.tensordef = TensorDef(frozenset({Field("i")}), dims, 0)
+        _overwrite_def(s, BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0))
         s.dcs = set(dcs)
         stats_objs.append(s)
 
-    new_def = TensorDef(frozenset({Field("i")}), dims, 0)
+    new_def = BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0)
     out = DCStats._merge_dc_join(new_def, stats_objs)
 
-    assert out.tensordef.index_order == (Field("i"),)
-    assert out.tensordef.dim_sizes == dims
+    assert out.index_order == (Field("i"),)
+    assert out.dim_sizes == dims
     assert out.dcs == expected_dcs
 
 
@@ -2125,15 +2167,15 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         field_idx_set = frozenset(idx_set)
         field_dims = {k: new_dims[k] for k in idx_set}
 
-        td = TensorDef(field_idx_set, field_dims, 0)
-        stats_objs.append(DCStats.from_def(td, set(dcs)))
+        td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
+        stats_objs.append(DCStats.from_def(td, dcs=set(dcs)))
 
-    new_def = TensorDef(frozenset(new_dims.keys()), new_dims, 0)
+    new_def = BaseTensorStats.from_fields(frozenset(new_dims.keys()), new_dims, 0)
     out = DCStats._merge_dc_union(new_def, stats_objs)
 
     # Does the order matter here ? - > Changed tuple to set as throwing assert error
-    assert set(out.tensordef.index_order) == set(new_dims.keys())
-    assert dict(out.tensordef.dim_sizes) == new_dims
+    assert set(out.index_order) == set(new_dims.keys())
+    assert dict(out.dim_sizes) == new_dims
     assert out.dcs == expected_dcs
 
 
@@ -2160,7 +2202,7 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
+    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
@@ -2171,7 +2213,7 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("i")}), dims2, 0)
+    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("i")}), dims2, 0))
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2211,7 +2253,9 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2224,7 +2268,9 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims2, 0)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims2, 0)
+    )
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2262,7 +2308,7 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
+    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
@@ -2273,7 +2319,7 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("j")}), dims2, 0)
+    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("j")}), dims2, 0))
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2316,7 +2362,9 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2330,7 +2378,9 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 0)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 0)
+    )
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2380,7 +2430,9 @@ def test_large_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 1)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 1)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2393,7 +2445,9 @@ def test_large_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 1)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 1)
+    )
     s2.dcs = set(dcs2)
 
     node3 = Table(
@@ -2407,7 +2461,12 @@ def test_large_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s3.tensordef = TensorDef(frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1)
+    _overwrite_def(
+        s3,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1
+        ),
+    )
     s3.dcs = set(dcs3)
 
     map = MapJoin(Literal(ffuncs.mul), (node1, node2))
@@ -2454,7 +2513,9 @@ def test_mixture_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims1, 1)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims1, 1)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2467,7 +2528,9 @@ def test_mixture_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset([Field("j"), Field("k")]), dims2, 1)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset([Field("j"), Field("k")]), dims2, 1)
+    )
     s2.dcs = set(dcs2)
 
     node3 = Table(
@@ -2481,7 +2544,12 @@ def test_mixture_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s3.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0)
+    _overwrite_def(
+        s3,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0
+        ),
+    )
     s3.dcs = set(dcs3)
 
     map = MapJoin(Literal(ffuncs.mul), (node1, node2))
@@ -2532,8 +2600,11 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         replace=False,
         cache=cache,
     )
-    stat.tensordef = TensorDef(
-        frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
     )
     stat.dcs = set(dcs)
 
@@ -2588,7 +2659,12 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         replace=False,
         cache=cache,
     )
-    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
+    _overwrite_def(
+        st,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
+    )
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -2642,7 +2718,12 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         replace=False,
         cache=cache,
     )
-    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
+    _overwrite_def(
+        st,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
+    )
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -2713,7 +2794,12 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         replace=False,
         cache=cache,
     )
-    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
+    _overwrite_def(
+        st,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
+    )
     st.dcs = set(dcs)
 
     reduce_fields = tuple(reduce_indices)
