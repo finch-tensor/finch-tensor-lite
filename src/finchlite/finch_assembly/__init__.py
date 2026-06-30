@@ -9,7 +9,6 @@ from .dataflow import (
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
-from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyExpression,
@@ -20,7 +19,6 @@ from .nodes import (
     Break,
     BufferLoop,
     Call,
-    ExistsDict,
     ForLoop,
     Function,
     GetAttr,
@@ -30,7 +28,6 @@ from .nodes import (
     Length,
     Literal,
     Load,
-    LoadDict,
     Module,
     Print,
     Repack,
@@ -40,7 +37,6 @@ from .nodes import (
     Slot,
     Stack,
     Store,
-    StoreDict,
     Unpack,
     Variable,
     WhileLoop,
@@ -73,9 +69,6 @@ __all__ = [
     "BufferFType",
     "BufferLoop",
     "Call",
-    "Dict",
-    "DictFType",
-    "ExistsDict",
     "ForLoop",
     "Function",
     "GetAttr",
@@ -85,7 +78,6 @@ __all__ = [
     "Length",
     "Literal",
     "Load",
-    "LoadDict",
     "Module",
     "NumberedStatement",
     "Print",
@@ -96,7 +88,6 @@ __all__ = [
     "Slot",
     "Stack",
     "Store",
-    "StoreDict",
     "Unpack",
     "Variable",
     "WhileLoop",
