@@ -29,14 +29,8 @@ TS = TypeVar("TS", bound="BaseTensorStats")
 
 
 class BaseTensorStats(TensorStats):
-    """Base class for tensor statistics.
-
-    ``BaseTensorStats`` owns the shared tensor-definition state -- the index
-    order, the per-axis dimension sizes, and the fill value -- along with the
-    operations that combine and transform that state (``mapjoin``,
-    ``aggregate``, ``relabel`` and ``reorder``). Subclasses layer their own
-    structural estimates (number of non-fill values, degree constraints, ...)
-    on top of this state.
+    """
+    Base class for tensor statistics.
     """
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):
@@ -68,9 +62,6 @@ class BaseTensorStats(TensorStats):
 
     @classmethod
     def from_tensor(cls, tensor: Any, indices: tuple[Field, ...]) -> BaseTensorStats:
-        """Return a bare ``BaseTensorStats`` holding only the definition state
-        (index order, dimension sizes, and fill value) of ``tensor``.
-        """
         return BaseTensorStats(tensor, indices)
 
     @classmethod
@@ -78,10 +69,6 @@ class BaseTensorStats(TensorStats):
         """Build a ``cls`` instance that reuses the definition state (index
         order, dimension sizes, fill value) of ``d``, setting any
         subclass-specific attributes from ``fields``.
-
-        This is the single construction path for wrapping a computed
-        definition into a concrete stats object, so subclasses normally do not
-        need to define their own ``from_def``.
         """
         obj = cls.from_fields(d.index_order, d.dim_sizes, d.fill_value)
         for name, value in fields.items():
@@ -89,12 +76,6 @@ class BaseTensorStats(TensorStats):
         return obj
 
     def copy(self) -> Self:
-        """Return a copy of this stats object of the same concrete type.
-
-        Copies the definition state plus a shallow copy of every other stored
-        attribute, so mutable members (dimension maps, DC sets, per-axis
-        dicts, ...) are not shared with the original.
-        """
         new = object.__new__(type(self))
         new.__dict__ = {name: copy.copy(value) for name, value in self.__dict__.items()}
         return new
@@ -202,13 +183,6 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
 
     @staticmethod
     def merge_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
-        """Merge multiple definitions into a single one.
-
-        Produces a new definition whose index set is the union of all input
-        indices. The dimension size for each axis is copied from the first
-        input that contains that axis, and the fill value is computed by
-        applying the operator ``op`` across all input fill values.
-        """
         new_fill_value = op(*(s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),
@@ -234,22 +208,6 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         reduce_indices: tuple[Field, ...],
         d: BaseTensorStats,
     ) -> BaseTensorStats:
-        """Reduce a definition along one or more axes.
-
-        Constructs a new definition by removing the axes in ``reduce_indices``
-        and computing a new fill value that reflects reducing the original fill
-        over the size of the reduced subspace.
-
-        Parameters:
-        op : Callable
-            The reduction operator.
-        init : Any | None
-            Explicit initial value for the reduction.
-        reduce_indices : tuple[Field,...]
-            Axis names to reduce/eliminate from the definition.
-        d : BaseTensorStats
-            The input definition.
-        """
         red_set = set(reduce_indices) & set(d.index_order)
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
 
@@ -283,12 +241,6 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
     def relabel(
         d: BaseTensorStats, relabel_indices: tuple[Field, ...]
     ) -> BaseTensorStats:
-        """Relabel the axes in ``d`` to new labels.
-
-        Constructs a new definition by associating the new labels for axes with
-        the dimension sizes of the old names. The fill value is unchanged since
-        the underlying tensor is unaffected.
-        """
         if len(relabel_indices) != len(d.index_order):
             raise ValueError(
                 f"Tensor has {len(d.index_order)} dims, "
