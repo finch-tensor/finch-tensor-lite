@@ -129,8 +129,6 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         return stat.copy()
 
     def mapjoin(self, op: FinchOperator, *args: TS) -> TS:
-        new_def = self.merge_defs(op, *args)
-
         join_args: list[TS] = []
         union_args: list[TS] = []
         for s in args:
@@ -140,19 +138,19 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
                 union_args.append(s)
 
         if union_args:
-            join_args.append(self._mapjoin_union(new_def, op, union_args))
+            join_args.append(self._mapjoin_union(op, *union_args))
             # Add test cases - To test both join and union
 
-        return self._mapjoin_join(new_def, op, join_args)
+        return self._mapjoin_join(op, *join_args)
 
     @abstractmethod
     def _mapjoin_union(
-        self, new_def: BaseTensorStats, op: FinchOperator, union_args: list[TS]
+        self, op: FinchOperator, *union_args: list[TS]
     ) -> TS: ...
 
     @abstractmethod
     def _mapjoin_join(
-        self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[TS]
+        self, op: FinchOperator, *join_args: TS
     ) -> TS: ...
 
     @abstractmethod
@@ -171,7 +169,7 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
     def reorder(self, stats: TS, reorder_indices: tuple[Field, ...]) -> TS: ...
 
     @staticmethod
-    def merge_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
+    def _mapjoin_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
         new_fill_value = op(*(s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),

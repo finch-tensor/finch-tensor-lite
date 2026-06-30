@@ -16,15 +16,17 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
         super().__init__(DenseStats)
 
     def _mapjoin_union(
-        self, new_def: BaseTensorStats, op: FinchOperator, union_args: list[DenseStats]
+        self, op: FinchOperator, *union_args: DenseStats
     ) -> DenseStats:
-        return DenseStats.from_def(new_def)
+        base_stats = super()._mapjoin_defs(op, *union_args)
+        return DenseStats.from_def(base_stats)
 
     def _mapjoin_join(
-        self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[DenseStats]
+        self, op: FinchOperator, *join_args: DenseStats
     ) -> DenseStats:
-        return DenseStats.from_def(new_def)
-
+        base_stats = super()._mapjoin_defs(op, *join_args)
+        return DenseStats.from_def(base_stats)
+    
     def aggregate(
         self,
         op: FinchOperator,

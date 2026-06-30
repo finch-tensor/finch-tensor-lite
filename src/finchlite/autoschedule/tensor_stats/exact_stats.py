@@ -27,19 +27,18 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
         super().__init__(ExactStats)
 
     def _mapjoin_join(
-        self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[ExactStats]
+        self, op: FinchOperator, *join_args: ExactStats
     ) -> ExactStats:
-        if len(join_args) == 0:
-            return ExactStats.from_def(new_def, expr=None)
-
+        base_stats = super()._mapjoin_defs(op, *join_args)
         expr = MapJoin(Literal(ffuncs.and_), tuple(s.expr for s in join_args))
-        return ExactStats.from_def(new_def, expr=expr)
+        return ExactStats.from_def(base_stats, expr=expr)
 
     def _mapjoin_union(
-        self, new_def: BaseTensorStats, op: FinchOperator, union_args: list[ExactStats]
+        self, op: FinchOperator, *union_args: ExactStats
     ) -> ExactStats:
+        base_stats = super()._mapjoin_defs(op, *union_args)
         expr = MapJoin(Literal(ffuncs.or_), tuple(s.expr for s in union_args))
-        return ExactStats.from_def(new_def, expr=expr)
+        return ExactStats.from_def(base_stats, expr=expr)
 
     def aggregate(
         self,

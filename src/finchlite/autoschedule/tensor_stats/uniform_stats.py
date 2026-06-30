@@ -18,15 +18,15 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
 
     def _mapjoin_union(
         self,
-        new_def: BaseTensorStats,
         op: FinchOperator,
-        union_args: list[UniformStats],
+        *union_args: UniformStats,
     ) -> UniformStats:
+        base_stats = super()._mapjoin_defs(op, *union_args)
 
-        new_vol = new_def.get_dim_space_size(new_def.index_order)
+        new_vol = base_stats.get_dim_space_size(base_stats.index_order)
 
         if new_vol == 0.0:
-            return UniformStats.from_def(new_def, nnz=0.0)
+            return UniformStats.from_def(base_stats, nnz=0.0)
 
         inv_p = 1.0
 
@@ -40,16 +40,16 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
 
         res_p = 1 - inv_p
 
-        return UniformStats.from_def(new_def, nnz=res_p * new_vol)
+        return UniformStats.from_def(base_stats, nnz=res_p * new_vol)
 
     def _mapjoin_join(
-        self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[UniformStats]
+        self, op: FinchOperator, *join_args: UniformStats
     ) -> UniformStats:
-
-        new_vol = new_def.get_dim_space_size(new_def.index_order)
+        base_stats = super()._mapjoin_defs(op, *join_args)
+        new_vol = base_stats.get_dim_space_size(base_stats.index_order)
 
         if new_vol == 0.0:
-            return UniformStats.from_def(new_def, nnz=0.0)
+            return UniformStats.from_def(base_stats, nnz=0.0)
 
         res_p = 1.0
 
@@ -61,7 +61,7 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
             else:
                 raise TypeError("Stats Class must be inherit from NumericStats")
 
-        return UniformStats.from_def(new_def, nnz=res_p * new_vol)
+        return UniformStats.from_def(base_stats, nnz=res_p * new_vol)
 
     def aggregate(
         self,

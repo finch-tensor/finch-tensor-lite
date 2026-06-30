@@ -49,21 +49,16 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         super().__init__(DCStats)
 
     def _mapjoin_union(
-        self, new_def: BaseTensorStats, op: FinchOperator, union_args: list[DCStats]
+        self, op: FinchOperator, *union_args: DCStats
     ) -> DCStats:
-
-        return DCStats._merge_dc_union(new_def, union_args)
+        base_stats = super()._mapjoin_defs(op, *union_args)
+        return DCStats._merge_dc_union(base_stats, union_args)
 
     def _mapjoin_join(
-        self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[DCStats]
+        self, op: FinchOperator, *join_args: DCStats
     ) -> DCStats:
-
-        if not join_args:
-            return DCStats.from_def(new_def, dcs=set())
-        join_cover = set().union(*(s.index_order for s in join_args))
-        if join_cover == set(new_def.index_order):
-            return DCStats._merge_dc_join(new_def, join_args)
-        return DCStats._merge_dc_union(new_def, join_args)
+        base_stats = super()._mapjoin_defs(op, *join_args)
+        return DCStats._merge_dc_join(base_stats, join_args)
 
     def aggregate(
         self,
@@ -367,7 +362,7 @@ class DCStats(NumericStats):
         Merge DCs for join-like operators
 
         Args:
-            new_def: The merged definition produced by merge_defs(...).
+            new_def: The merged definition produced by _mapjoin_defs(...).
             all_stats: DCStats inputs whose DC sets are to be merged.
 
         Returns:
@@ -396,7 +391,7 @@ class DCStats(NumericStats):
         Merge DCs for union-like operators.
 
         Args:
-            new_def: The output definition produced by merge_defs(...).
+            new_def: The output definition produced by _mapjoin_defs(...).
             all_stats: The DCStats inputs to merge.
 
         Returns:

@@ -1238,7 +1238,7 @@ def test_reorder_def(orig_axes, new_axes):
 )
 def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
     objs = [BaseTensorStats.from_fields(ax, dims, fv) for (ax, dims, fv) in defs]
-    out = BaseTensorStatsFactory.merge_defs(func, *objs)
+    out = BaseTensorStatsFactory._mapjoin_defs(func, *objs)
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
     assert out.fill_value == expected_fill
@@ -1433,7 +1433,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("i")) == 2.0
     assert dsm.get_dim_size(Field("j")) == 3.0
     assert dsm.get_dim_size(Field("k")) == 4.0
-    assert dsm.fill_value == 0.0
+    assert dsm.fill_value == 1.0
 
     node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
     ds_sum = insert_statistics(

@@ -119,26 +119,19 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
 
     def _mapjoin_union(
         self,
-        new_def: BaseTensorStats,
         op: FinchOperator,
-        union_args: list[DatabaseStats],
+        *union_args: DatabaseStats,
     ) -> DatabaseStats:
-
-        return self._merge_union(new_def, union_args)
+        base_stats = super()._mapjoin_defs(op, *union_args)
+        return self._merge_union(base_stats, union_args)
 
     def _mapjoin_join(
         self,
-        new_def: BaseTensorStats,
         op: FinchOperator,
-        join_args: list[DatabaseStats],
+        *join_args: DatabaseStats,
     ) -> DatabaseStats:
-
-        if not join_args:
-            return DatabaseStats.from_def(new_def, nnz=0.0, V={})
-        join_cover = set().union(*(s.index_order for s in join_args))
-        if join_cover == set(new_def.index_order):
-            return self._merge_join(new_def, join_args)
-        return self._merge_union(new_def, join_args)
+        base_stats = super()._mapjoin_defs(op, *join_args)
+        return self._merge_join(base_stats, join_args)
 
     def aggregate(
         self,

@@ -56,7 +56,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
 
         b_args: list[BlockedStats] = list(args)
         first_arg = b_args[0]
-        new_def = BaseTensorStatsFactory.merge_defs(op, *b_args)
+        new_def = BaseTensorStatsFactory._mapjoin_defs(op, *b_args)
 
         blocks_per_dim = {k: v for arg in b_args for k, v in arg.blocks_per_dim.items()}
 
