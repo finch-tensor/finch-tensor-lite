@@ -235,6 +235,8 @@ def mlir_type(t: FType):
             return t.mlir_type()
         case algebra.bool_:
             return "i1"
+        case algebra.intp:
+            return "index"
         case algebra.int_:
             return "i64"
         case algebra.float_:
@@ -367,8 +369,20 @@ class MLIRContext(Context):
                 self.exec(ctx_2.emit())
                 return None
 
-            # case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
-            #     ...
+            case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
+                lo, hi = self(start), self(end)
+                step = self.new_ssa()
+                self.exec(f"{feed}{step} = arith.constant 1 : index")
+                iv = self.new_ssa()
+                ctx_2 = self.subblock()
+                ctx_2.bindings[var_n] = (iv, mlir_type(var_t))
+                ctx_2(body)
+                self.exec(
+                    f"{feed}scf.for {iv} = {lo} to {hi} step {step} {{\n"
+                    f"{ctx_2.emit()}\n"
+                    f"{feed}}}"
+                )
+                return None
 
             # case asm.WhileLoop(cond, body):
             #     ...
