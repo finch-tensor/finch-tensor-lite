@@ -29,6 +29,9 @@ jobs:
             poetry run pytest benchmarks/ --codspeed -vvv
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
