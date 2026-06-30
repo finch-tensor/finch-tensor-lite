@@ -73,6 +73,27 @@ def test_bufferized_ndarray_custom_fill_value():
     assert hash(x.ftype) == hash(y.ftype)
 
 
+def test_index_tensor_returns_linear_indices():
+    import importlib
+
+    lazy_interface = importlib.import_module("finchlite.interface.lazy")
+
+    tns = lazy_interface.IndexTensor((2, 3), np.int64)
+
+    assert tns.shape == (2, 3)
+    assert tns.element_type == finchlite.int64
+    assert tns.fill_value == np.int64(0)
+    assert tns[0, 0].item() == np.int64(0)
+    assert tns[0, 2].item() == np.int64(2)
+    assert tns[1, 0].item() == np.int64(3)
+    assert tns[1, 2].item() == np.int64(5)
+
+    constructed = tns.ftype.construct((2, 3))
+
+    assert constructed.ftype == tns.ftype
+    assert constructed[1, 2].item() == np.int64(5)
+
+
 def test_fiber_tensor():
     fmt = fiber_tensor(
         dense(

@@ -660,6 +660,22 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_equal(result, expected)
 
 
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
+@pytest.mark.parametrize(
+    "op, np_op", [(finchlite.argmin, np.argmin), (finchlite.argmax, np.argmax)]
+)
+@pytest.mark.parametrize("axis", [None, 0, 1, -1])
+@pytest.mark.parametrize("keepdims", [False, True])
+def test_argmin_argmax(wrap, op, np_op, axis, keepdims):
+    x = np.array([[4.0, 1.0, 1.0], [2.0, 2.0, 3.0]])
+    result = op(wrap(x), axis=axis, keepdims=keepdims)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+
+    assert result.dtype in (finchlite.int32, finchlite.int64)
+    finch_assert_equal(result, np_op(x, axis=axis, keepdims=keepdims))
+
+
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
 @pytest.mark.parametrize(
     "op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)]

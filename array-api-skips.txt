@@ -25,8 +25,6 @@ array_api_tests/test_signatures.py::test_func_signature[sort]
 array_api_tests/test_signatures.py::test_func_signature[flip]
 array_api_tests/test_signatures.py::test_func_signature[roll]
 array_api_tests/test_signatures.py::test_func_signature[take]
-array_api_tests/test_signatures.py::test_func_signature[argmax]
-array_api_tests/test_signatures.py::test_func_signature[argmin]
 array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
 array_api_tests/test_signatures.py::test_func_signature[concat]
@@ -123,8 +121,6 @@ array_api_tests/test_has_names.py::test_has_names[set-unique_all]
 array_api_tests/test_has_names.py::test_has_names[set-unique_counts]
 array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
 array_api_tests/test_has_names.py::test_has_names[set-unique_values]
-array_api_tests/test_has_names.py::test_has_names[searching-argmax]
-array_api_tests/test_has_names.py::test_has_names[searching-argmin]
 array_api_tests/test_has_names.py::test_has_names[searching-searchsorted]
 array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
 array_api_tests/test_has_names.py::test_has_names[creation-meshgrid]
@@ -205,8 +201,6 @@ array_api_tests/test_manipulation_functions.py::test_tile
 # test_searching_functions
 
 # not implemented
-array_api_tests/test_searching_functions.py::test_argmax
-array_api_tests/test_searching_functions.py::test_argmin
 # 0D issue
 array_api_tests/test_searching_functions.py::test_nonzero
 
