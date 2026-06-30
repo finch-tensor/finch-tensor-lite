@@ -7,9 +7,9 @@ authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<3.14'
 dependencies = ['numpy>=1.19,<2.4', 'numba>=0.61,<0.63.1', 'donfig>=0.8.1.post1,<0.9.0', "lark (>=1.3.0,<2.0.0)"]
 
-[tool.poetry]
+[tool.pixi]
 packages = [{include = "finchlite", from = "src"}]
-requires-poetry = '>=2.0,<3.0'
+requires-pixi = '>=2.0,<3.0'
 
 [project.optional-dependencies]
 test = [
@@ -30,8 +30,8 @@ benchmark = [
 ]
 
 [build-system]
-requires = ["poetry-core>=1.0.8"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pixi-core>=1.0.8"]
+build-backend = "pixi.core.masonry.api"
 
 [tool.ruff]
 extend-exclude = [

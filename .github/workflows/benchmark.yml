@@ -18,7 +18,7 @@ jobs:
             ${{ matrix.environment }}
       - name: Install package
         run: |
-          poetry install --extras benchmark --extras test
+          pixi install --extras benchmark --extras test
       - name: Install debug symbols
         run: |
           sudo apt-get update && sudo apt-get install -y libc6-dbg
@@ -27,7 +27,7 @@ jobs:
         with:
           mode: walltime,memory
           run: |
-            poetry run pytest benchmarks/ --codspeed -vvv
+            pixi run pytest benchmarks/ --codspeed -vvv
 
 on:
   push:

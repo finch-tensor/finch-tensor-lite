@@ -31,7 +31,7 @@ See below for how to perform development tasks via `pixi run`, which will instal
 ### Publishing
 
 The "Publish" GitHub Action is a manual workflow for publishing Python packages to
-PyPI using Poetry. It handles the version management based on the `pyproject.toml`
+PyPI using Pixi. It handles the version management based on the `pyproject.toml`
 file and automates tagging and creating GitHub releases.
 
 #### Version Update

@@ -2,7 +2,7 @@
 JIT ASV benchmark: time ``fl.jit`` on a 5-matrix matmul chain.
 Also measures standalone ``fl.jit`` compile time.
 
-Run: ``poetry run asv run --bench jit_benchmarks``
+Run: ``pixi run asv run --bench jit_benchmarks``
 """
 
 import numpy as np
