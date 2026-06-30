@@ -209,19 +209,19 @@ class NumbaArgumentFType(ABC):
 
 class PrintableNumbaFType(ABC):
     @abstractmethod
-    def numba_print(self, ctx, obj) -> tuple[str, ...]:
+    def numba_print(self, ctx, obj) -> str:
         """
-        Return expressions to pass to Numba's print for this object.
+        Return a Numba expression for this value in printf argument position.
         """
         ...
 
 
-def numba_print(fmt: FType, ctx, obj) -> tuple[str, ...]:
+def numba_print(fmt: FType, ctx, obj) -> str:
     match fmt:
         case PrintableNumbaFType():
             return fmt.numba_print(ctx, obj)
         case _:
-            return (ctx(obj),)
+            return ctx(obj)
 
 
 def to_numpy_type(t: FType) -> np.dtype:
@@ -605,7 +605,15 @@ class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
 
 
 class NumbaContext(Context):
-    def __init__(self, tab="    ", indent=0, types=None, slots=None):
+    def __init__(
+        self,
+        tab="    ",
+        indent=0,
+        types=None,
+        slots=None,
+        imports=None,
+        importset=None,
+    ):
         if types is None:
             types = ScopedDict()
         if slots is None:
@@ -618,13 +626,18 @@ class NumbaContext(Context):
         self.types = types
         self.slots = slots
 
-        self.imports = [
-            "import _operator, builtins",
-            "from numba import njit",
-            "import numpy",
-            "from numpy import int64, float64",
-            "\n",
-        ]
+        if imports is None:
+            imports = [
+                "import _operator, builtins",
+                "from numba import njit",
+                "import numpy",
+                "from numpy import int64, float64",
+                "\n",
+            ]
+        if importset is None:
+            importset = set(imports)
+        self.imports = imports
+        self._importset = importset
 
     @property
     def feed(self) -> str:
@@ -639,10 +652,17 @@ class NumbaContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
+    def add_import(self, import_line: str):
+        if import_line not in self._importset:
+            self.imports.insert(-1, import_line)
+            self._importset.add(import_line)
+
     def block(self) -> "NumbaContext":
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
+        blk.imports = self.imports
+        blk._importset = self._importset
         blk.types = self.types
         blk.slots = self.slots
         return blk
@@ -892,12 +912,24 @@ class NumbaContext(Context):
                     self(func)
                 return None
             case asm.Print(args):
+                match args:
+                    case (asm.Literal(str() as fmt), *vals):
+                        pass
+                    case _:
+                        raise TypeError("Print expects a literal format string")
                 print_args = [
-                    expr
-                    for arg in args
-                    for expr in numba_print(arg.result_type, self, arg)
+                    numba_print(val.result_type, self, val) for val in vals
                 ]
-                self.exec(f"{feed}print({', '.join(print_args)})")
+                tuple_expr = ", ".join(print_args)
+                if len(print_args) == 1:
+                    tuple_expr = f"{tuple_expr},"
+                fmt_var = self.freshen("fmt")
+                self.add_import("from numba import objmode")
+                self.exec(
+                    f"{feed}with objmode():\n"
+                    f"{feed}{self.tab}{fmt_var} = {fmt!r}\n"
+                    f"{feed}{self.tab}print({fmt_var} % ({tuple_expr}), end='')"
+                )
                 return None
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")

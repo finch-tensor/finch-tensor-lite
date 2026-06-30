@@ -250,9 +250,9 @@ def test_asm_print(capsys, file_regression):
                     (p_var, x_var),
                     asm.Block(
                         (
-                            asm.Print((p_var,)),
-                            asm.Print((x_var,)),
-                            asm.Print((p_var, x_var)),
+                            asm.Print((asm.Literal("%s\n"), p_var)),
+                            asm.Print((asm.Literal("%s\n"), x_var)),
+                            asm.Print((asm.Literal("%s %s\n"), p_var, x_var)),
                             asm.Assign(
                                 res_var,
                                 asm.Call(
@@ -281,8 +281,10 @@ def test_asm_print(capsys, file_regression):
                                     ),
                                 ),
                             ),
-                            asm.Print((res_var,)),
-                            asm.Print((p_var, x_var, res_var)),
+                            asm.Print((asm.Literal("%s\n"), res_var)),
+                            asm.Print(
+                                (asm.Literal("%s %s %s\n"), p_var, x_var, res_var)
+                            ),
                             asm.Return(res_var),
                         )
                     ),

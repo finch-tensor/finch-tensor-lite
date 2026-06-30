@@ -1,3 +1,4 @@
+import builtins
 import ctypes
 import logging
 import shutil
@@ -504,14 +505,14 @@ ctype_print_fmt: dict[Any, str] = {
 
 class PrintableCFType(ABC):
     @abstractmethod
-    def c_print(self, ctx, obj) -> tuple[str, tuple[str, ...]]:
+    def c_print(self, ctx, obj) -> str:
         """
-        Return a printf format fragment and the C expressions it consumes.
+        Return a C expression for this value in printf argument position.
         """
         ...
 
 
-def c_print(fmt: FType, ctx, obj) -> tuple[str, tuple[str, ...]]:
+def c_print(fmt: FType, ctx, obj) -> str:
     match fmt:
         case PrintableCFType():
             return fmt.c_print(ctx, obj)
@@ -523,57 +524,72 @@ def c_print(fmt: FType, ctx, obj) -> tuple[str, tuple[str, ...]]:
             | algebra.str_
         ):
             return c_print_scalar(fmt, ctx, obj)
-        case TupleFType():
-            return c_print_tuple(fmt, ctx, obj)
-        case StructFType():
-            return c_print_struct(fmt, ctx, obj)
         case _:
             raise NotImplementedError(f"No C print mapping for {fmt}")
 
 
-def c_print_scalar(fmt: FType, ctx, obj) -> tuple[str, tuple[str, ...]]:
+def c_print_scalar(fmt: FType, ctx, obj) -> str:
     ctype = c_type(fmt)
     if ctype not in ctype_print_fmt:
         raise NotImplementedError(f"No C print mapping for {fmt}")
     if isinstance(fmt, algebra.ftypes.FDTypeBoolean):
-        return ctype_print_fmt[ctype], (f"(int){obj}",)
-    return ctype_print_fmt[ctype], (obj,)
+        return f"(int){obj}"
+    return obj
 
 
-def c_print_tuple(fmt: TupleFType, ctx, obj) -> tuple[str, tuple[str, ...]]:
-    fields = fmt.struct_fields
-    if not fields:
-        return "()", ()
-
-    pieces: list[str] = ["("]
-    args: list[str] = []
-    for field_idx, (field, field_t) in enumerate(fields):
-        if field_idx > 0:
-            pieces.append(", ")
-        field_fmt, field_args = c_print(field_t, ctx, c_getattr(fmt, ctx, obj, field))
-        pieces.append(field_fmt)
-        args.extend(field_args)
-    if len(fields) == 1:
-        pieces.append(",")
-    pieces.append(")")
-    return "".join(pieces), tuple(args)
+def c_print_string_fallback(fmt: FType, ctx) -> str:
+    try:
+        fallback = ctx.ctype_name(c_type(fmt))
+    except NotImplementedError:
+        fallback = str(fmt)
+    return f'"{c_string_literal(fallback)}"'
 
 
-def c_print_struct(fmt: StructFType, ctx, obj) -> tuple[str, tuple[str, ...]]:
-    pieces: list[str] = [f"{fmt.struct_name}("]
-    args: list[str] = []
-    for field_idx, (field, field_t) in enumerate(fmt.struct_fields):
-        if field_idx > 0:
-            pieces.append(", ")
-        field_fmt, field_args = c_print(field_t, ctx, c_getattr(fmt, ctx, obj, field))
-        pieces.extend((f"{field}=", field_fmt))
-        args.extend(field_args)
-    pieces.append(")")
-    return "".join(pieces), tuple(args)
+def c_printf_arg(fmt: FType, ctx, obj, conversion: str) -> str:
+    if conversion == "s":
+        try:
+            return c_print(fmt, ctx, obj)
+        except NotImplementedError:
+            return c_print_string_fallback(fmt, ctx)
+    return c_print(fmt, ctx, obj)
 
 
 def c_string_literal(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def printf_conversions(fmt: str) -> list[str]:
+    conversions = []
+    idx = 0
+    while idx < len(fmt):
+        if fmt[idx] != "%":
+            idx += 1
+            continue
+        idx += 1
+        if idx < len(fmt) and fmt[idx] == "%":
+            idx += 1
+            continue
+        while idx < len(fmt) and fmt[idx] in "-+ #0":
+            idx += 1
+        if idx < len(fmt) and fmt[idx] == "*":
+            raise NotImplementedError("dynamic printf widths are not supported")
+        while idx < len(fmt) and fmt[idx].isdigit():
+            idx += 1
+        if idx < len(fmt) and fmt[idx] == ".":
+            idx += 1
+            if idx < len(fmt) and fmt[idx] == "*":
+                raise NotImplementedError("dynamic printf precisions are not supported")
+            while idx < len(fmt) and fmt[idx].isdigit():
+                idx += 1
+        if fmt.startswith(("hh", "ll"), idx):
+            idx += 2
+        elif idx < len(fmt) and fmt[idx] in "hljztL":
+            idx += 1
+        if idx >= len(fmt):
+            raise ValueError("incomplete printf format specifier")
+        conversions.append(fmt[idx])
+        idx += 1
+    return conversions
 
 
 class CGenerator(UnvalidatedForm, CLowerer):
@@ -966,15 +982,22 @@ class CContext(Context):
                 return None
             case asm.Print(args):
                 self.add_header("#include <stdio.h>")
-                pieces: list[str] = []
-                print_args: list[str] = []
-                for arg_idx, arg in enumerate(args):
-                    if arg_idx > 0:
-                        pieces.append(" ")
-                    arg_fmt, arg_args = c_print(arg.result_type, self, self(arg))
-                    pieces.append(arg_fmt)
-                    print_args.extend(arg_args)
-                fmt_str = c_string_literal("".join(pieces) + "\n")
+                match args:
+                    case (asm.Literal(str() as fmt), *vals):
+                        pass
+                    case _:
+                        raise TypeError("Print expects a literal format string")
+                conversions = printf_conversions(fmt)
+                if builtins.len(conversions) != builtins.len(vals):
+                    raise ValueError(
+                        f"printf format expects {builtins.len(conversions)} arguments, "
+                        f"got {builtins.len(vals)}"
+                    )
+                print_args = [
+                    c_printf_arg(val.result_type, self, self(val), conversion)
+                    for val, conversion in zip(vals, conversions, strict=False)
+                ]
+                fmt_str = c_string_literal(fmt)
                 if print_args:
                     self.exec(
                         f'{feed}printf("{fmt_str}", {", ".join(print_args)});'

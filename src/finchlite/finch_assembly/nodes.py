@@ -675,13 +675,13 @@ class Module(AssemblyTree):
 @dataclass(eq=True, frozen=True)
 class Print(AssemblyTree, AssemblyStatement):
     """
-    Print values of give variables.
+    Print values using a printf-style format string.
 
     Attributes:
-        args: list of variables to be printed.
+        args: format string literal followed by values to be printed.
     """
 
-    args: tuple[Variable, ...]
+    args: tuple[AssemblyExpression, ...]
 
     @property
     def children(self):
@@ -857,11 +857,18 @@ class AssemblyPrinterContext(Context):
                     self(func)
                 return None
             case Print(args):
-                args_value_str = ""
-                for arg in args:
-                    if isinstance(arg, Variable):
-                        args_value_str = args_value_str + f"{{{self(arg)}}} "
-                self.exec(f"{feed}print(f'{args_value_str}')")
+                match args:
+                    case (Literal(str() as fmt), *vals):
+                        vals_expr = ", ".join(self(val) for val in vals)
+                        if len(vals) == 0:
+                            tuple_expr = "()"
+                        elif len(vals) == 1:
+                            tuple_expr = f"({vals_expr},)"
+                        else:
+                            tuple_expr = f"({vals_expr})"
+                        self.exec(f"{feed}print({fmt!r} % {tuple_expr}, end='')")
+                    case _:
+                        raise TypeError("Print expects a literal format string")
                 return None
             case Stack(obj, type_):
                 self.exec(f"{feed}stack({self(obj)}, {str(type_)})")

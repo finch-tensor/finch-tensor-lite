@@ -371,10 +371,15 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                             )
                 return AssemblyInterpreterLibrary(self, kernels)
             case asm.Print(args):
-                args_value_str = ""
-                for arg in args:
-                    args_value_str = args_value_str + f"{self(arg)} "
-                print(args_value_str, file=self.stdout)
+                match args:
+                    case (asm.Literal(str() as fmt), *vals):
+                        print(
+                            fmt % tuple(self(val) for val in vals),
+                            end="",
+                            file=self.stdout,
+                        )
+                    case _:
+                        raise TypeError("Print expects a literal format string")
                 return None
             case asm.Stack(val):
                 raise NotImplementedError(

@@ -1207,16 +1207,24 @@ def test_print(compiler, capfd, file_regression):
                             asm.Assign(i64_var, asm.Literal(np.int64(65536))),
                             asm.Assign(f32_var, asm.Literal(np.float32(2.0))),
                             asm.Assign(f64_var, asm.Literal(np.float64(3.0))),
-                            asm.Print((i16_var, i32_var, i64_var)),
                             asm.Print(
                                 (
+                                    asm.Literal("%d %d %ld\n"),
+                                    i16_var,
+                                    i32_var,
+                                    i64_var,
+                                )
+                            ),
+                            asm.Print(
+                                (
+                                    asm.Literal("%f %f\n"),
                                     f32_var,
                                     f64_var,
                                 )
                             ),
-                            asm.Print((p_var,)),
-                            asm.Print((x_var,)),
-                            asm.Print((p_var, x_var)),
+                            asm.Print((asm.Literal("%s\n"), p_var)),
+                            asm.Print((asm.Literal("%s\n"), x_var)),
+                            asm.Print((asm.Literal("%s %s\n"), p_var, x_var)),
                             asm.Assign(
                                 res_var,
                                 asm.Call(
@@ -1245,8 +1253,10 @@ def test_print(compiler, capfd, file_regression):
                                     ),
                                 ),
                             ),
-                            asm.Print((res_var,)),
-                            asm.Print((p_var, x_var, res_var)),
+                            asm.Print((asm.Literal("%f\n"), res_var)),
+                            asm.Print(
+                                (asm.Literal("%s %s %f\n"), p_var, x_var, res_var)
+                            ),
                             asm.Return(res_var),
                         )
                     ),
