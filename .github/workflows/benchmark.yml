@@ -7,18 +7,12 @@ jobs:
         uses: actions/checkout@v4
         with:
             fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          pixi-version: v0.64.0
+          pixi-version: v0.71.2
           environments: >-
             default
             ${{ matrix.environment }}
-      - name: Install package
-        run: |
-          pixi install --extras benchmark --extras test
       - name: Install debug symbols
         run: |
           sudo apt-get update && sudo apt-get install -y libc6-dbg
