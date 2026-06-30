@@ -1365,6 +1365,7 @@ class MatrixPatternTensorFType(TensorFType):
     _element_type: FType
     _shape_type: tuple
     _tensor_type: type[MatrixPatternTensor]
+    _k: int
 
     @property
     def fill_value(self):
@@ -1389,6 +1390,7 @@ class MatrixPatternTensorFType(TensorFType):
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
             and self._tensor_type == other._tensor_type
+            and self._k == other._k
         )
 
     def __hash__(self):
@@ -1398,11 +1400,12 @@ class MatrixPatternTensorFType(TensorFType):
                 self._element_type,
                 self._shape_type,
                 self._tensor_type,
+                self._k,
             )
         )
 
     def construct(self, shape: tuple) -> MatrixPatternTensor:
-        return self._tensor_type(shape, dtype=self.element_type)
+        return self._tensor_type(shape, k=self._k, dtype=self.element_type)
 
     def __call__(self, val: Any) -> MatrixPatternTensor:
         raise NotImplementedError(
@@ -1411,9 +1414,10 @@ class MatrixPatternTensorFType(TensorFType):
 
 
 class MatrixPatternTensor(Tensor):
-    def __init__(self, shape, *, dtype=None):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
         shape = _matrix_shape(shape)
         self._shape = shape
+        self._k = k
         self._element_type = ftype(dtype if dtype is not None else np.float64)
         self._fill_value = self._element_type(0)
         self._one_value = self._element_type(1)
@@ -1464,32 +1468,23 @@ class MatrixPatternTensor(Tensor):
             self._element_type,
             tuple(ftype(dim) for dim in self.shape),
             type(self),
+            self._k,
         )
 
 
 class EyeTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
-        return i == j
+        return j - i == self._k
 
 
 class UpperTriangleTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
-        return i <= j
-
-
-class StrictUpperTriangleTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return i < j
+        return j - i >= self._k
 
 
 class LowerTriangleTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
-        return i >= j
-
-
-class StrictLowerTriangleTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return i > j
+        return j - i <= self._k
 
 
 def _matrix_shape(shape: int | tuple[int, int]) -> tuple[int, int]:
@@ -1501,27 +1496,83 @@ def _matrix_shape(shape: int | tuple[int, int]) -> tuple[int, int]:
     return shape_tuple
 
 
-def eye(n: int, m: int | None = None, *, dtype=None) -> LazyTensor:
+def eye(
+    n_rows: int,
+    n_cols: int | None = None,
+    *,
+    k: int = 0,
+    dtype=None,
+    device=None,
+) -> LazyTensor:
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
     return cast(
         LazyTensor,
-        lazy(EyeTensor((n, n if m is None else m), dtype=dtype)),
+        lazy(
+            EyeTensor(
+                (n_rows, n_rows if n_cols is None else n_cols),
+                k=k,
+                dtype=dtype,
+            )
+        ),
     )
 
 
-def upper_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
-    return cast(LazyTensor, lazy(UpperTriangleTensor(shape, dtype=dtype)))
+def upper_triangle(
+    shape: int | tuple[int, int], *, k: int = 0, dtype=None
+) -> LazyTensor:
+    return cast(LazyTensor, lazy(UpperTriangleTensor(shape, k=k, dtype=dtype)))
 
 
-def strict_upper_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
-    return cast(LazyTensor, lazy(StrictUpperTriangleTensor(shape, dtype=dtype)))
+def lower_triangle(
+    shape: int | tuple[int, int], *, k: int = 0, dtype=None
+) -> LazyTensor:
+    return cast(LazyTensor, lazy(LowerTriangleTensor(shape, k=k, dtype=dtype)))
 
 
-def lower_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
-    return cast(LazyTensor, lazy(LowerTriangleTensor(shape, dtype=dtype)))
+def triu(x, /, *, k: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    mask = UpperTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
+    return where(mask, x, full(x.shape, 0, dtype=x.element_type))
 
 
-def strict_lower_triangle(shape: int | tuple[int, int], *, dtype=None) -> LazyTensor:
-    return cast(LazyTensor, lazy(StrictLowerTriangleTensor(shape, dtype=dtype)))
+def tril(x, /, *, k: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    mask = LowerTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
+    return where(mask, x, full(x.shape, 0, dtype=x.element_type))
+
+
+def diag(x, /, *, k: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim == 1 and k == 0:
+        vals = broadcast_to(expand_dims(x, axis=1), (x.shape[0], x.shape[0]))
+        return where(
+            eye(x.shape[0], k=k, dtype=np.bool_),
+            vals,
+            full((x.shape[0], x.shape[0]), 0, dtype=x.element_type),
+        )
+    if x.ndim in (1, 2):
+        from .fuse import compute
+
+        return cast(
+            LazyTensor,
+            lazy(np.ascontiguousarray(np.diag(compute(x).to_numpy(), k=k))),
+        )
+    raise ValueError(f"x must be a 1D or 2D array, got {x.ndim}D array")
+
+
+def trace(x, /, *, offset: int = 0, dtype=None) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim != 2:
+        raise ValueError(f"x must be a 2D array, got {x.ndim}D array")
+    if dtype is not None:
+        x = astype(x, dtype)
+    mask = eye(x.shape[0], x.shape[1], k=offset, dtype=x.element_type)
+    return sum(multiply(x, mask), axis=None)
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:

@@ -30,32 +30,59 @@ def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None
     return compute(lazy.empty(shape, dtype=dtype))
 
 
-def eye(n: int, m: int | None = None, *, dtype: Any | None = None, device=None):
-    return compute(lazy.eye(n, m, dtype=dtype))
+def eye(
+    n_rows: int,
+    n_cols: int | None = None,
+    *,
+    k: int = 0,
+    dtype: Any | None = None,
+    device=None,
+):
+    return compute(lazy.eye(n_rows, n_cols, k=k, dtype=dtype, device=device))
 
 
 def upper_triangle(
-    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
+    shape: int | tuple[int, int],
+    *,
+    k: int = 0,
+    dtype: Any | None = None,
+    device=None,
 ):
-    return compute(lazy.upper_triangle(shape, dtype=dtype))
-
-
-def strict_upper_triangle(
-    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
-):
-    return compute(lazy.strict_upper_triangle(shape, dtype=dtype))
+    return compute(lazy.upper_triangle(shape, k=k, dtype=dtype))
 
 
 def lower_triangle(
-    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
+    shape: int | tuple[int, int],
+    *,
+    k: int = 0,
+    dtype: Any | None = None,
+    device=None,
 ):
-    return compute(lazy.lower_triangle(shape, dtype=dtype))
+    return compute(lazy.lower_triangle(shape, k=k, dtype=dtype))
 
 
-def strict_lower_triangle(
-    shape: int | tuple[int, int], *, dtype: Any | None = None, device=None
-):
-    return compute(lazy.strict_lower_triangle(shape, dtype=dtype))
+def triu(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.triu(x, k=k)
+    return compute(lazy.triu(x, k=k))
+
+
+def tril(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tril(x, k=k)
+    return compute(lazy.tril(x, k=k))
+
+
+def diag(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.diag(x, k=k)
+    return compute(lazy.diag(x, k=k))
+
+
+def trace(x, /, *, offset: int = 0, dtype=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.trace(x, offset=offset, dtype=dtype)
+    return compute(lazy.trace(x, offset=offset, dtype=dtype))
 
 
 def full_like(
