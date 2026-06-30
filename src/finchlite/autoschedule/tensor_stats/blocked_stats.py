@@ -90,7 +90,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for aggregate")
 
-        new_def = BaseTensorStatsFactory.aggregate(op, init, reduce_indices, stats)
+        new_def = BaseTensorStatsFactory.aggregate_def(op, init, reduce_indices, stats)
         grid_reduce_axes = []
         for i, idx in enumerate(stats.index_order):
             if idx in reduce_indices:
@@ -142,7 +142,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
     def relabel(
         self, stats: BlockedStats, relabel_indices: tuple[Field, ...]
     ) -> BlockedStats:
-        new_def = BaseTensorStatsFactory.relabel(stats, relabel_indices)
+        new_def = BaseTensorStatsFactory.relabel_def(stats, relabel_indices)
 
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for relabel")
@@ -166,7 +166,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for reorder")
 
-        new_def = BaseTensorStatsFactory.reorder(stats, reorder_indices)
+        new_def = BaseTensorStatsFactory.reorder_def(stats, reorder_indices)
 
         old_order = stats.index_order
         dropped = [
@@ -259,7 +259,7 @@ class BlockedStats(NumericStats):
         blocks_per_dim: Mapping[Field, int],
         stats_factory: StatsFactory[NumericStats],
     ) -> BlockedStats:
-        d = BaseTensorStats.from_tensor(tensor, fields)
+        d = BaseTensorStats(tensor, fields)
         data = tensor.to_numpy() if hasattr(tensor, "to_numpy") else tensor
         grid = cls.build_grid(d, blocks_per_dim, stats_factory, data=data)
         return cls(grid, dict(blocks_per_dim), d, stats_factory)

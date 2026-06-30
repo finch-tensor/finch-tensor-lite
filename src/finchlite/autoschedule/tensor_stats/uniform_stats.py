@@ -70,7 +70,7 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
         reduce_indices: tuple[Field, ...],
         stats: UniformStats,
     ) -> UniformStats:
-        new_def = super().aggregate(op, init, reduce_indices, stats)
+        new_def = self.aggregate_def(op, init, reduce_indices, stats)
         res_vol = new_def.get_dim_space_size(new_def.index_order)
         red_set = set(reduce_indices) & set(stats.index_order)
         k = math.prod(int(stats.dim_sizes[x]) for x in red_set)
@@ -91,7 +91,7 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
     def relabel(
         self, stats: UniformStats, relabel_indices: tuple[Field, ...]
     ) -> UniformStats:
-        new_def = super().relabel(stats, relabel_indices)
+        new_def = self.relabel_def(stats, relabel_indices)
         if isinstance(stats, NumericStats):
             return UniformStats.from_def(new_def, nnz=stats.estimate_non_fill_values())
         raise TypeError("Stats Class must be inherit from NumericStats")
@@ -99,7 +99,7 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
     def reorder(
         self, stats: UniformStats, reorder_indices: tuple[Field, ...]
     ) -> UniformStats:
-        new_def = super().reorder(stats, reorder_indices)
+        new_def = self.reorder_def(stats, reorder_indices)
         if isinstance(stats, NumericStats):
             return UniformStats.from_def(new_def, nnz=stats.estimate_non_fill_values())
         raise TypeError("Stats Class must be inherit from NumericStats")

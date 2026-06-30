@@ -150,7 +150,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for aggregate")
 
-        new_def = super().aggregate(op, init, reduce_indices, stats)
+        new_def = self.aggregate_def(op, init, reduce_indices, stats)
         new_nnz = min(
             stats.nnz,
             math.prod(
@@ -172,7 +172,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
     ) -> DatabaseStats:
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for relabel")
-        new_def = super().relabel(stats, relabel_indices)
+        new_def = self.relabel_def(stats, relabel_indices)
         V = {}
         for old, new in zip(stats.index_order, relabel_indices, strict=True):
             V[new] = stats.V[old]
@@ -183,7 +183,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
     ) -> DatabaseStats:
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for reorder")
-        new_def = super().reorder(stats, reorder_indices)
+        new_def = self.reorder_def(stats, reorder_indices)
         return DatabaseStats.from_def(new_def, nnz=stats.nnz, V=stats.V.copy())
 
 

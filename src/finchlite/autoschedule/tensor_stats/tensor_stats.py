@@ -61,10 +61,6 @@ class BaseTensorStats(TensorStats):
         return obj
 
     @classmethod
-    def from_tensor(cls, tensor: Any, indices: tuple[Field, ...]) -> BaseTensorStats:
-        return BaseTensorStats(tensor, indices)
-
-    @classmethod
     def from_def(cls, d: BaseTensorStats, **fields: Any) -> Self:
         """Build a ``cls`` instance that reuses the definition state (index
         order, dimension sizes, fill value) of ``d``, setting any
@@ -181,6 +177,21 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         self, new_def: BaseTensorStats, op: FinchOperator, join_args: list[TS]
     ) -> TS: ...
 
+    @abstractmethod
+    def aggregate(
+        self,
+        op: FinchOperator,
+        init: Any | None,
+        reduce_indices: tuple[Field, ...],
+        stats: TS,
+    ) -> TS: ...
+
+    @abstractmethod
+    def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS: ...
+
+    @abstractmethod
+    def reorder(self, stats: TS, reorder_indices: tuple[Field, ...]) -> TS: ...
+
     @staticmethod
     def merge_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
         new_fill_value = op(*(s.fill_value for s in args))
@@ -202,7 +213,7 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         )
 
     @staticmethod
-    def aggregate(
+    def aggregate_def(
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
@@ -238,7 +249,7 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         return BaseTensorStats.from_fields(new_index_order, new_dim_sizes, init)
 
     @staticmethod
-    def relabel(
+    def relabel_def(
         d: BaseTensorStats, relabel_indices: tuple[Field, ...]
     ) -> BaseTensorStats:
         if len(relabel_indices) != len(d.index_order):
@@ -254,7 +265,7 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         return BaseTensorStats.from_fields(relabel_indices, new_dim_sizes, d.fill_value)
 
     @staticmethod
-    def reorder(
+    def reorder_def(
         d: BaseTensorStats, reorder_indices: tuple[Field, ...]
     ) -> BaseTensorStats:
         for old_idx in d.index_order:

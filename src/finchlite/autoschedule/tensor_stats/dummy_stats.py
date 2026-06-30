@@ -29,19 +29,19 @@ class DummyStatsFactory(BaseTensorStatsFactory["DummyStats"]):
         reduce_indices: tuple[Field, ...],
         stats: DummyStats,
     ) -> DummyStats:
-        new_def = super().aggregate(op, init, reduce_indices, stats)
+        new_def = self.aggregate_def(op, init, reduce_indices, stats)
         return DummyStats.from_def(new_def)
 
     def relabel(
         self, stats: DummyStats, relabel_indices: tuple[Field, ...]
     ) -> DummyStats:
-        new_def = super().relabel(stats, relabel_indices)
+        new_def = self.relabel_def(stats, relabel_indices)
         return DummyStats.from_def(new_def)
 
     def reorder(
         self, stats: DummyStats, reorder_indices: tuple[Field, ...]
     ) -> DummyStats:
-        new_def = super().reorder(stats, reorder_indices)
+        new_def = self.reorder_def(stats, reorder_indices)
         return DummyStats.from_def(new_def)
 
 

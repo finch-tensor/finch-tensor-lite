@@ -42,19 +42,19 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
         reduce_indices: tuple[Field, ...],
         stats: DenseStats,
     ) -> DenseStats:
-        new_def = super().aggregate(op, init, reduce_indices, stats)
+        new_def = self.aggregate_def(op, init, reduce_indices, stats)
         return DenseStats.from_def(new_def)
 
     def relabel(
         self, stats: DenseStats, relabel_indices: tuple[Field, ...]
     ) -> DenseStats:
-        new_def = super().relabel(stats, relabel_indices)
+        new_def = self.relabel_def(stats, relabel_indices)
         return DenseStats.from_def(new_def)
 
     def reorder(
         self, stats: DenseStats, reorder_indices: tuple[Field, ...]
     ) -> DenseStats:
-        new_def = super().reorder(stats, reorder_indices)
+        new_def = self.reorder_def(stats, reorder_indices)
         return DenseStats.from_def(new_def)
 
 

@@ -73,21 +73,22 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         stats: DCStats,
     ) -> DCStats:
         fields = reduce_indices
+        new_def: BaseTensorStats
         if len(fields) == 0:
             new_def = stats.copy()
         else:
-            new_def = super().aggregate(op, init, fields, stats)
+            new_def = self.aggregate_def(op, init, fields, stats)
 
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs=dcs)
 
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
-        new_def = super().relabel(stats, relabel_indices)
+        new_def = self.relabel_def(stats, relabel_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs=dcs)
 
     def reorder(self, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
-        new_def = super().reorder(stats, reorder_indices)
+        new_def = self.reorder_def(stats, reorder_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
         return DCStats.from_def(new_def, dcs=dcs)
 

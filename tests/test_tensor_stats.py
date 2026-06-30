@@ -1192,7 +1192,7 @@ def test_reorder_def(orig_axes, new_axes):
     td = BaseTensorStats.from_fields(
         index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0
     )
-    td2 = BaseTensorStatsFactory.reorder(td, tuple(new_axes))
+    td2 = BaseTensorStatsFactory.reorder_def(td, tuple(new_axes))
     assert td2.index_order == tuple(new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
@@ -1358,7 +1358,7 @@ def test_tensordef_aggregate(
     d = BaseTensorStats.from_fields(
         index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value
     )
-    out = BaseTensorStatsFactory.aggregate(op_func, None, reduce_fields, d)
+    out = BaseTensorStatsFactory.aggregate_def(op_func, None, reduce_fields, d)
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
