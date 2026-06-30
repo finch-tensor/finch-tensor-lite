@@ -1,5 +1,6 @@
 from .eager import (
     diagonal,
+    inv,
     matmul,
     matrix_power,
     matrix_transpose,
@@ -11,6 +12,7 @@ from .eager import (
 
 __all__ = [
     "diagonal",
+    "inv",
     "matmul",
     "matrix_power",
     "matrix_transpose",

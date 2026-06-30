@@ -2,6 +2,8 @@ import builtins
 from collections.abc import Sequence
 from typing import Any
 
+import numpy as np
+
 from finchlite.algebra import FinchOperator
 
 from . import lazy
@@ -321,12 +323,23 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
+def inv(x, /):
+    if isinstance(x, lazy.LazyTensor):
+        raise ValueError("inv requires a materialized array; call compute() first")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
+
+
 def matrix_power(x, n, /):
     """
     Computes the power of a matrix.
     """
     if isinstance(x, lazy.LazyTensor):
         return lazy.matrix_power(x, n)
+    if isinstance(n, int) and n < 0:
+        return matrix_power(inv(x), -n)
     return compute(lazy.matrix_power(x, n))
 
 

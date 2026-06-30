@@ -1252,7 +1252,10 @@ def matrix_power(x, n) -> LazyTensor:
     if not isinstance(n, int):
         raise ValueError(f"n must be an integer, got {type(n)}")
     if n < 0:
-        raise ValueError("n must be a non-negative integer")
+        raise ValueError(
+            "negative matrix powers require materializing first; "
+            "call compute() before matrix_power"
+        )
 
     if n == 0:
         identity = eye(x.shape[-1], dtype=x.element_type)
@@ -1754,14 +1757,32 @@ def diag(x, /, *, k: int = 0) -> LazyTensor:
     raise ValueError(f"x must be a 1D or 2D array, got {x.ndim}D array")
 
 
+def diagonal(x, /, *, offset: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    from .fuse import compute
+
+    return cast(
+        LazyTensor,
+        lazy(
+            np.ascontiguousarray(
+                np.diagonal(
+                    compute(x).to_numpy(),
+                    offset=offset,
+                    axis1=-2,
+                    axis2=-1,
+                )
+            )
+        ),
+    )
+
+
 def trace(x, /, *, offset: int = 0, dtype=None) -> LazyTensor:
     x = lazy(x)
-    if x.ndim != 2:
-        raise ValueError(f"x must be a 2D array, got {x.ndim}D array")
-    if dtype is not None:
-        x = astype(x, dtype)
-    mask = eye(x.shape[0], x.shape[1], k=offset, dtype=x.element_type)
-    return sum(multiply(x, mask), axis=None)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    return sum(diagonal(x, offset=offset), axis=-1, dtype=dtype)
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:

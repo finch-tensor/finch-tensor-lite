@@ -970,10 +970,25 @@ def test_matrix_power(a, n, wrap):
     finch_assert_allclose(result, expected)
 
 
+def test_matrix_power_negative_eager():
+    a = np.array([[1.0, 2.0], [3.0, 5.0]])
+    expected = np.linalg.matrix_power(a, -3)
+
+    result = finchlite.linalg.matrix_power(a, -3)
+
+    finch_assert_allclose(result, expected)
+
+
+def test_matrix_power_negative_lazy_requires_materialization():
+    a = finchlite.lazy(np.array([[1.0, 2.0], [3.0, 5.0]]))
+
+    with pytest.raises(ValueError, match="materializing first"):
+        finchlite.linalg.matrix_power(a, -1)
+
+
 @pytest.mark.parametrize(
     "a, n",
     [
-        (np.ones((2, 2)), -1),
         (np.ones((2, 2)), 1.5),
     ],
 )
