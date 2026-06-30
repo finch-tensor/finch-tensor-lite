@@ -24,11 +24,14 @@ jobs:
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
-          mode: walltime,memory
+          mode: simulation,memory
           run: |
             poetry run pytest benchmarks/ --codspeed -vvv
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main

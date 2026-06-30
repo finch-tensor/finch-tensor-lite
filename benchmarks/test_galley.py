@@ -24,8 +24,10 @@ from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.autoschedule.tensor_stats import UniformStatsFactory
+from finchlite.codegen.numba_codegen.numba import NumbaCompiler
+from finchlite.compile.lower import NotationCompiler
+from finchlite.finch_assembly.simplification import AssemblySimplify
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
-from finchlite.finch_notation.interpreter import NotationInterpreter
 from finchlite.symbolic import gensym
 
 from .utils import patch_benchmark
@@ -72,7 +74,13 @@ def _make_pipeline():
     optimizer = GalleyLogicalOptimizer(
         DefaultLoopOrderer(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                        )
+                    )
+                )
             )
         )
     )

@@ -63,6 +63,22 @@ COMPILE_NUMBA = LogicNormalizer(
     )
 )
 
+COMPILE_NUMBA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicalOptimizer(
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicalOptimizer(
