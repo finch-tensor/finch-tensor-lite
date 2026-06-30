@@ -13,6 +13,9 @@ jobs:
           python-version: '3.x'
       - name: Install dependencies
         run: pip install toml
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.71.3
       - name: Get version
         run: |
             VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["project"]["version"])')
@@ -21,7 +24,7 @@ jobs:
       - name: Authenticate with Prefix.dev
         run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
       - name: Build and Publish Package
-        run: pixi publish --target-channel https://prefix.dev{{ secrets.PREFIX_CHANNEL_NAME }}
+        run: pixi publish --target-channel https://prefix.dev/${{ secrets.PREFIX_CHANNEL_NAME }}
       - name: Create Release
         uses: actions/create-release@v1
         if: success()

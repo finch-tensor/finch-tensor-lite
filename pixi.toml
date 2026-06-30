@@ -10,6 +10,7 @@ preview = ["pixi-build"]
 [environments]
 test = { features = ["test"], solve-group = "default" }
 mindeps = { features = ["test", "mindeps"], solve-group = "default" }
+benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 # finch-tensor-lite package definition #
@@ -20,7 +21,7 @@ version = "*"
 
 [package.host-dependencies]
 python = ">=3.10,<3.13"
-poetry-core = "*"
+setuptools = "*"
 
 [package.run-dependencies]
 numpy = "*"
@@ -62,6 +63,9 @@ default-environment = "test"
 
 [feature.mindeps.dependencies]
 python = "3.11.*"
+
+[feature.benchmark.dependencies]
+pytest-codspeed = "*"
 
 [feature.pre-commit.dependencies]
 pre-commit = "*"

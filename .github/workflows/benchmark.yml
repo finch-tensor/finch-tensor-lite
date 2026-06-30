@@ -12,13 +12,8 @@ jobs:
           python-version: '3.12'
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          pixi-version: v0.64.0
-          environments: >-
-            default
-            ${{ matrix.environment }}
-      - name: Install package
-        run: |
-          pixi install --extras benchmark --extras test
+          pixi-version: v0.71.3
+          environments: benchmark
       - name: Install debug symbols
         run: |
           sudo apt-get update && sudo apt-get install -y libc6-dbg
@@ -27,7 +22,7 @@ jobs:
         with:
           mode: walltime,memory
           run: |
-            pixi run pytest benchmarks/ --codspeed -vvv
+            pixi run -e benchmark pytest benchmarks/ --codspeed -vvv
 
 on:
   push:
