@@ -6,6 +6,7 @@ import numpy as np
 from finchlite import algebra
 from finchlite import finch_assembly as asm
 from finchlite.algebra import FType, ffuncs
+from finchlite.finch_assembly import BufferFType
 from finchlite.symbolic import Context, ScopedDict
 
 
@@ -244,6 +245,41 @@ def mlir_type(t: FType):
             raise NotImplementedError(f"No MLIR type mapping for {t}")
 
 
+class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
+    """
+    Abstract base class for the ftype of datastructures. The ftype defines how
+    the data in an Buffer is organized and accessed.
+    """
+
+    @abstractmethod
+    def mlir_length(self, ctx: "MLIRContext", buffer):
+        """
+        Return MLIR code which loads a named buffer at the given index.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_load(self, ctx: "MLIRContext", buffer, index):
+        """
+        Return MLIR code which loads a named buffer at the given index.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_store(self, ctx: "MLIRContext", buffer, index, value=None):
+        """
+        Return MLIR code which stores a named buffer to the given index.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_resize(self, ctx: "MLIRContext", buffer, new_length):
+        """
+        Return MLIR code which resizes a named buffer to the given length.
+        """
+        ...
+
+
 class MLIRContext(Context):
     def __init__(
         self,
@@ -312,11 +348,17 @@ class MLIRContext(Context):
             case asm.Call(asm.Literal(op), args):
                 return mlir_function_call(op, self, *args)
 
-            # case asm.Load(buffer, index):
-            #     ...
+            case asm.Load(buffer, index):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                return buf_t.mlir_load(self, buffer, index)
 
-            # case asm.Store(buffer, index, value):
-            #     ...
+            case asm.Store(buffer, index, value):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                return buf_t.mlir_store(self, buffer, index, value)
 
             # case asm.Block(bodies):
             #     ...
