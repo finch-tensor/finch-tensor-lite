@@ -459,7 +459,7 @@ def arange(
     if stop is None:
         start, stop = 0, start
     arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
-    return broadcast_to(lazy(arr), (len(arr),))
+    return lazy(arr)
 
 
 def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
