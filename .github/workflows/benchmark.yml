@@ -22,12 +22,12 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: poetry run pytest benchmarks/ --codspeed
+          run: poetry run pytest benchmarks/ --codspeed -vvv
       - name: Run memory benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           mode: memory
-          run: poetry run pytest benchmarks/ --codspeed
+          run: poetry run pytest benchmarks/ --codspeed -vvv
 
 on:
   pull_request:
