@@ -1,15 +1,15 @@
 from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
 from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
-from .ftype import FType, FTyped, fisinstance, ftype
 from .gensym import gensym
 from .rewriters import (
     Chain,
     Fixpoint,
+    Memo,
     PostWalk,
     PreWalk,
     Rewrite,
 )
-from .stage import Stage
+from .stage import Form, Stage, UnvalidatedForm
 from .term import (
     Term,
     TermTree,
@@ -23,9 +23,9 @@ __all__ = [
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",
-    "FType",
-    "FTyped",
     "Fixpoint",
+    "Form",
+    "Memo",
     "NamedTerm",
     "Namespace",
     "PostOrderDFS",
@@ -38,9 +38,7 @@ __all__ = [
     "Stage",
     "Term",
     "TermTree",
-    "fisinstance",
-    "fisinstance",
-    "ftype",
+    "UnvalidatedForm",
     "gensym",
     "intree",
     "isdescendant",

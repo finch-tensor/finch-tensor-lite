@@ -4,11 +4,12 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from .. import finch_assembly as asm
-from .. import finch_notation as ntn
-from ..algebra import Tensor, register_property
-from ..compile.lower import FinchTensorFType
-from ..symbolic import FType, FTyped
+from finchlite import finch_assembly as asm
+from finchlite import finch_notation as ntn
+from finchlite.algebra import FType, FTyped, ImmutableStructFType, TupleFType, bool_
+from finchlite.compile.lower import FinchTensorFType
+
+from .override_tensor import OverrideTensor
 
 
 class LevelFType(FType, ABC):
@@ -135,9 +136,16 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(self, shape):
+    def level_asm_repack(self, ctx, lvl_fields) -> None:
         """
-        Construct level
+        Emit code for repack the level.
+        """
+        ...
+
+    @abstractmethod
+    def construct(self, shape, **kwargs):
+        """
+        Construct a level instance with the given shape.
         """
         ...
 
@@ -202,7 +210,7 @@ class Level(FTyped, ABC):
 
 
 @dataclass
-class FiberTensor(Tensor):
+class FiberTensor(OverrideTensor):
     """
     A class representing a tensor with fiber structure.
 
@@ -211,8 +219,8 @@ class FiberTensor(Tensor):
     """
 
     lvl: Level
-    pos: asm.Variable | asm.Literal
-    dirty_bit: bool
+    pos: np.integer = np.intp(0)
+    dirty_bit: bool = False
 
     def __repr__(self):
         return f"FiberTensor(lvl={self.lvl})"
@@ -264,16 +272,22 @@ class FiberTensor(Tensor):
         # TODO: temporary for dense only. TBD in sparse_level PR
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.to_numpy().item()
 
-@dataclass(eq=True, frozen=True)
+
+@dataclass(unsafe_hash=True)
 class FiberTensorFields:
     lvl_fields: NamedTuple
     pos: asm.AssemblyExpression
     dirty_bit: asm.AssemblyExpression
+    visited_idxs: tuple[ntn.Variable, ...] = ()
 
 
 @dataclass(unsafe_hash=True)
-class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
+class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     """
     An abstract base class representing the ftype of a fiber tensor.
 
@@ -292,16 +306,29 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
     def struct_fields(self):
         return [
             ("lvl", self.lvl_t),
-            ("shape", asm.TupleFType.from_tuple(self.shape_type)),
+            ("shape", TupleFType.from_tuple(self.shape_type)),
             ("pos", self.position_type),
-            ("dirty_bit", np.bool_),
+            ("dirty_bit", bool_),
         ]
 
-    def __call__(self, shape: tuple[int, ...]):
+    def construct(self, shape: tuple[int, ...]):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape=shape), self.position_type(0), False)
+        return FiberTensor(self.lvl_t.construct(shape=shape), self.position_type(0))
+
+    def __call__(self, val: Any) -> FiberTensor:
+        """
+        Convert a tensor to this fiber tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A FiberTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
@@ -353,6 +380,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         return self.lvl_t.level_lower_increment(ctx, tns.obj, op, val, tns.obj.pos)
 
     def lower_declare(self, ctx, tns, init, op, shape):
+        tns.obj.dirty_bit = True
         return self.lvl_t.level_lower_declare(
             ctx, tns.obj.lvl_fields, init, op, shape, tns.obj.pos
         )
@@ -367,6 +395,7 @@ class FiberTensorFType(FinchTensorFType, asm.AssemblyStructFType):
         val_lvl = asm.GetAttr(val, asm.Literal("lvl"))
         lvl_fields = self.lvl_t.level_asm_unpack(ctx, var_n, val_lvl)
         pos = asm.GetAttr(val, asm.Literal("pos"))
+
         dirty_bit = asm.GetAttr(val, asm.Literal("dirty_bit"))
         return FiberTensorFields(lvl_fields, pos, dirty_bit)
 
@@ -401,6 +430,3 @@ def fiber_tensor(lvl: LevelFType):
     # mypy does not understand that dataclasses generate __hash__ and __eq__
     # https://github.com/python/mypy/issues/19799
     return FiberTensorFType(lvl)  # type: ignore[abstract]
-
-
-register_property(FiberTensor, "asarray", "__attr__", lambda x: x)

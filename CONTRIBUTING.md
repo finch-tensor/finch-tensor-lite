@@ -161,6 +161,49 @@ You can download it here: [vscode-finch-assembly](https://github.com/finch-tenso
   the file directly. For clarity, nodes of both IRs should be referred to with
   qualified names, e.g. `lgc.Plan` and `ntn.Loop`.
 
----
+### Debugging with Verbose Logging
 
-**If you find an error or unclear section, please fix it or open an issue.**
+Finch uses Python's standard `logging` module for debug output. To enable verbose
+logging and inspect internal compiler stages (e.g., Logic IR before/after optimization,
+Assembly IR, generated code), configure a logger handler using the helpers in
+`finchlite.util.logging`.
+
+#### Quick start
+
+```python
+import logging
+from finchlite.util.logging import get_logger_handler, FORMAT
+
+# Show all Finch debug output
+handler = get_logger_handler("root")
+logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
+```
+
+#### Filtering by compilation stage
+
+The `compilation_stage` field is hierarchical. You can filter to a subset of stages
+by passing a dotted pattern to `get_logger_handler`. Patterns can be combined with
+a comma (`,`).
+
+| Stage | Full name | Abbreviation |
+|---|---|---|
+| All stages | `root` | `r` |
+| Logic IR (all) | `root.logic` | `r.l` |
+| Logic IR before optimization | `root.logic.pre-opt` | `r.l.pre` |
+| Logic IR after optimization | `root.logic.post-opt` | `r.l.post` |
+| Notation IR | `root.notation` | `r.n` |
+| Assembly IR | `root.assembly` | `r.a` |
+| Galley optimizer | `root.galley` | `r.g` |
+| All codegen | `root.codegen` | `r.c` |
+| C backend | `root.codegen.c-backend` | `r.c.cb` |
+| Numba backend | `root.codegen.numba-backend` | `r.c.nb` |
+
+Example — show only the Logic IR after optimization and Numba-generated code:
+
+```python
+import logging
+from finchlite.util.logging import get_logger_handler, FORMAT
+
+handler = get_logger_handler("r.l.post,r.c.nb")
+logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
+```

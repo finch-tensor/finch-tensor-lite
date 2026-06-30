@@ -1,13 +1,8 @@
-import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self, cast
 
-from finchlite.algebra import (
-    overwrite,
-    promote_max,
-    promote_min,
-)
+from finchlite.algebra import ffuncs
 from finchlite.symbolic import Context, Term, TermTree
 from finchlite.util.print import qual_str
 
@@ -156,12 +151,12 @@ class Call(EinsumExpression, EinsumTree):
 
     Attributes:
         op: The function to apply e.g.,
-            operator.add, operator.mul, operator.subtract, operator.div, etc...
+            ffunc.add, ffunc.mul, ffunc.subtract, ffunc.div, etc...
             Must be a callable.
         args: The arguments to the operation.
     """
 
-    op: Literal  # the function to apply e.g., operator.add
+    op: Literal  # the function to apply e.g., ffunc.add
     args: tuple[EinsumExpression, ...]  # Subtrees
     # input_fields: tuple[tuple[Field, ...], ...]
     # Children: The args
@@ -275,30 +270,30 @@ class Produces(EinsumTree, EinsumStatement):
 
 
 infix_strs = {
-    overwrite: "",
-    operator.add: "+",
-    operator.sub: "-",
-    operator.mul: "*",
-    operator.truediv: "/",
-    operator.mod: "%",
-    operator.pow: "**",
-    operator.and_: "&",
-    operator.or_: "|",
-    operator.xor: "^",
-    operator.floordiv: "//",
-    operator.mod: "%",
-    operator.pow: "**",
-    promote_max: "max",
-    promote_min: "min",
+    ffuncs.overwrite: "",
+    ffuncs.add: "+",
+    ffuncs.sub: "-",
+    ffuncs.mul: "*",
+    ffuncs.truediv: "/",
+    ffuncs.mod: "%",
+    ffuncs.pow: "**",
+    ffuncs.and_: "&",
+    ffuncs.or_: "|",
+    ffuncs.xor: "^",
+    ffuncs.floordiv: "//",
+    ffuncs.mod: "%",
+    ffuncs.pow: "**",
+    ffuncs.max: "max",
+    ffuncs.min: "min",
 }
 
 
 unary_strs = {
-    operator.add: "+",
-    operator.pos: "+",
-    operator.sub: "-",
-    operator.neg: "-",
-    operator.invert: "~",
+    ffuncs.add: "+",
+    ffuncs.pos: "+",
+    ffuncs.sub: "-",
+    ffuncs.neg: "-",
+    ffuncs.invert: "~",
 }
 
 
