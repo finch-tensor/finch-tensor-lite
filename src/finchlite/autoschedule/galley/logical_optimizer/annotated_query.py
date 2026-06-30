@@ -317,16 +317,16 @@ class AnnotatedQuery:
 
         Parameters
         ----------
-        parent_idxs : Mapping[Field, Iterable[Field]]
+        parent_idxs : Dict[Field, Iterable[Field]]
             Mapping from an index to the iterable of its parent indices.
-        connected_idxs : Mapping[Field, Iterable[Field]]
+        connected_idxs : Dict[Field, Iterable[Field]]
             Mapping from an index to the iterable of indices considered
             "connected" to it (undirected neighbors). Only connections between
             non-parent pairs are used to form components.
 
         Returns
         -------
-        list[list[Field]]
+        List[List[Field]]
             A list of components, each a list of Field objects. Components are
             ordered so that any component containing a parent appears before any
             component containing its child.
