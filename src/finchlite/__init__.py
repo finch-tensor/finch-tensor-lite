@@ -68,11 +68,14 @@ from .compile import (
 )
 from .finch_fused.jit import jit
 from .interface import (
+    EyeTensor,
     LazyTensor,
+    LowerTriangleTensor,
     NumPyFType,
     NumPyWrapper,
     Scalar,
     ScalarFType,
+    UpperTriangleTensor,
     abs,
     acos,
     acosh,
@@ -106,6 +109,7 @@ from .interface import (
     cosh,
     count_nonfill,
     count_nonzero,
+    diag,
     divide,
     einop,
     einsum,
@@ -115,6 +119,7 @@ from .interface import (
     exp,
     expand_dims,
     expm1,
+    eye,
     floor,
     floor_divide,
     full,
@@ -184,6 +189,9 @@ from .interface import (
     tan,
     tanh,
     tensordot,
+    trace,
+    tril,
+    triu,
     truediv,
     trunc,
     var,
@@ -211,9 +219,7 @@ from .tensor.level import (
     element,
     sparse_list,
 )
-from .tensor.masks import (
-    tril,
-)
+from .tensor.masks import tril as fiber_tril
 
 e = math.e
 pi = math.pi
@@ -242,6 +248,7 @@ __all__ = [
     "ElementLevelFType",
     "Extent",
     "ExtentFType",
+    "EyeTensor",
     "FDTypeSignedInteger",
     "FDTypeUnsignedInteger",
     "FType",
@@ -251,6 +258,7 @@ __all__ = [
     "FiberTensorFType",
     "LazyTensor",
     "LogicCapture",
+    "LowerTriangleTensor",
     "NumPyFType",
     "NumPyWrapper",
     "NumpyBuffer",
@@ -265,6 +273,7 @@ __all__ = [
     "TensorDef",
     "TensorFType",
     "UniformStats",
+    "UpperTriangleTensor",
     "__array_api_version__",
     "abs",
     "acos",
@@ -306,6 +315,7 @@ __all__ = [
     "count_nonfill",
     "count_nonzero",
     "dense",
+    "diag",
     "dimension",
     "divide",
     "e",
@@ -320,8 +330,10 @@ __all__ = [
     "expand_dims",
     "expm1",
     "extent",
+    "eye",
     "ffuncs",
     "fiber_tensor",
+    "fiber_tril",
     "fill_value",
     "finfo",
     "fisinstance",
@@ -420,7 +432,9 @@ __all__ = [
     "tan",
     "tanh",
     "tensordot",
+    "trace",
     "tril",
+    "triu",
     "truediv",
     "trunc",
     "uint8",

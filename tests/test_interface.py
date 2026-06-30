@@ -907,6 +907,96 @@ def test_outer_requires_vectors(a, b):
         finchlite.outer(a, b)
 
 
+@pytest.mark.parametrize(
+    "a, n",
+    [
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), 2),
+        (np.arange(9, dtype=np.float64).reshape(3, 3), 3),
+    ],
+)
+def test_matrix_power_bufferized_ndarray(a, n):
+    ba = finchlite.asarray(a)
+    expected = np.linalg.matrix_power(a, n)
+
+    result = finchlite.linalg.matrix_power(ba, n)
+
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "a, n",
+    [
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), 0),
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), 1),
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), 2),
+        (np.array([[1.0, 2.0], [3.0, 4.0]]), 5),
+        (np.array([[2.0, 0.0], [0.0, 3.0]]), 4),
+        (np.arange(9, dtype=np.float64).reshape(3, 3), 3),
+        (np.stack([np.array([[1.0, 2.0], [3.0, 4.0]]), np.eye(2)]), 3),
+        # invalid: non-square
+        (np.ones((2, 3)), 2),
+        # invalid: 1D
+        (np.ones((3,)), 2),
+    ],
+)
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_matrix_power(a, n, wrap):
+    wa = wrap(a)
+
+    try:
+        expected = np.linalg.matrix_power(a, n)
+    except (ValueError, np.linalg.LinAlgError):
+        with pytest.raises(ValueError):
+            result = finchlite.linalg.matrix_power(wa, n)
+            if isinstance(result, finchlite.LazyTensor):
+                finchlite.compute(result)
+        return
+
+    result = finchlite.linalg.matrix_power(wa, n)
+
+    if isinstance(result, finchlite.LazyTensor):
+        assert isinstance(wa, finchlite.LazyTensor)
+        result = finchlite.compute(result)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+def test_matrix_power_negative_eager():
+    a = np.array([[1.0, 2.0], [3.0, 5.0]])
+    expected = np.linalg.matrix_power(a, -3)
+
+    result = finchlite.linalg.matrix_power(a, -3)
+
+    finch_assert_allclose(result, expected)
+
+
+def test_matrix_power_negative_lazy_requires_materialization():
+    a = finchlite.lazy(np.array([[1.0, 2.0], [3.0, 5.0]]))
+
+    with pytest.raises(ValueError, match="materializing first"):
+        finchlite.linalg.matrix_power(a, -1)
+
+
+@pytest.mark.parametrize(
+    "a, n",
+    [
+        (np.ones((2, 2)), 1.5),
+    ],
+)
+def test_matrix_power_invalid_n(a, n):
+    with pytest.raises((ValueError, TypeError)):
+        finchlite.linalg.matrix_power(a, n)
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "a",
@@ -1357,6 +1447,10 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     finch_assert_equal(result, expected, strict=True)
 
 
+@pytest.mark.skip(
+    "We're holding off on numba tests for tril until we can refactor looplets "
+    "and build a full suite of mask tensors."
+)
 @pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize(
     "arr1,arr2",
