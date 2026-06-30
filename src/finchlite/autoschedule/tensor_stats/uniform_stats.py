@@ -9,7 +9,7 @@ from finchlite.algebra.algebra import FinchOperator, is_annihilator, is_identity
 from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
-from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStatsFactory
 
 
 class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):

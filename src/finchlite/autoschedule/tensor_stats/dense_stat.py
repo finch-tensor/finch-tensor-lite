@@ -8,25 +8,21 @@ from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
 from .numeric_stats import NumericStats
-from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStatsFactory
 
 
 class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
     def __init__(self):
         super().__init__(DenseStats)
 
-    def _mapjoin_union(
-        self, op: FinchOperator, *union_args: DenseStats
-    ) -> DenseStats:
+    def _mapjoin_union(self, op: FinchOperator, *union_args: DenseStats) -> DenseStats:
         base_stats = super()._mapjoin_defs(op, *union_args)
         return DenseStats.from_def(base_stats)
 
-    def _mapjoin_join(
-        self, op: FinchOperator, *join_args: DenseStats
-    ) -> DenseStats:
+    def _mapjoin_join(self, op: FinchOperator, *join_args: DenseStats) -> DenseStats:
         base_stats = super()._mapjoin_defs(op, *join_args)
         return DenseStats.from_def(base_stats)
-    
+
     def aggregate(
         self,
         op: FinchOperator,

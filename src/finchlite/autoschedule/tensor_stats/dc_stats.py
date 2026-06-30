@@ -48,15 +48,11 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
     def __init__(self):
         super().__init__(DCStats)
 
-    def _mapjoin_union(
-        self, op: FinchOperator, *union_args: DCStats
-    ) -> DCStats:
+    def _mapjoin_union(self, op: FinchOperator, *union_args: DCStats) -> DCStats:
         base_stats = super()._mapjoin_defs(op, *union_args)
         return DCStats._merge_dc_union(base_stats, union_args)
 
-    def _mapjoin_join(
-        self, op: FinchOperator, *join_args: DCStats
-    ) -> DCStats:
+    def _mapjoin_join(self, op: FinchOperator, *join_args: DCStats) -> DCStats:
         base_stats = super()._mapjoin_defs(op, *join_args)
         return DCStats._merge_dc_join(base_stats, join_args)
 

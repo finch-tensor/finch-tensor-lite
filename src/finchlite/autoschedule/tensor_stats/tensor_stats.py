@@ -144,14 +144,10 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
         return self._mapjoin_join(op, *join_args)
 
     @abstractmethod
-    def _mapjoin_union(
-        self, op: FinchOperator, *union_args: list[TS]
-    ) -> TS: ...
+    def _mapjoin_union(self, op: FinchOperator, *union_args: list[TS]) -> TS: ...
 
     @abstractmethod
-    def _mapjoin_join(
-        self, op: FinchOperator, *join_args: TS
-    ) -> TS: ...
+    def _mapjoin_join(self, op: FinchOperator, *join_args: TS) -> TS: ...
 
     @abstractmethod
     def aggregate(

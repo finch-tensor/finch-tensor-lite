@@ -12,15 +12,11 @@ class DummyStatsFactory(BaseTensorStatsFactory["DummyStats"]):
     def __init__(self):
         super().__init__(DummyStats)
 
-    def _mapjoin_join(
-        self, op: FinchOperator, *join_args: DummyStats
-    ) -> DummyStats:
+    def _mapjoin_join(self, op: FinchOperator, *join_args: DummyStats) -> DummyStats:
         base_stats = super()._mapjoin_defs(op, *join_args)
         return DummyStats.from_def(base_stats)
 
-    def _mapjoin_union(
-        self,  op: FinchOperator, *union_args: DummyStats
-    ) -> DummyStats:
+    def _mapjoin_union(self, op: FinchOperator, *union_args: DummyStats) -> DummyStats:
         base_stats = super()._mapjoin_defs(op, *union_args)
         return DummyStats.from_def(base_stats)
 
