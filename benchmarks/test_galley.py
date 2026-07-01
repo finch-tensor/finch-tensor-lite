@@ -3,7 +3,7 @@ Galley ASV benchmark: report Galley ``optimize_time`` and ``downstream_time`` fo
 10-matrix matmul chain. One case uses dense matrices while the other
 uses a sparse input for the last matrix.
 
-Run: ``poetry run asv run --bench galley_benchmarks``
+Run: ``pixi run asv run --bench galley_benchmarks``
 """
 
 from functools import reduce
