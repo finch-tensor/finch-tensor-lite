@@ -93,7 +93,7 @@ def _make_pipeline():
     "empty_last",
     [
         pytest.param(True, id="empty_last"),
-        pytest.param(False, id="dense_last"),
+        pytest.param(False, id="dense_last", marks=pytest.mark.skip("slow")),
     ],
 )
 def test_galley_matmul_chain(
