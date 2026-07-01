@@ -2147,7 +2147,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         field_dims = {k: new_dims[k] for k in idx_set}
 
         td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
-        stats_objs.append(DCStats.from_def(td, dcs=set(dcs)))
+        stats_objs.append(DCStats.from_base_stats(td, dcs=set(dcs)))
 
     out = DCStatsFactory().mapjoin(ffuncs.add, *stats_objs)
 

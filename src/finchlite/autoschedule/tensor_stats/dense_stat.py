@@ -17,11 +17,11 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: DenseStats) -> DenseStats:
         base_stats = super()._mapjoin_defs(op, *union_args)
-        return DenseStats.from_def(base_stats)
+        return DenseStats.from_base_stats(base_stats)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: DenseStats) -> DenseStats:
         base_stats = super()._mapjoin_defs(op, *join_args)
-        return DenseStats.from_def(base_stats)
+        return DenseStats.from_base_stats(base_stats)
 
     def aggregate(
         self,
@@ -30,20 +30,20 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
         reduce_indices: tuple[Field, ...],
         stats: DenseStats,
     ) -> DenseStats:
-        new_def = self.aggregate_def(op, init, reduce_indices, stats)
-        return DenseStats.from_def(new_def)
+        base_stats = self.aggregate_def(op, init, reduce_indices, stats)
+        return DenseStats.from_base_stats(base_stats)
 
     def relabel(
         self, stats: DenseStats, relabel_indices: tuple[Field, ...]
     ) -> DenseStats:
-        new_def = self.relabel_def(stats, relabel_indices)
-        return DenseStats.from_def(new_def)
+        base_stats = self.relabel_def(stats, relabel_indices)
+        return DenseStats.from_base_stats(base_stats)
 
     def reorder(
         self, stats: DenseStats, reorder_indices: tuple[Field, ...]
     ) -> DenseStats:
-        new_def = self.reorder_def(stats, reorder_indices)
-        return DenseStats.from_def(new_def)
+        base_stats = self.reorder_def(stats, reorder_indices)
+        return DenseStats.from_base_stats(base_stats)
 
 
 class DenseStats(NumericStats):

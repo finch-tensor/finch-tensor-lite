@@ -61,7 +61,7 @@ class BaseTensorStats(TensorStats):
         return obj
 
     @classmethod
-    def from_def(cls, d: BaseTensorStats, **fields: Any) -> Self:
+    def from_base_stats(cls, d: BaseTensorStats, **fields: Any) -> Self:
         """Build a ``cls`` instance that reuses the definition state (index
         order, dimension sizes, fill value) of ``d``, setting any
         subclass-specific attributes from ``fields``.

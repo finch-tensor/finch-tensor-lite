@@ -56,19 +56,19 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
 
         b_args: list[BlockedStats] = list(args)
         first_arg = b_args[0]
-        new_def = BaseTensorStatsFactory._mapjoin_defs(op, *b_args)
+        base_stats = BaseTensorStatsFactory._mapjoin_defs(op, *b_args)
 
         blocks_per_dim = {k: v for arg in b_args for k, v in arg.blocks_per_dim.items()}
 
         new_blocks = np.empty(
-            tuple(blocks_per_dim[idx] for idx in new_def.index_order), dtype=object
+            tuple(blocks_per_dim[idx] for idx in base_stats.index_order), dtype=object
         )
 
         inner_factory = first_arg.stats_factory
 
         for coord in np.ndindex(new_blocks.shape):
             local_blocks: list[NumericStats] = []
-            global_coord = dict(zip(new_def.index_order, coord, strict=True))
+            global_coord = dict(zip(base_stats.index_order, coord, strict=True))
             for arg in b_args:
                 local_coord = tuple(global_coord[idx] for idx in arg.index_order)
                 block: Any = arg.blocks[local_coord]
@@ -77,7 +77,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             new_blocks[coord] = inner_factory.mapjoin(op, *local_blocks)
 
         return BlockedStats(
-            new_blocks, first_arg.blocks_per_dim, new_def, inner_factory
+            new_blocks, first_arg.blocks_per_dim, base_stats, inner_factory
         )
 
     def aggregate(
@@ -90,7 +90,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for aggregate")
 
-        new_def = BaseTensorStatsFactory.aggregate_def(op, init, reduce_indices, stats)
+        base_stats = BaseTensorStatsFactory.aggregate_def(op, init, reduce_indices, stats)
         grid_reduce_axes = []
         for i, idx in enumerate(stats.index_order):
             if idx in reduce_indices:
@@ -135,14 +135,14 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         return BlockedStats(
             final_grid,
             new_blocks_per_dim,
-            new_def,
+            base_stats,
             stats.stats_factory,
         )
 
     def relabel(
         self, stats: BlockedStats, relabel_indices: tuple[Field, ...]
     ) -> BlockedStats:
-        new_def = BaseTensorStatsFactory.relabel_def(stats, relabel_indices)
+        base_stats = BaseTensorStatsFactory.relabel_def(stats, relabel_indices)
 
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for relabel")
@@ -157,7 +157,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
                 new_blocks[coord] = stats.stats_factory.relabel(block, relabel_indices)
 
         return BlockedStats(
-            new_blocks, new_blocks_per_dim, new_def, stats.stats_factory
+            new_blocks, new_blocks_per_dim, base_stats, stats.stats_factory
         )
 
     def reorder(
@@ -166,7 +166,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for reorder")
 
-        new_def = BaseTensorStatsFactory.reorder_def(stats, reorder_indices)
+        base_stats = BaseTensorStatsFactory.reorder_def(stats, reorder_indices)
 
         old_order = stats.index_order
         dropped = [
@@ -196,7 +196,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         return BlockedStats(
             final_blocks,
             new_blocks_per_dim,
-            new_def,
+            base_stats,
             stats.stats_factory,
         )
 

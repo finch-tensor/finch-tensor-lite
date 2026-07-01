@@ -29,12 +29,12 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
     def _mapjoin_join(self, op: FinchOperator, *join_args: ExactStats) -> ExactStats:
         base_stats = super()._mapjoin_defs(op, *join_args)
         expr = MapJoin(Literal(ffuncs.and_), tuple(s.expr for s in join_args))
-        return ExactStats.from_def(base_stats, expr=expr)
+        return ExactStats.from_base_stats(base_stats, expr=expr)
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: ExactStats) -> ExactStats:
         base_stats = super()._mapjoin_defs(op, *union_args)
         expr = MapJoin(Literal(ffuncs.or_), tuple(s.expr for s in union_args))
-        return ExactStats.from_def(base_stats, expr=expr)
+        return ExactStats.from_base_stats(base_stats, expr=expr)
 
     def aggregate(
         self,
@@ -53,25 +53,25 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
         else:
             bool_op, bool_init = ffuncs.and_, True
 
-        new_def = self.aggregate_def(op, init, reduce_indices, stats)
+        base_stats = self.aggregate_def(op, init, reduce_indices, stats)
         expr = Aggregate(
             Literal(bool_op), Literal(bool_init), stats.expr, reduce_indices
         )
-        return ExactStats.from_def(new_def, expr=expr)
+        return ExactStats.from_base_stats(base_stats, expr=expr)
 
     def relabel(
         self, stats: ExactStats, relabel_indices: tuple[Field, ...]
     ) -> ExactStats:
-        new_def = self.relabel_def(stats, relabel_indices)
+        base_stats = self.relabel_def(stats, relabel_indices)
         expr = Relabel(stats.expr, relabel_indices)
-        return ExactStats.from_def(new_def, expr=expr)
+        return ExactStats.from_base_stats(base_stats, expr=expr)
 
     def reorder(
         self, stats: ExactStats, reorder_indices: tuple[Field, ...]
     ) -> ExactStats:
-        new_def = self.reorder_def(stats, reorder_indices)
+        base_stats = self.reorder_def(stats, reorder_indices)
         expr = Reorder(stats.expr, reorder_indices)
-        return ExactStats.from_def(new_def, expr=expr)
+        return ExactStats.from_base_stats(base_stats, expr=expr)
 
 
 class ExactStats(NumericStats):
@@ -81,11 +81,11 @@ class ExactStats(NumericStats):
         self.nnz = self.estimate_non_fill_values()
 
     @classmethod
-    def from_def(cls, d: BaseTensorStats, **fields: Any) -> ExactStats:
+    def from_base_stats(cls, d: BaseTensorStats, **fields: Any) -> ExactStats:
         # ExactStats derives ``nnz`` from ``expr``, so it extends the generic
-        # ``from_def`` rather than relying on it directly. Callers pass
+        # ``from_base_stats`` rather than relying on it directly. Callers pass
         # ``expr=...`` (the structure expression) as a keyword.
-        obj = super().from_def(d, **fields)
+        obj = super().from_base_stats(d, **fields)
         obj.nnz = obj.estimate_non_fill_values()
         return obj
 

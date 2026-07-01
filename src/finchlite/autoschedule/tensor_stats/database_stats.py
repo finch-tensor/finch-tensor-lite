@@ -25,7 +25,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         base_stats = super()._mapjoin_defs(op, *union_args)
 
         if len(union_args) == 1:
-            return DatabaseStats.from_def(
+            return DatabaseStats.from_base_stats(
                 base_stats, nnz=union_args[0].nnz, V=dict(union_args[0].V)
             )
 
@@ -72,7 +72,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             cur_V = new_V
             cur_indices = set(i.index_order).union(cur_indices)
 
-        return DatabaseStats.from_def(base_stats, nnz=cur_nnz, V=new_V)
+        return DatabaseStats.from_base_stats(base_stats, nnz=cur_nnz, V=new_V)
 
     def _mapjoin_join(
         self,
@@ -82,7 +82,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         base_stats = super()._mapjoin_defs(op, *join_args)
 
         if len(join_args) == 1:
-            return DatabaseStats.from_def(
+            return DatabaseStats.from_base_stats(
                 base_stats, nnz=join_args[0].nnz, V=dict(join_args[0].V)
             )
 
@@ -121,7 +121,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             cur_V = new_V
             cur_indices = set(i.index_order).union(cur_indices)
 
-        return DatabaseStats.from_def(base_stats, nnz=new_nnz, V=new_V)
+        return DatabaseStats.from_base_stats(base_stats, nnz=new_nnz, V=new_V)
 
     def aggregate(
         self,
@@ -148,7 +148,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
             # V(C,i) = V(A,i)
             new_V[idx] = stats.V[idx]
 
-        return DatabaseStats.from_def(base_stats, nnz=new_nnz, V=new_V)
+        return DatabaseStats.from_base_stats(base_stats, nnz=new_nnz, V=new_V)
 
     def relabel(
         self, stats: DatabaseStats, relabel_indices: tuple[Field, ...]
@@ -159,7 +159,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         V = {}
         for old, new in zip(stats.index_order, relabel_indices, strict=True):
             V[new] = stats.V[old]
-        return DatabaseStats.from_def(base_stats, nnz=stats.nnz, V=V)
+        return DatabaseStats.from_base_stats(base_stats, nnz=stats.nnz, V=V)
 
     def reorder(
         self, stats: DatabaseStats, reorder_indices: tuple[Field, ...]
@@ -167,7 +167,7 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for reorder")
         base_stats = self.reorder_def(stats, reorder_indices)
-        return DatabaseStats.from_def(base_stats, nnz=stats.nnz, V=stats.V.copy())
+        return DatabaseStats.from_base_stats(base_stats, nnz=stats.nnz, V=stats.V.copy())
 
 
 class DatabaseStats(NumericStats):

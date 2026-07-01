@@ -52,7 +52,7 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         base_stats = super()._mapjoin_defs(op, *union_args)
 
         if len(union_args) == 1:
-            return DCStats.from_def(union_args[0], dcs=set(union_args[0].dcs))
+            return DCStats.from_base_stats(union_args[0], dcs=set(union_args[0].dcs))
 
         dc_keys: Counter[tuple[frozenset[Field], frozenset[Field]]] = Counter()
         stats_dcs: list[dict[tuple[frozenset[Field], frozenset[Field]], float]] = []
@@ -82,13 +82,13 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
                 new_dcs[key] = min(float(2**64), total)
 
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
-        return DCStats.from_def(base_stats, dcs=new_stats)
+        return DCStats.from_base_stats(base_stats, dcs=new_stats)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: DCStats) -> DCStats:
         base_stats = super()._mapjoin_defs(op, *join_args)
 
         if len(join_args) == 1:
-            return DCStats.from_def(base_stats, dcs=set(join_args[0].dcs))
+            return DCStats.from_base_stats(base_stats, dcs=set(join_args[0].dcs))
 
         new_dc: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
         for stats in join_args:
@@ -99,7 +99,7 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
                     new_dc[dc_key] = dc.value
 
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
-        return DCStats.from_def(base_stats, dcs=new_stats)
+        return DCStats.from_base_stats(base_stats, dcs=new_stats)
 
     def aggregate(
         self,
@@ -109,24 +109,24 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         stats: DCStats,
     ) -> DCStats:
         fields = reduce_indices
-        new_def: BaseTensorStats
+        base_stats: BaseTensorStats
         if len(fields) == 0:
-            new_def = stats.copy()
+            base_stats = stats.copy()
         else:
-            new_def = self.aggregate_def(op, init, fields, stats)
+            base_stats = self.aggregate_def(op, init, fields, stats)
 
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs=dcs)
+        return DCStats.from_base_stats(base_stats, dcs=dcs)
 
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
-        new_def = self.relabel_def(stats, relabel_indices)
+        base_stats = self.relabel_def(stats, relabel_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs=dcs)
+        return DCStats.from_base_stats(base_stats, dcs=dcs)
 
     def reorder(self, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
-        new_def = self.reorder_def(stats, reorder_indices)
+        base_stats = self.reorder_def(stats, reorder_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs=dcs)
+        return DCStats.from_base_stats(base_stats, dcs=dcs)
 
 
 class DCStats(NumericStats):
