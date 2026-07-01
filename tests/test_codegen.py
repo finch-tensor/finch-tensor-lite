@@ -43,7 +43,13 @@ def test_add_function():
     c_code = """
     #include <stdio.h>
 
-    int add(int a, int b) {
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
+
+    FINCH_EXPORT int add(int a, int b) {
         return a + b;
     }
     """
@@ -60,6 +66,12 @@ def test_buffer_function():
     #include <stdint.h>
     #include <string.h>
 
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
+
     typedef struct CNumpyBuffer {
         void* arr;
         void* data;
@@ -67,7 +79,7 @@ def test_buffer_function():
         void* (*resize)(void**, size_t);
     } CNumpyBuffer;
 
-    void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
+    FINCH_EXPORT void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
         // Get the original data pointer and length
         double* data = (double*)(buffer->data);
         size_t length = buffer->length;

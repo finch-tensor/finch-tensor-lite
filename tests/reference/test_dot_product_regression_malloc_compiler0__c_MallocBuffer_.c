@@ -1,3 +1,10 @@
+
+#ifdef _WIN32
+    #define FINCH_EXPORT __declspec( dllexport )
+#else
+    #define FINCH_EXPORT
+#endif
+
 #include <stdint.h>
 struct CMallocBufferStruct {
     void* data;
@@ -43,7 +50,7 @@ mallocbuffer_init(
         memset(m->data, 0, length * datasize);
 }
 
-double dot_product(struct CMallocBufferStruct* a, struct CMallocBufferStruct* b) {
+FINCH_EXPORT double dot_product(struct CMallocBufferStruct* a, struct CMallocBufferStruct* b) {
     double c = (double)0.0;
     struct CMallocBufferStruct* a_ = a;
     double* a__data = (double*)a_->data;
