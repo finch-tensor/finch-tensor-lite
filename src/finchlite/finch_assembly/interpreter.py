@@ -354,12 +354,6 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterLibrary(self, kernels)
-            case asm.Print(args):
-                args_value_str = ""
-                for arg in args:
-                    args_value_str = args_value_str + f"{self(arg)} "
-                print(args_value_str, file=self.stdout)
-                return None
             case asm.Stack(val):
                 raise NotImplementedError(
                     "AssemblyInterpreter does not support symbolic, no target language"
