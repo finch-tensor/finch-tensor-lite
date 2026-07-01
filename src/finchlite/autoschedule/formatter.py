@@ -104,3 +104,7 @@ class DefaultLogicFormatter(LogicFormatter):
             dimension_type=TupleFType.from_tuple(shape_type),
             fill_value=fill_value,
         )
+
+
+class BufferizedNDArrayFormatter(DefaultLogicFormatter):
+    pass

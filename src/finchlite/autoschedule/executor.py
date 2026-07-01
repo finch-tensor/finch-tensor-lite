@@ -8,7 +8,7 @@ from finchlite.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsF
 from finchlite.finch_logic.nodes import TableValue
 from finchlite.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 
-from .formatter import DefaultLogicFormatter
+from .formatter import BufferizedNDArrayFormatter
 
 
 def extract_tensors(
@@ -52,7 +52,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         cache: bool = False,
     ):
         if ctx is None:
-            ctx = DefaultLogicFormatter()
+            ctx = BufferizedNDArrayFormatter()
         if stats_factory is None:
             stats_factory = DenseStatsFactory()
         self.ctx: LogicLoader = ctx

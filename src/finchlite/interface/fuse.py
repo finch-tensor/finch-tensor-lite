@@ -51,11 +51,17 @@ Performance:
 """
 
 from finchlite.autoschedule import get_default_scheduler
-from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finchlite.finch_logic import (
+    Alias,
+    Field,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
 from finchlite.symbolic import gensym
 
 from .lazy import LazyTensor, asarray, lazy
-
 
 def compute(arg, ctx=None):
     """
