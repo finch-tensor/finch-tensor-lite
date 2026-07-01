@@ -93,7 +93,9 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
     ) -> UniformStats:
         base_stats = self.relabel_def(stats, relabel_indices)
         if isinstance(stats, NumericStats):
-            return UniformStats.from_base_stats(base_stats, nnz=stats.estimate_non_fill_values())
+            return UniformStats.from_base_stats(
+                base_stats, nnz=stats.estimate_non_fill_values()
+            )
         raise TypeError("Stats Class must be inherit from NumericStats")
 
     def reorder(
@@ -101,7 +103,9 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
     ) -> UniformStats:
         base_stats = self.reorder_def(stats, reorder_indices)
         if isinstance(stats, NumericStats):
-            return UniformStats.from_base_stats(base_stats, nnz=stats.estimate_non_fill_values())
+            return UniformStats.from_base_stats(
+                base_stats, nnz=stats.estimate_non_fill_values()
+            )
         raise TypeError("Stats Class must be inherit from NumericStats")
 
 

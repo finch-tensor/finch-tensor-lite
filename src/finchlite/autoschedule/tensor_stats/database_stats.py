@@ -167,7 +167,9 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
         if not isinstance(stats, DatabaseStats):
             raise TypeError("DatabaseStats expected for reorder")
         base_stats = self.reorder_def(stats, reorder_indices)
-        return DatabaseStats.from_base_stats(base_stats, nnz=stats.nnz, V=stats.V.copy())
+        return DatabaseStats.from_base_stats(
+            base_stats, nnz=stats.nnz, V=stats.V.copy()
+        )
 
 
 class DatabaseStats(NumericStats):

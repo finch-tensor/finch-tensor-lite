@@ -90,7 +90,9 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for aggregate")
 
-        base_stats = BaseTensorStatsFactory.aggregate_def(op, init, reduce_indices, stats)
+        base_stats = BaseTensorStatsFactory.aggregate_def(
+            op, init, reduce_indices, stats
+        )
         grid_reduce_axes = []
         for i, idx in enumerate(stats.index_order):
             if idx in reduce_indices:
