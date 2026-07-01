@@ -1,7 +1,7 @@
 name: Benchmark
 jobs:
   benchmark:
-    runs-on: codspeed-macro
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -24,7 +24,7 @@ jobs:
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
-          mode: walltime,memory
+          mode: simulation,memory
           run: |
             poetry run pytest benchmarks/ --codspeed -vvv
 
