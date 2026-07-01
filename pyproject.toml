@@ -31,10 +31,13 @@ platforms = ["linux-64", "linux-aarch64", "linux-ppc64le", "osx-arm64", "win-64"
 preview = ["pixi-build"]
 requires-pixi = ">=0.71.0"
 
+[tool.pixi.workspace.build-variants]
+python = ["3.11.*", "3.12.*"]
+
 [tool.pixi.environments]
 test = { features = ["test"], solve-group = "default" }
 test-c = { features = ["test", "c"], solve-group = "default" }
-mindeps = { features = ["test", "mindeps"], solve-group = "default" }
+mindeps = { features = ["test", "mindeps"], solve-group = "mindeps" }
 benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 c = { features = ["c"], solve-group = "default" }
 c-gcc = { features = ["c-gcc"], solve-group = "default" }
@@ -42,14 +45,16 @@ c-clang = { features = ["c-clang"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 [tool.pixi.package.build.backend]
-name = "pixi-build-python"
+name = "pixi-build-cmake"
 version = "*"
 
 [tool.pixi.package.host-dependencies]
-python = ">=3.10,<3.13"
-setuptools = "*"
+python = "*"
+cmake = "*"
+pixi-build-cmake = "*"
 
 [tool.pixi.package.run-dependencies]
+python = ">=3.11,<3.14"
 numpy = ">=1.19,<2.4"
 numba = ">=0.61,<0.63.1"
 donfig = ">=0.8.1.post1,<0.9.0"
