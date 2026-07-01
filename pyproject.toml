@@ -31,9 +31,6 @@ platforms = ["linux-64", "linux-aarch64", "linux-ppc64le", "osx-arm64", "win-64"
 preview = ["pixi-build"]
 requires-pixi = ">=0.71.0"
 
-[tool.pixi.workspace.build-variants]
-python = ["3.11.*", "3.12.*"]
-
 [tool.pixi.environments]
 test = { features = ["test"], solve-group = "default" }
 test-c = { features = ["test", "c"], solve-group = "default" }
