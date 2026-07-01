@@ -612,7 +612,7 @@ def result_type(*arrays_and_dtypes) -> FDType:
         raise TypeError("result_type requires at least one argument")
 
     concrete_types = [
-        _result_type_arg(arg) for arg in arrays_and_dtypes if not _is_python_scalar(arg)
+        _result_type_arg(arg) for arg in arrays_and_dtypes
     ]
     if len(concrete_types) == 0:
         raise TypeError("result_type requires at least one array or dtype argument")
