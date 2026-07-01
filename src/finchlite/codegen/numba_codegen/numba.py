@@ -140,6 +140,9 @@ def numba_function_call(op, ctx, *args: Any) -> str:
     match op:
         case ffuncs._InitWrite():
             return ctx(args[1])
+        case ffuncs.where:
+            condition, x1, x2 = args
+            return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
         case ffuncs.make_tuple:
             return f"({','.join([ctx(arg) for arg in args])},)"
         case NumbaOperator():
