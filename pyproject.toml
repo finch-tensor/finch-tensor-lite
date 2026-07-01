@@ -25,6 +25,96 @@ benchmark = [
     "pytest-codspeed>=5",
 ]
 
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
+requires-pixi = ">=0.71.0"
+
+[tool.pixi.environments]
+test = { features = ["test"], solve-group = "default" }
+test-c = { features = ["test", "c"], solve-group = "default" }
+mindeps = { features = ["test", "mindeps"], solve-group = "default" }
+benchmark = { features = ["test", "benchmark"], solve-group = "default" }
+c = { features = ["c"], solve-group = "default" }
+c-gcc = { features = ["c-gcc"], solve-group = "default" }
+c-clang = { features = ["c-clang"], solve-group = "default" }
+pre-commit = { features = ["pre-commit"], no-default-feature = true }
+
+[tool.pixi.package.build.backend]
+name = "pixi-build-python"
+version = "*"
+
+[tool.pixi.package.host-dependencies]
+python = ">=3.10,<3.13"
+setuptools = "*"
+
+[tool.pixi.package.run-dependencies]
+numpy = "*"
+numba = "*"
+donfig = "*"
+lark = "*"
+
+[tool.pixi.dependencies]
+finch-tensor-lite.path = "."
+
+[tool.pixi.dev]
+finch-tensor-lite.path = "."
+
+[tool.pixi.tasks]
+compile = "python -c 'import finchlite'"
+
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+sparse = "*"
+scipy = "*"
+mypy = "*"
+pytest-mypy = "*"
+pytest-regressions = "*"
+
+[tool.pixi.feature.test.tasks.test]
+cmd = "pytest -m 'not c_backend'"
+depends-on = ["compile"]
+default-environment = "test"
+
+[tool.pixi.feature.test.tasks.test-c]
+cmd = "pytest -m c_backend"
+depends-on = ["compile"]
+default-environment = "test-c"
+
+[tool.pixi.feature.test.tasks.type-check]
+cmd = "mypy ."
+default-environment = "test"
+
+[tool.pixi.feature.mindeps.dependencies]
+python = "3.11.*"
+
+[tool.pixi.feature.benchmark.dependencies]
+pytest-codspeed = "*"
+
+[tool.pixi.feature.c.dependencies]
+c-compiler = "*"
+
+[tool.pixi.feature.c-gcc.dependencies]
+gcc = "*"
+
+[tool.pixi.feature.c-gcc.activation.env]
+CC = "gcc"
+
+[tool.pixi.feature.c-clang.dependencies]
+clang = "*"
+
+[tool.pixi.feature.c-clang.activation.env]
+CC = "clang"
+
+[tool.pixi.feature.pre-commit.dependencies]
+pre-commit = "*"
+
+[tool.pixi.feature.pre-commit.tasks]
+pre-commit-install = "pre-commit install"
+pre-commit = "pre-commit run -a"
+
 
 [build-system]
 requires = ["setuptools>=77"]
