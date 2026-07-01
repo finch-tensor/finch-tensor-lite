@@ -101,11 +101,15 @@ def test_galley_matmul_chain(
 ) -> None:
     import finchlite.autoschedule.galley_optimize as galley
 
+    # Warmup
+    pipeline = _make_pipeline()
+    plan = _plan_from_lazy(_build_expr(empty_last))
+    pipeline(plan)
+
+    # Benchmark
     if metric == "optimize":
         patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
     else:
         patch_benchmark(benchmark, monkeypatch, LogicStandardizer, "lower")
 
-    pipeline = _make_pipeline()
-    plan = _plan_from_lazy(_build_expr(empty_last))
     pipeline(plan)

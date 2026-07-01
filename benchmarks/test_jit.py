@@ -24,9 +24,16 @@ def _f1_jit(A, B, C, D, E):
 
 def test_f1_jit(scheduler, benchmark):
     args = mat_chain([1, 20, 30, 40, 50, 60])
+    # Warmup
+    fl.jit(_f1_jit)(*args)
 
+    # Benchmark
     benchmark(fl.jit(_f1_jit), *args)
 
 
 def test_jit_creation(scheduler, benchmark):
+    # Warmup
+    fl.jit(_f1_jit)
+
+    # Benchmark
     benchmark(fl.jit, _f1_jit)
