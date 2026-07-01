@@ -12,7 +12,7 @@ from finchlite.finch_logic import Field
 from finchlite.finch_logic.tensor_stats import StatsFactory
 
 from .numeric_stats import NumericStats
-from .tensor_def import TensorDef
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
 class BlockedStatsFactory(StatsFactory["BlockedStats"]):
@@ -37,18 +37,18 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             stats_factory=self.inner_factory,
         )
 
-    def copy_stats(self, stat: BlockedStats) -> BlockedStats:
+    def copy(self, stat: BlockedStats) -> BlockedStats:
         if not isinstance(stat, BlockedStats):
-            raise TypeError("copy_stats expected a BlockedStats instance")
+            raise TypeError("copy expected a BlockedStats instance")
 
         new_blocks = np.empty_like(stat.blocks)
         for i in range(stat.blocks.size):
-            new_blocks.flat[i] = stat.stats_factory.copy_stats(stat.blocks.flat[i])
+            new_blocks.flat[i] = stat.stats_factory.copy(stat.blocks.flat[i])
 
         return BlockedStats(
             new_blocks,
             stat.blocks_per_dim.copy(),
-            stat.tensordef.copy(),
+            stat,
             stat.stats_factory,
         )
 
@@ -56,20 +56,19 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
 
         b_args: list[BlockedStats] = list(args)
         first_arg = b_args[0]
-        def_args = [stat.tensordef for stat in b_args]
-        new_def = TensorDef.mapjoin(op, *def_args)
+        base_stats = BaseTensorStatsFactory._mapjoin_defs(op, *b_args)
 
         blocks_per_dim = {k: v for arg in b_args for k, v in arg.blocks_per_dim.items()}
 
         new_blocks = np.empty(
-            tuple(blocks_per_dim[idx] for idx in new_def.index_order), dtype=object
+            tuple(blocks_per_dim[idx] for idx in base_stats.index_order), dtype=object
         )
 
         inner_factory = first_arg.stats_factory
 
         for coord in np.ndindex(new_blocks.shape):
             local_blocks: list[NumericStats] = []
-            global_coord = dict(zip(new_def.index_order, coord, strict=True))
+            global_coord = dict(zip(base_stats.index_order, coord, strict=True))
             for arg in b_args:
                 local_coord = tuple(global_coord[idx] for idx in arg.index_order)
                 block: Any = arg.blocks[local_coord]
@@ -78,7 +77,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
             new_blocks[coord] = inner_factory.mapjoin(op, *local_blocks)
 
         return BlockedStats(
-            new_blocks, first_arg.blocks_per_dim, new_def, inner_factory
+            new_blocks, first_arg.blocks_per_dim, base_stats, inner_factory
         )
 
     def aggregate(
@@ -91,7 +90,9 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for aggregate")
 
-        new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
+        base_stats = BaseTensorStatsFactory.aggregate_def(
+            op, init, reduce_indices, stats
+        )
         grid_reduce_axes = []
         for i, idx in enumerate(stats.index_order):
             if idx in reduce_indices:
@@ -136,14 +137,14 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         return BlockedStats(
             final_grid,
             new_blocks_per_dim,
-            new_def,
+            base_stats,
             stats.stats_factory,
         )
 
     def relabel(
         self, stats: BlockedStats, relabel_indices: tuple[Field, ...]
     ) -> BlockedStats:
-        new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
+        base_stats = BaseTensorStatsFactory.relabel_def(stats, relabel_indices)
 
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for relabel")
@@ -158,7 +159,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
                 new_blocks[coord] = stats.stats_factory.relabel(block, relabel_indices)
 
         return BlockedStats(
-            new_blocks, new_blocks_per_dim, new_def, stats.stats_factory
+            new_blocks, new_blocks_per_dim, base_stats, stats.stats_factory
         )
 
     def reorder(
@@ -167,7 +168,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for reorder")
 
-        new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
+        base_stats = BaseTensorStatsFactory.reorder_def(stats, reorder_indices)
 
         old_order = stats.index_order
         dropped = [
@@ -197,7 +198,7 @@ class BlockedStatsFactory(StatsFactory["BlockedStats"]):
         return BlockedStats(
             final_blocks,
             new_blocks_per_dim,
-            new_def,
+            base_stats,
             stats.stats_factory,
         )
 
@@ -207,18 +208,20 @@ class BlockedStats(NumericStats):
         self,
         blocks: np.ndarray,
         blocks_per_dim: dict[Field, int],
-        tensordef: TensorDef,
+        tensordef: BaseTensorStats,
         stats_factory: StatsFactory[NumericStats],
     ):
+        self.index_order = tensordef.index_order
+        self.dim_sizes = tensordef.dim_sizes
+        self.fill_value = tensordef.fill_value
         self.blocks = blocks
         self.blocks_per_dim = blocks_per_dim
-        self.tensordef = tensordef
         self.stats_factory = stats_factory
 
     @classmethod
     def build_grid(
         cls,
-        d: TensorDef,
+        d: BaseTensorStats,
         blocks_per_dim: Mapping[Field, int],
         stats_factory: StatsFactory[NumericStats],
         data: Any,
@@ -258,7 +261,7 @@ class BlockedStats(NumericStats):
         blocks_per_dim: Mapping[Field, int],
         stats_factory: StatsFactory[NumericStats],
     ) -> BlockedStats:
-        d = TensorDef.from_tensor(tensor, fields)
+        d = BaseTensorStats(tensor, fields)
         data = tensor.to_numpy() if hasattr(tensor, "to_numpy") else tensor
         grid = cls.build_grid(d, blocks_per_dim, stats_factory, data=data)
         return cls(grid, dict(blocks_per_dim), d, stats_factory)
@@ -268,7 +271,7 @@ class BlockedStats(NumericStats):
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
-        total_elements = math.prod(self.tensordef.dim_sizes.values())
+        total_elements = math.prod(self.dim_sizes.values())
         num_blocks = self.blocks.size
         block_volume = total_elements / num_blocks
         densities = [
@@ -279,3 +282,15 @@ class BlockedStats(NumericStats):
         size_part = np.log2(sizes)
 
         return np.concatenate([size_part, dense_part])
+
+    def copy(self) -> BlockedStats:
+        new_blocks = np.empty_like(self.blocks)
+        for i in range(self.blocks.size):
+            new_blocks.flat[i] = self.stats_factory.copy(self.blocks.flat[i])
+
+        return BlockedStats(
+            new_blocks,
+            self.blocks_per_dim.copy(),
+            self,
+            self.stats_factory,
+        )

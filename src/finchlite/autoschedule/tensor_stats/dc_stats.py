@@ -16,8 +16,7 @@ from finchlite.finch_logic import Field
 from finchlite.tensor import BufferizedNDArray
 
 from .numeric_stats import NumericStats
-from .tensor_def import TensorDef
-from .tensor_stats import BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
 @dataclass(frozen=True)
@@ -49,27 +48,58 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
     def __init__(self):
         super().__init__(DCStats)
 
-    def copy_stats(self, stat: DCStats) -> DCStats:
-        if not isinstance(stat, DCStats):
-            raise TypeError("copy_stats expected a DCStats instance")
-        return DCStats.from_def(stat.tensordef.copy(), set(stat.dcs))
+    def _mapjoin_union(self, op: FinchOperator, *union_args: DCStats) -> DCStats:
+        base_stats = super()._mapjoin_defs(op, *union_args)
 
-    def _mapjoin_union(
-        self, new_def: TensorDef, op: FinchOperator, union_args: list[DCStats]
-    ) -> DCStats:
+        if len(union_args) == 1:
+            return DCStats.from_base_stats(union_args[0], dcs=set(union_args[0].dcs))
 
-        return DCStats._merge_dc_union(new_def, union_args)
+        dc_keys: Counter[tuple[frozenset[Field], frozenset[Field]]] = Counter()
+        stats_dcs: list[dict[tuple[frozenset[Field], frozenset[Field]], float]] = []
+        for stats in union_args:
+            dcs: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
+            Z = tuple(x for x in base_stats.index_order if x not in stats.index_order)
+            Z_dim_size = base_stats.get_dim_space_size(Z)
+            for dc in stats.dcs:
+                new_key = (dc.from_indices, dc.to_indices)
+                dcs[new_key] = dc.value
+                dc_keys[new_key] += 1
 
-    def _mapjoin_join(
-        self, new_def: TensorDef, op: FinchOperator, join_args: list[DCStats]
-    ) -> DCStats:
+                ext_dc_key = (dc.from_indices, dc.to_indices | frozenset(Z))
+                if ext_dc_key not in dcs:
+                    dc_keys[ext_dc_key] += 1
+                prev = dcs.get(ext_dc_key, math.inf)
+                dcs[ext_dc_key] = min(prev, dc.value * Z_dim_size)
+            stats_dcs.append(dcs)
 
-        if not join_args:
-            return DCStats.from_def(new_def, set())
-        join_cover = set().union(*(s.tensordef.index_order for s in join_args))
-        if join_cover == set(new_def.index_order):
-            return DCStats._merge_dc_join(new_def, join_args)
-        return DCStats._merge_dc_union(new_def, join_args)
+        new_dcs: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
+        for key, count in dc_keys.items():
+            if count == len(union_args):
+                total = sum(d.get(key, 0.0) for d in stats_dcs)
+                X, Y = key
+                if Y.issubset(base_stats.index_order):
+                    total = min(total, base_stats.get_dim_space_size(Y))
+                new_dcs[key] = min(float(2**64), total)
+
+        new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
+        return DCStats.from_base_stats(base_stats, dcs=new_stats)
+
+    def _mapjoin_join(self, op: FinchOperator, *join_args: DCStats) -> DCStats:
+        base_stats = super()._mapjoin_defs(op, *join_args)
+
+        if len(join_args) == 1:
+            return DCStats.from_base_stats(base_stats, dcs=set(join_args[0].dcs))
+
+        new_dc: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
+        for stats in join_args:
+            for dc in stats.dcs:
+                dc_key = (dc.from_indices, dc.to_indices)
+                current_dc = new_dc.get(dc_key, math.inf)
+                if dc.value < current_dc:
+                    new_dc[dc_key] = dc.value
+
+        new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
+        return DCStats.from_base_stats(base_stats, dcs=new_stats)
 
     def aggregate(
         self,
@@ -79,25 +109,24 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         stats: DCStats,
     ) -> DCStats:
         fields = reduce_indices
+        base_stats: BaseTensorStats
         if len(fields) == 0:
-            new_def = stats.tensordef.copy()
+            base_stats = stats.copy()
         else:
-            new_def = TensorDef.aggregate(op, init, fields, stats.tensordef)
+            base_stats = self.aggregate_def(op, init, fields, stats)
 
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
+        return DCStats.from_base_stats(base_stats, dcs=dcs)
 
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
-        d = stats.tensordef
-        new_def = TensorDef.relabel(d, relabel_indices)
+        base_stats = self.relabel_def(stats, relabel_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
+        return DCStats.from_base_stats(base_stats, dcs=dcs)
 
     def reorder(self, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
-        d = stats.tensordef
-        new_def = TensorDef.reorder(d, reorder_indices)
+        base_stats = self.reorder_def(stats, reorder_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_def(new_def, dcs)
+        return DCStats.from_base_stats(base_stats, dcs=dcs)
 
 
 class DCStats(NumericStats):
@@ -111,21 +140,11 @@ class DCStats(NumericStats):
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):
         """
-        Initialize DCStats from a tensor and its axis names, build the TensorDef,
+        Initialize DCStats from a tensor and its axis names, build the BaseTensorStats,
         and compute degree constraint (DC) records from the tensor’s structure.
         """
-        self.tensordef = TensorDef.from_tensor(tensor, fields)
+        super().__init__(tensor, fields)
         self.dcs = self._structure_to_dcs(tensor, fields)
-
-    @staticmethod
-    def from_def(tensordef: TensorDef, dcs: set[DC]) -> DCStats:
-        """
-        Build DCStats directly from a TensorDef and an existing DC set.
-        """
-        self = object.__new__(DCStats)
-        self.tensordef = tensordef.copy()
-        self.dcs = set(dcs)
-        return self
 
     def _structure_to_dcs(self, arr: Tensor, fields: Iterable[Field]) -> set[DC]:
         """
@@ -217,7 +236,7 @@ class DCStats(NumericStats):
                     ntn.Literal(ffuncs.ne),
                     (
                         A_access,
-                        ntn.Literal(self.tensordef.fill_value),
+                        ntn.Literal(self.fill_value),
                     ),
                 ),
             )
@@ -236,7 +255,7 @@ class DCStats(NumericStats):
                                 ntn.Literal(ffuncs.ne),
                                 (
                                     A_access,
-                                    ntn.Literal(self.tensordef.fill_value),
+                                    ntn.Literal(self.fill_value),
                                 ),
                             ),
                         ),
@@ -378,85 +397,6 @@ class DCStats(NumericStats):
         dcs.add(DC(frozenset({}), frozenset({*fields}), dc_proj_pairs[-1]))
         return dcs
 
-    @staticmethod
-    def _merge_dc_join(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:
-        """
-        Merge DCs for join-like operators
-
-        Args:
-            new_def: The merged TensorDef produced by TensorDef.mapjoin(...).
-            all_stats: DCStats inputs whose DC sets are to be merged.
-
-        Returns:
-            A new DCStats built on `new_def` with DCs:
-            For every key (X, Y) that appears in at least one input, set
-            d_out(X, Y) to the smallest of the values provided for that key
-            by the inputs that define it.
-        """
-        if len(all_stats) == 1:
-            return DCStats.from_def(new_def, set(all_stats[0].dcs))
-
-        new_dc: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
-        for stats in all_stats:
-            for dc in stats.dcs:
-                dc_key = (dc.from_indices, dc.to_indices)
-                current_dc = new_dc.get(dc_key, math.inf)
-                if dc.value < current_dc:
-                    new_dc[dc_key] = dc.value
-
-        new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
-        return DCStats.from_def(new_def, new_stats)
-
-    @staticmethod
-    def _merge_dc_union(new_def: TensorDef, all_stats: list[DCStats]) -> DCStats:
-        """
-        Merge DCs for union-like operators.
-
-        Args:
-            new_def: The output TensorDef produced by TensorDef.mapjoin(...).
-            all_stats: The DCStats inputs to merge.
-
-        Returns:
-            A new DCStats built on `new_def` whose DC set reflects union semantics.
-            If there is only one input, this returns a copy of its DCs attached to
-            `new_def`.
-        """
-        if len(all_stats) == 1:
-            return DCStats.from_def(new_def, set(all_stats[0].dcs))
-
-        dc_keys: Counter[tuple[frozenset[Field], frozenset[Field]]] = Counter()
-        stats_dcs: list[dict[tuple[frozenset[Field], frozenset[Field]], float]] = []
-        for stats in all_stats:
-            dcs: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
-            Z = tuple(
-                x for x in new_def.index_order if x not in stats.tensordef.index_order
-            )
-            # Z = new_def.index_order - stats.tensordef.index_order
-            Z_dim_size = new_def.get_dim_space_size(Z)
-            for dc in stats.dcs:
-                new_key = (dc.from_indices, dc.to_indices)
-                dcs[new_key] = dc.value
-                dc_keys[new_key] += 1
-
-                ext_dc_key = (dc.from_indices, dc.to_indices | frozenset(Z))
-                if ext_dc_key not in dcs:
-                    dc_keys[ext_dc_key] += 1
-                prev = dcs.get(ext_dc_key, math.inf)
-                dcs[ext_dc_key] = min(prev, dc.value * Z_dim_size)
-            stats_dcs.append(dcs)
-
-        new_dcs: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
-        for key, count in dc_keys.items():
-            if count == len(all_stats):
-                total = sum(d.get(key, 0.0) for d in stats_dcs)
-                X, Y = key
-                if Y.issubset(new_def.index_order):
-                    total = min(total, new_def.get_dim_space_size(Y))
-                new_dcs[key] = min(float(2**64), total)
-
-        new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
-        return DCStats.from_def(new_def, new_stats)
-
     def estimate_non_fill_values(self) -> float:
         """
         Estimate the number of non-fill values using DCs.
@@ -469,7 +409,7 @@ class DCStats(NumericStats):
         Returns:
             the estimated number of non-fill entries in the tensor.
         """
-        idx: frozenset[Field] = frozenset(self.tensordef.dim_sizes.keys())
+        idx: frozenset[Field] = frozenset(self.dim_sizes.keys())
         if len(idx) == 0:
             return 1.0
 
