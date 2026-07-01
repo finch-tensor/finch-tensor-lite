@@ -2,7 +2,7 @@
 
 ## What is serialize/construct/unpack/... ?
 
-When a complex data structure, such as a hash table or array, gets passed into a
+When a complex data structure, such as an array, gets passed into a
 kernel (C or Numba) as an argument, there are five different stages that are
 performed:
 
@@ -12,8 +12,7 @@ performed:
 2. Inside the kernel, the data structure is unpacked to reveal the underlying
    data structure.
 3. The kernel modifies this data structure. The modifications it should do are
-   provided by assembly instructions. See the hashtable implementation for
-   reference on how these mutations work.
+   provided by assembly instructions.
 4. The kernel has finished making its modifications. It's time to _repack_ the
    data structure.
 5. The kernel has finished running. If we have mutated the serialized data
@@ -28,8 +27,8 @@ The function that turns an object in the kernel back into a python object is
 called `construct_from_c(fmt, obj)` or `construct_from_numba(fmt, obj)`. It is
 only called for the object being returned by the kernel.
 
-Unpacking is only implemented for arrays and hash tables. It should not be
-implemented for scalar types.
+Unpacking is only implemented for arrays. It should not be implemented for scalar
+types.
 
 ### C Example
 
@@ -115,80 +114,3 @@ names that were used in the unpacking.
 
 Unpack and Repack require numba codegen contexts to freshen variables and emit
 initialization code.
-
-## Hash Table Data Types
-
-Hash Tables may have keys and values that have the following finch types:
-1. A scalar (as defined in numpy or python)
-2. An FType inheriting from `ImmutableStructFType`
-
-Nothing else is currently supported nor is intended to be supported.
-
-All `ImmutableStructFType`'s will get serialized to typed tuples for numba.
-
-The C Context requires `c_hash` and `c_eq` behavior for a type that wants to be
-hashed. Custom ftypes can implement this by subclassing `CHashableFType`; scalar,
-immutable struct, and tuple ftypes are handled by the standard match cases in
-`c_hash` and `c_eq`. Each method returns the *name* of a macro that will get
-expanded for hashing or equality. See the outline below for how these functions
-work:
-
-```python
-class CustomFType(FType, CHashableFType):
-    def c_hash(self, ctx: "CContext"):
-        ctx.add_header(f'#include "{common_h}"')
-        return "custom_hash"
-
-    def c_eq(self, ctx: "CContext"):
-        ctx.add_header(f'#include "{common_h}"')
-        return "custom_eq"
-
-# For immutable structs with fields.
-def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable)
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("hash") is not None:
-            return properties["hash"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_hash(fmt, ctx) for fmt in fmt.struct_fieldtypes]
-    name = ctx.freshen("hash")
-    ctx.datastructures[fmt]["hash"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var_n = ctx.freshen("var")
-    args = ",".join(
-        f"{macro}(&({var_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
-    return name
-
-
-def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    # this should be true in whatever structs we have.
-    assert isinstance(fmt, Hashable)
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("eq") is not None:
-            return properties["eq"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
-    name = ctx.freshen("eq")
-    ctx.datastructures[fmt]["eq"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var1_n = ctx.freshen("var")
-    var2_n = ctx.freshen("var")
-    args = " && ".join(
-        f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
-    return name
-```
