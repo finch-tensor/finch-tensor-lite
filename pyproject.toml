@@ -27,15 +27,11 @@ benchmark = [
 
 
 [build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.11.25,<0.12"]
+build-backend = "uv_build"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-finchlite = ["py.typed"]
-
+[tool.uv.build-backend]
+module-name = "finchlite"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
