@@ -384,18 +384,6 @@ class MLIRContext(Context):
                 )
                 return None
 
-            # case asm.WhileLoop(cond, body):
-            #     ...
-
-            # case asm.BufferLoop(buf, var, body):
-            #     ...
-
-            # case asm.If(cond, body):
-            #     ...
-
-            # case asm.IfElse(cond, body, else_body):
-            #     ...
-
             case asm.Function(asm.Variable(func_name, return_t), args, body):
                 ctx_2 = self.subblock()
                 statement = []

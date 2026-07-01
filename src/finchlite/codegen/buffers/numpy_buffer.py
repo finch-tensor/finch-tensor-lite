@@ -7,6 +7,7 @@ import numba
 
 from finchlite.algebra import FType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
+from finchlite.codegen.mlir_codegen import MLIRBufferFType, MLIRContext, mlir_type
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
@@ -22,6 +23,10 @@ class CBufferFields(NamedTuple):
     data: str
     length: str
     obj: str
+
+
+class MLIRBufferFields(NamedTuple):
+    buffer: str
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -83,7 +88,7 @@ class NumpyBuffer(Buffer):
         return f"NumpyBuffer({arr_repr})"
 
 
-class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
+class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFType):
     """
     A ftype for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFType class.
@@ -268,3 +273,76 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
         Construct a NumpyBuffer from a Numba-compatible object.
         """
         return NumpyBuffer(numba_buffer[0])
+
+    def mlir_type(self):
+        return f"memref<?x{mlir_type(self.element_type)}>"
+
+    def mlir_length(self, ctx: "MLIRContext", buf: "Stack"):
+        c0 = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{c0} = arith.constant 0 : index")
+        res = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{res} = memref.dim {buf.obj.buffer}, {c0} : {self.mlir_type()}"
+        )
+        return res
+
+    def mlir_load(self, ctx: "MLIRContext", buf: "Stack", idx: "AssemblyExpression"):
+        i = ctx(idx)
+        c0 = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{c0} = memref.load {buf.obj.buffer}[{i}] : {self.mlir_type()}"
+        )
+        return c0
+
+    def mlir_store(
+        self,
+        ctx: "MLIRContext",
+        buf: "Stack",
+        idx: "AssemblyExpression",
+        value: "AssemblyExpression",
+    ):
+        new = ctx(value)
+        i = ctx(idx)
+        ctx.exec(
+            f"{ctx.feed}memref.store {new}, {buf.obj.buffer}[{i}] : {self.mlir_type()}"
+        )
+        return
+
+    def mlir_resize(self, ctx: "MLIRContext", buf: "Stack", new_len):
+        c0 = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{c0} = memref.realloc {buf.obj.buffer}({ctx(new_len)}) "
+            f": {self.mlir_type()} to {self.mlir_type()}"
+        )
+        return MLIRBufferFields(c0)
+
+    # def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
+    #     """
+    #     Unpack the buffer into MLIR context.
+    #     """
+    #     ...
+
+    # def mlir_repack(self, ctx: "MLIRContext", lhs, obj):
+    #     """
+    #     Repack the buffer from MLIR context.
+    #     """
+    #     ...
+
+    # def serialize_to_mlir(self, obj):
+    #     """
+    #     Serialize the NumPy buffer to a MLIR-compatible structure.
+    #     """
+    #     ...
+
+    # def deserialize_from_mlir(self, obj, mlir_buffer):
+    #     """
+    #     Update this buffer based on how the MLIR call modified the
+    #     MLIRNumpyBuffer structure.
+    #     """
+    #     ...
+
+    # def construct_from_mlir(self, mlir_buffer):
+    #     """
+    #     Construct a NumpyBuffer from a MLIR-compatible structure.
+    #     """
+    #     ...

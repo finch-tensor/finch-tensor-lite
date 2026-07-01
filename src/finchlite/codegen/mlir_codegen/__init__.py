@@ -1,6 +1,7 @@
 from .mlir import (
     MLIRArgumentFType,
     MLIRBinaryOperator,
+    MLIRBufferFType,
     MLIRContext,
     MLIRNAryOperator,
     MLIROperator,
@@ -16,6 +17,7 @@ from .stages import MLIRCode, MLIRLowerer
 __all__ = [
     "MLIRArgumentFType",
     "MLIRBinaryOperator",
+    "MLIRBufferFType",
     "MLIRCode",
     "MLIRContext",
     "MLIRLowerer",
