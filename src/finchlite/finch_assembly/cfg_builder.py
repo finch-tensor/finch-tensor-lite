@@ -28,7 +28,6 @@ from .nodes import (
     Literal,
     Load,
     Module,
-    Print,
     Repack,
     Resize,
     Return,
@@ -220,18 +219,15 @@ def assembly_dataflow_preprocess(node: AssemblyNode) -> tuple[AssemblyNode, int]
         nonlocal sid
         if isinstance(
             x,
-            (
-                Unpack,
-                Repack,
-                Resize,
-                SetAttr,
-                Print,
-                Store,
-                Assign,
-                Assert,
-                Return,
-                Break,
-            ),
+            Unpack
+            | Repack
+            | Resize
+            | SetAttr
+            | Store
+            | Assign
+            | Assert
+            | Return
+            | Break,
         ):
             s = NumberedStatement(x, sid)
             sid += 1

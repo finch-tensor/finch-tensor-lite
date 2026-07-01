@@ -19,7 +19,6 @@ from finchlite.algebra import (
     fisinstance,
 )
 from finchlite.finch_assembly import BufferFType
-from finchlite.finch_assembly.dct import DictFType
 from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finchlite.util.logging import LOG_BACKEND_NUMBA
 
@@ -140,6 +139,9 @@ def numba_function_call(op, ctx, *args: Any) -> str:
     match op:
         case ffuncs._InitWrite():
             return ctx(args[1])
+        case ffuncs.where:
+            condition, x1, x2 = args
+            return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
         case ffuncs.make_tuple:
             return f"({','.join([ctx(arg) for arg in args])},)"
         case NumbaOperator():
@@ -434,34 +436,6 @@ def struct_construct_from_numba(fmt: StructFType, numba_struct):
         for (name, field_type) in fmt.struct_fields
     ]
     return fmt.from_fields(*args)
-
-
-class NumbaDictFType(DictFType, NumbaArgumentFType, ABC):
-    """
-    Abstract base class for the ftype of datastructures. The ftype defines how
-    the data in a Map is organized and accessed.
-    """
-
-    @abstractmethod
-    def numba_existsdict(self, ctx: "NumbaContext", map, idx):
-        """
-        Return numba code which checks whether a given key exists in a map.
-        """
-        ...
-
-    @abstractmethod
-    def numba_loaddict(self, ctx, buffer, idx):
-        """
-        Return numba code which gets a value corresponding to a certain key.
-        """
-        ...
-
-    @abstractmethod
-    def numba_storedict(self, ctx, buffer, idx, value):
-        """
-        Return C code which stores a certain value given a certain integer tuple key.
-        """
-        ...
 
 
 class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
@@ -766,24 +740,6 @@ class NumbaContext(Context):
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
                 return buf_t.numba_length(self, buf)
-            case asm.LoadDict(dct, idx):
-                dct = self.resolve(dct)
-                dct_t = dct.result_type
-                if not isinstance(dct_t, NumbaDictFType):
-                    raise TypeError(f"Expected numba dict type, got: {dct_t}")
-                return dct_t.numba_loaddict(self, dct, idx)
-            case asm.ExistsDict(dct, idx):
-                dct = self.resolve(dct)
-                dct_t = dct.result_type
-                if not isinstance(dct_t, NumbaDictFType):
-                    raise TypeError(f"Expected numba dict type, got: {dct_t}")
-                return dct_t.numba_existsdict(self, dct, idx)
-            case asm.StoreDict(dct, idx, val):
-                dct = self.resolve(dct)
-                dct_t = dct.result_type
-                if not isinstance(dct_t, NumbaDictFType):
-                    raise TypeError(f"Expected numba dict type, got: {dct_t}")
-                return dct_t.numba_storedict(self, dct, idx, val)
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 if bodies == ():
