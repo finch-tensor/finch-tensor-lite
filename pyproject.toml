@@ -129,7 +129,6 @@ finchlite = ["py.typed"]
 [tool.ruff]
 extend-exclude = [
     "tests/reference",
-    "src/finchlite/codegen/stc",
 ]
 line-length = 88
 
@@ -158,4 +157,4 @@ section-order = [
 
 [tool.mypy]
 ignore_missing_imports = true
-exclude = ["tests/reference", "src/finchlite/codegen/stc", "(^|/)benchmarks/"]
+exclude = ["tests/reference", "(^|/)benchmarks/"]

@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate, zip_longest
-from typing import Any, overload
+from typing import Any, cast, overload
 
 import numpy as np
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
@@ -467,7 +467,7 @@ def arange(
     if stop is None:
         start, stop = 0, start
     arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
-    return broadcast_to(lazy(arr), (len(arr),))
+    return lazy(arr)
 
 
 def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
@@ -1240,6 +1240,42 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
+def matrix_power(x, n) -> LazyTensor:
+    x = lazy(x)
+
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    if x.shape[-1] != x.shape[-2]:
+        raise ValueError(
+            f"x must be a square matrix in inner dimensions, got shape {x.shape}"
+        )
+    if not isinstance(n, int):
+        raise ValueError(f"n must be an integer, got {type(n)}")
+    if n < 0:
+        raise ValueError(
+            "negative matrix powers require materializing first; "
+            "call compute() before matrix_power"
+        )
+
+    if n == 0:
+        identity = eye(x.shape[-1], dtype=x.element_type)
+        return broadcast_to(identity, x.shape)
+
+    result = None
+    base = x
+    while n > 0:
+        if n % 2 == 1:
+            result = base if result is None else matmul(result, base)
+        n //= 2
+        if n > 0:
+            base = matmul(base, base)
+
+    if result is None:
+        raise RuntimeError("matrix_power failed to produce a result")
+
+    return result
+
+
 def bitwise_invert(x) -> LazyTensor:
     return elementwise(ffuncs.invert, lazy(x))
 
@@ -1515,6 +1551,238 @@ class FillTensor(Tensor):
             ftype(self._fill_value),
             tuple(ftype(dim) for dim in self.shape),
         )
+
+
+@dataclass(frozen=True, eq=False)
+class MatrixPatternTensorFType(TensorFType):
+    _fill_value: Any
+    _element_type: FType
+    _shape_type: tuple
+    _tensor_type: type[MatrixPatternTensor]
+    _k: int
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, MatrixPatternTensorFType):
+            return False
+        return (
+            ffuncs.same(self._fill_value, other._fill_value)
+            and self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+            and self._tensor_type == other._tensor_type
+            and self._k == other._k
+        )
+
+    def __hash__(self):
+        return hash(
+            (
+                ffuncs.samehash(self._fill_value),
+                self._element_type,
+                self._shape_type,
+                self._tensor_type,
+                self._k,
+            )
+        )
+
+    def construct(self, shape: tuple) -> MatrixPatternTensor:
+        return self._tensor_type(shape, k=self._k, dtype=self.element_type)
+
+    def __call__(self, val: Any) -> MatrixPatternTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class MatrixPatternTensor(Tensor):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
+        shape = _matrix_shape(shape)
+        self._shape = shape
+        self._k = k
+        self._element_type = ftype(dtype if dtype is not None else np.float64)
+        self._fill_value = self._element_type(0)
+        self._one_value = self._element_type(1)
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != 2:
+            raise ValueError("Matrix pattern tensors require two indices.")
+        val = self._one_value if self._contains(*idxs) else self._fill_value
+        return Scalar(val, fill_value=self._fill_value)
+
+    def _contains(self, i, j) -> bool:
+        raise NotImplementedError
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
+        for i in range(self.shape[0]):
+            for j in range(self.shape[1]):
+                arr[i, j] = (
+                    self._one_value if self._contains(i, j) else self._fill_value
+                )
+        return arr
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return MatrixPatternTensorFType(
+            self._fill_value,
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            type(self),
+            self._k,
+        )
+
+
+class EyeTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return j - i == self._k
+
+
+class UpperTriangleTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return j - i >= self._k
+
+
+class LowerTriangleTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return j - i <= self._k
+
+
+def _matrix_shape(shape: int | tuple[int, int]) -> tuple[int, int]:
+    if isinstance(shape, int):
+        return (shape, shape)
+    shape_tuple = tuple(shape)
+    if len(shape_tuple) != 2:
+        raise ValueError(f"Expected a 2D shape, got {shape_tuple}")
+    return shape_tuple
+
+
+def eye(
+    n_rows: int,
+    n_cols: int | None = None,
+    *,
+    k: int = 0,
+    dtype=None,
+    device=None,
+) -> LazyTensor:
+    if device is not None:
+        raise ValueError(f"device argument is not supported; got {device!r}")
+    return cast(
+        LazyTensor,
+        lazy(
+            EyeTensor(
+                (n_rows, n_rows if n_cols is None else n_cols),
+                k=k,
+                dtype=dtype,
+            )
+        ),
+    )
+
+
+def triu(x, /, *, k: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    mask = UpperTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
+    return elementwise(
+        ffuncs.where,
+        mask,
+        x,
+        FillTensor(x.shape, x.element_type(0)),
+    )
+
+
+def tril(x, /, *, k: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    mask = LowerTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
+    return elementwise(
+        ffuncs.where,
+        mask,
+        x,
+        FillTensor(x.shape, x.element_type(0)),
+    )
+
+
+def diag(x, /, *, k: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim == 1 and k == 0:
+        vals = broadcast_to(expand_dims(x, axis=1), (x.shape[0], x.shape[0]))
+        return where(
+            eye(x.shape[0], k=k, dtype=np.bool_),
+            vals,
+            full((x.shape[0], x.shape[0]), 0, dtype=x.element_type),
+        )
+    if x.ndim in (1, 2):
+        from .fuse import compute
+
+        return cast(
+            LazyTensor,
+            lazy(np.ascontiguousarray(np.diag(compute(x).to_numpy(), k=k))),
+        )
+    raise ValueError(f"x must be a 1D or 2D array, got {x.ndim}D array")
+
+
+def diagonal(x, /, *, offset: int = 0) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    from .fuse import compute
+
+    return cast(
+        LazyTensor,
+        lazy(
+            np.ascontiguousarray(
+                np.diagonal(
+                    compute(x).to_numpy(),
+                    offset=offset,
+                    axis1=-2,
+                    axis2=-1,
+                )
+            )
+        ),
+    )
+
+
+def trace(x, /, *, offset: int = 0, dtype=None) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+    return sum(diagonal(x, offset=offset), axis=-1, dtype=dtype)
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:

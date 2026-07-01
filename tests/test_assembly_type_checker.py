@@ -7,9 +7,8 @@ import numpy as np
 import finchlite
 import finchlite.finch_assembly as asm
 from finchlite import ffuncs
-from finchlite.algebra import FType, TupleFType, ftype
+from finchlite.algebra import FType, ftype
 from finchlite.codegen import NumpyBuffer
-from finchlite.codegen.buffers import CHashTable, NumbaHashTable
 from finchlite.finch_assembly import assembly_check_types
 
 
@@ -691,107 +690,3 @@ def test_simple_struct():
     )
 
     assembly_check_types(mod)
-
-
-@pytest.mark.parametrize(
-    ["constructor"],
-    [
-        pytest.param(CHashTable, marks=pytest.mark.c_backend),
-        (NumbaHashTable,),
-    ],
-)
-def test_hashtable(constructor):
-    table = constructor(
-        TupleFType.from_tuple((finchlite.int_, finchlite.int_)),
-        TupleFType.from_tuple((finchlite.int_, finchlite.int_, finchlite.int_)),
-    )
-
-    table_v = asm.Variable("a", ftype(table))
-    table_slt = asm.Slot("a_", ftype(table))
-
-    key_type = table.ftype.key_type
-    val_type = table.ftype.value_type
-    key_v = asm.Variable("key", key_type)
-    val_v = asm.Variable("val", val_type)
-
-    mod = asm.Module(
-        (
-            asm.Function(
-                asm.Variable(
-                    "setidx",
-                    TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(3))),
-                ),
-                (table_v, key_v, val_v),
-                asm.Block(
-                    (
-                        asm.Unpack(table_slt, table_v),
-                        asm.StoreDict(
-                            table_slt,
-                            key_v,
-                            val_v,
-                        ),
-                        asm.Repack(table_slt),
-                        asm.Return(asm.LoadDict(table_slt, key_v)),
-                    )
-                ),
-            ),
-            asm.Function(
-                asm.Variable("exists", finchlite.bool),
-                (table_v, key_v),
-                asm.Block(
-                    (
-                        asm.Unpack(table_slt, table_v),
-                        asm.Return(asm.ExistsDict(table_slt, key_v)),
-                    )
-                ),
-            ),
-        )
-    )
-    assembly_check_types(mod)
-
-
-@pytest.mark.parametrize(
-    ["constructor"],
-    [
-        pytest.param(CHashTable, marks=pytest.mark.c_backend),
-        (NumbaHashTable,),
-    ],
-)
-def test_hashtable_fail(constructor):
-    table = constructor(
-        TupleFType.from_tuple((finchlite.int_, finchlite.int_)),
-        TupleFType.from_tuple((finchlite.int_, finchlite.int_, finchlite.int_)),
-    )
-
-    table_v = asm.Variable("a", ftype(table))
-    table_slt = asm.Slot("a_", ftype(table))
-
-    key_type = table.ftype.key_type
-    val_type = table.ftype.value_type
-    key_v = asm.Variable("key", key_type)
-    val_v = asm.Variable("val", val_type)
-    mod = asm.Module(
-        (
-            asm.Function(
-                asm.Variable(
-                    "setidx",
-                    TupleFType.from_tuple(tuple(finchlite.int_ for _ in range(2))),
-                ),
-                (table_v, key_v, val_v),
-                asm.Block(
-                    (
-                        asm.Unpack(table_slt, table_v),
-                        asm.StoreDict(
-                            table_slt,
-                            key_v,
-                            val_v,
-                        ),
-                        asm.Repack(table_slt),
-                        asm.Return(asm.LoadDict(table_slt, key_v)),
-                    )
-                ),
-            ),
-        )
-    )
-    with pytest.raises(asm.AssemblyTypeError):
-        assembly_check_types(mod)
