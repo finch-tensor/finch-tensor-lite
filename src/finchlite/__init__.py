@@ -30,12 +30,14 @@ from .algebra import (
     intp,
     isdtype,
     none_,
+    result_type,
     str_,
     uint8,
     uint16,
     uint32,
     uint64,
 )
+from .array_namespace_info import __array_namespace_info__
 from .autoschedule import (
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
@@ -275,6 +277,7 @@ __all__ = [
     "UniformStats",
     "UpperTriangleTensor",
     "__array_api_version__",
+    "__array_namespace_info__",
     "abs",
     "acos",
     "acosh",
@@ -413,6 +416,7 @@ __all__ = [
     "reduce",
     "remainder",
     "reshape",
+    "result_type",
     "round",
     "same",
     "set_default_scheduler",

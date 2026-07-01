@@ -347,6 +347,76 @@ def test_asarray_existing_finch_tensors_pass_through():
     assert scalar.dtype == finchlite.int64
 
 
+def test_array_namespace_info():
+    info = finchlite.__array_namespace_info__()
+
+    assert info.capabilities() == {
+        "boolean indexing": False,
+        "data-dependent shapes": False,
+        "max dimensions": 5,
+    }
+    assert info.default_device() is None
+    assert info.devices() == [None]
+    assert info.default_dtypes() == {
+        "real floating": finchlite.float64,
+        "complex floating": finchlite.complex128,
+        "integral": finchlite.int64,
+        "indexing": finchlite.intp,
+    }
+    assert info.dtypes(kind="bool") == {"bool": finchlite.bool}
+    assert info.dtypes(kind="integral") == {
+        "int8": finchlite.int8,
+        "int16": finchlite.int16,
+        "int32": finchlite.int32,
+        "int64": finchlite.int64,
+        "uint8": finchlite.uint8,
+        "uint16": finchlite.uint16,
+        "uint32": finchlite.uint32,
+        "uint64": finchlite.uint64,
+    }
+    assert set(info.dtypes(kind=("real floating", "complex floating"))) == {
+        "float16",
+        "float32",
+        "float64",
+        "complex64",
+        "complex128",
+    }
+
+    with pytest.raises(ValueError):
+        info.default_dtypes(device="gpu")
+
+
+def test_result_type():
+    assert finchlite.result_type(finchlite.int8, finchlite.int16) == finchlite.int16
+    assert finchlite.result_type(finchlite.int32, finchlite.uint32) == finchlite.int64
+    assert (
+        finchlite.result_type(finchlite.float32, finchlite.float64)
+        == finchlite.float64
+    )
+    assert (
+        finchlite.result_type(finchlite.complex64, finchlite.complex128)
+        == finchlite.complex128
+    )
+    assert finchlite.result_type(
+        finchlite.asarray([1], dtype=finchlite.int32), finchlite.uint16
+    ) == finchlite.int32
+
+
+def test_result_type_python_scalars_are_weak():
+    assert finchlite.result_type(finchlite.bool, True) == finchlite.bool
+    assert finchlite.result_type(finchlite.int32, 1) == finchlite.int32
+    assert finchlite.result_type(finchlite.float32, 1, 1.0) == finchlite.float32
+    assert (
+        finchlite.result_type(finchlite.complex64, 1, 1.0, 1j)
+        == finchlite.complex64
+    )
+
+    with pytest.raises(TypeError):
+        finchlite.result_type(1, 1.0)
+    with pytest.raises(TypeError):
+        finchlite.result_type(finchlite.int32, 1.0)
+
+
 def test_lazy_python_scalars_keep_builtin_dtypes():
     assert finchlite.lazy(True).dtype == finchlite.bool_
     assert finchlite.lazy(1).dtype == finchlite.int_

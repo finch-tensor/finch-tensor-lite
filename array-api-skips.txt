@@ -17,8 +17,6 @@ array_api_tests/test_signatures.py::test_func_signature[unique_inverse]
 array_api_tests/test_signatures.py::test_func_signature[unique_values]
 # creation functions
 array_api_tests/test_signatures.py::test_func_signature[meshgrid]
-# inspection functions
-array_api_tests/test_signatures.py::test_func_signature[result_type]
 # other functions
 array_api_tests/test_signatures.py::test_func_signature[argsort]
 array_api_tests/test_signatures.py::test_func_signature[sort]
@@ -83,13 +81,8 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[f
 # test_data_type_functions
 
 # not implemented
-array_api_tests/test_data_type_functions.py::test_result_type
 array_api_tests/test_data_type_functions.py::test_finfo[Float32]
-array_api_tests/test_data_type_functions.py::TestResultType::test_with_scalars
-array_api_tests/test_data_type_functions.py::TestResultType::test_result_type
-array_api_tests/test_data_type_functions.py::TestResultType::test_shuffled
 array_api_tests/test_searching_functions.py::test_searchsorted
-array_api_tests/test_data_type_functions.py::TestResultType::test_arrays_and_dtypes
 
 # test_has_names
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
@@ -125,7 +118,6 @@ array_api_tests/test_has_names.py::test_has_names[manipulation-tile]
 array_api_tests/test_has_names.py::test_has_names[manipulation-unstack]
 array_api_tests/test_has_names.py::test_has_names[sorting-argsort]
 array_api_tests/test_has_names.py::test_has_names[sorting-sort]
-array_api_tests/test_has_names.py::test_has_names[data_type-result_type]
 array_api_tests/test_has_names.py::test_has_names[indexing-take]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack__]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack_device__]
@@ -293,17 +285,6 @@ array_api_tests/test_statistical_functions.py::test_cumulative_sum
 
 # issue: finfo-dtype0 — finfo does not handle finchlite dtype objects (only string names)
 array_api_tests/test_data_type_functions.py::test_finfo[dtype0]
-
-# issue: missing-namespace-info — __array_namespace_info__ not implemented
-array_api_tests/test_has_names.py::test_has_names[info-__array_namespace_info__]
-array_api_tests/test_inspection_functions.py::test_array_namespace_info
-array_api_tests/test_inspection_functions.py::test_array_namespace_info_dtypes
-array_api_tests/test_signatures.py::test_func_signature[__array_namespace_info__]
-array_api_tests/test_signatures.py::test_info_func_signature[capabilities]
-array_api_tests/test_signatures.py::test_info_func_signature[default_device]
-array_api_tests/test_signatures.py::test_info_func_signature[default_dtypes]
-array_api_tests/test_signatures.py::test_info_func_signature[devices]
-array_api_tests/test_signatures.py::test_info_func_signature[dtypes]
 
 # issue: missing-device — device attribute and to_device method not implemented
 array_api_tests/test_has_names.py::test_has_names[array_attribute-device]
