@@ -61,6 +61,16 @@ def diag(x, /, *, k: int = 0):
     return compute(lazy.diag(x, k=k))
 
 
+def diff(x, /, *, axis: int = -1, n: int = 1, prepend=None, append=None):
+    if (
+        isinstance(x, lazy.LazyTensor)
+        or isinstance(prepend, lazy.LazyTensor)
+        or isinstance(append, lazy.LazyTensor)
+    ):
+        return lazy.diff(x, axis=axis, n=n, prepend=prepend, append=append)
+    return compute(lazy.diff(x, axis=axis, n=n, prepend=prepend, append=append))
+
+
 def diagonal(x, /, *, offset: int = 0):
     if isinstance(x, lazy.LazyTensor):
         return lazy.diagonal(x, offset=offset)

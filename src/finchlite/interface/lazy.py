@@ -1785,6 +1785,53 @@ def trace(x, /, *, offset: int = 0, dtype=None) -> LazyTensor:
     return sum(diagonal(x, offset=offset), axis=-1, dtype=dtype)
 
 
+def diff(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    n: int = 1,
+    prepend=None,
+    append=None,
+) -> LazyTensor:
+    x = lazy(x)
+    if not isinstance(n, int) or isinstance(n, bool):
+        raise TypeError(f"n must be an integer, got {type(n).__name__}")
+    if n < 0:
+        raise ValueError(f"n must be non-negative, got {n}")
+    if prepend is not None or append is not None:
+        raise NotImplementedError("diff does not yet support prepend or append")
+    if isinstance(x.element_type, FDTypeBoolean):
+        raise TypeError("diff requires a numeric input array")
+
+    axis = normalize_axis_index(axis, x.ndim)
+    if n == 0:
+        return x
+    if x.shape[axis] <= n:
+        shape = tuple(0 if i == axis else dim for i, dim in enumerate(x.shape))
+        return empty(shape, dtype=x.element_type)
+
+    moved = moveaxis(x, axis, -1)
+    axis_size = moved.shape[-1]
+    main = eye(axis_size, axis_size - 1, dtype=moved.element_type)
+    lower = eye(axis_size, axis_size - 1, k=-1, dtype=moved.element_type)
+    negative_part = reduce(
+        ffuncs.add,
+        multiply(expand_dims(moved, axis=-1), main),
+        axis=-2,
+    )
+    positive_part = reduce(
+        ffuncs.add,
+        multiply(expand_dims(moved, axis=-1), lower),
+        axis=-2,
+    )
+    return diff(
+        moveaxis(subtract(positive_part, negative_part), -1, axis),
+        axis=axis,
+        n=n - 1,
+    )
+
+
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.

@@ -158,6 +158,52 @@ def test_diag(k):
     )
 
 
+@pytest.mark.parametrize(
+    "arr, axis, n",
+    [
+        (np.arange(5, dtype=np.int32), -1, 1),
+        (np.array([0, 2, 7, 15], dtype=np.uint8), -1, 2),
+        (np.arange(6, dtype=np.float32).reshape((2, 3)), -1, 1),
+        (np.arange(24, dtype=np.int64).reshape((2, 3, 4)), 0, 1),
+        (np.arange(24, dtype=np.int64).reshape((2, 3, 4)), 1, 2),
+        (np.arange(24, dtype=np.int64).reshape((2, 3, 4)), 2, 2),
+    ],
+)
+def test_diff(arr, axis, n):
+    expected = np.diff(arr, axis=axis, n=n)
+
+    np.testing.assert_array_equal(
+        finchlite.diff(arr, axis=axis, n=n).to_numpy(),
+        expected,
+    )
+    np.testing.assert_array_equal(
+        finchlite.compute(finchlite.diff(finchlite.lazy(arr), axis=axis, n=n))
+        .to_numpy(),
+        expected,
+    )
+
+
+def test_diff_n_zero():
+    arr = np.arange(6, dtype=np.float32).reshape((2, 3))
+
+    np.testing.assert_array_equal(finchlite.diff(arr, n=0).to_numpy(), arr)
+    np.testing.assert_array_equal(
+        finchlite.compute(finchlite.diff(finchlite.lazy(arr), n=0)).to_numpy(),
+        arr,
+    )
+
+
+def test_diff_empty_axis():
+    arr = np.arange(3, dtype=np.int32)
+    expected = np.diff(arr, n=4)
+
+    np.testing.assert_array_equal(finchlite.diff(arr, n=4).to_numpy(), expected)
+    np.testing.assert_array_equal(
+        finchlite.compute(finchlite.diff(finchlite.lazy(arr), n=4)).to_numpy(),
+        expected,
+    )
+
+
 @pytest.mark.parametrize("offset", [-1, 0, 1])
 def test_trace(offset):
     arr = np.arange(12, dtype=np.int32).reshape((3, 4))
