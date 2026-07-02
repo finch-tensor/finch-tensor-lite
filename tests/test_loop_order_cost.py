@@ -1,4 +1,6 @@
+import time
 from collections import OrderedDict
+from functools import reduce
 
 import pytest
 
@@ -30,13 +32,17 @@ def _sparse(shape, nnz, rng):
 
 
 def _ref_cost(A, B, order):
-    join = A[:, :, None] * B[None, :, :]
-    cost = sum(
-        (join != 0)
-        .any(axis=tuple(AXES[n] for n in AXES if n not in set(order[:k])))
-        .sum()
-        for k in range(1, len(order) + 1)
-    )
+    masks = {
+        frozenset(("i", "j")): A[:, :, None] != 0,
+        frozenset(("j", "k")): B[None, :, :] != 0,
+    }
+    cost = 0.0
+    for k in range(1, len(order) + 1):
+        prefix = set(order[:k])
+        rels = [mask for axes, mask in masks.items() if axes & prefix]
+        subquery = reduce(np.logical_and, rels)
+        reduce_axes = tuple(AXES[n] for n in AXES if n not in prefix)
+        cost += subquery.any(axis=reduce_axes).sum()
     if not is_subsequence(("i", "j"), order):
         cost += np.count_nonzero(A)
     if not is_subsequence(("j", "k"), order):
@@ -53,6 +59,7 @@ def _cost(A, B, order, sf):
 
 
 def test_loop_order_cost():
+    test_start = time.perf_counter()
     rng = np.random.default_rng(42)
     sf = ExactStatsFactory()
     cases = [
@@ -70,7 +77,73 @@ def test_loop_order_cost():
             )
         )
 
+    n_costs = 0
+    cost_time = 0.0
+    ref_time = 0.0
+
     for A, B in cases:
         for order in ORDERS:
             names = tuple(f.name for f in order)
-            assert _cost(A, B, order, sf) == pytest.approx(_ref_cost(A, B, names))
+
+            t0 = time.perf_counter()
+            got = _cost(A, B, order, sf)
+            cost_time += time.perf_counter() - t0
+            n_costs += 1
+
+            t0 = time.perf_counter()
+            expected = _ref_cost(A, B, names)
+            ref_time += time.perf_counter() - t0
+
+            assert got == pytest.approx(expected)
+
+    avg_cost_ms = cost_time / n_costs * 1000
+    avg_ref_ms = ref_time / n_costs * 1000
+    total_time = time.perf_counter() - test_start
+    print(
+        f"loop_order_cost: {cost_time:.4f}s total "
+        f"({n_costs} calls, {avg_cost_ms:.2f}ms avg)"
+    )
+    print(
+        f"_ref_cost:       {ref_time:.4f}s total "
+        f"({n_costs} calls, {avg_ref_ms:.2f}ms avg)"
+    )
+    print(f"test total:      {total_time:.4f}s")
+
+
+def test_empty_relation():
+    test_start = time.perf_counter()
+    sf = ExactStatsFactory()
+    i, j, k, l, m = (Field(name) for name in "ijklm")
+    a, b, c, d = (Alias(name) for name in "ABCD")
+    expr = MapJoin(
+        Literal(ffuncs.mul),
+        (
+            Table(a, (i, j)),
+            Table(b, (j, k)),
+            Table(c, (k, l)),
+            Table(d, (l, m)),
+        ),
+    )
+    bindings = OrderedDict(
+        {
+            a: sf(fl.asarray(np.ones((3, 3))), (i, j)),
+            b: sf(fl.asarray(np.ones((3, 3))), (j, k)),
+            c: sf(fl.asarray(np.ones((3, 3))), (k, l)),
+            d: sf(fl.asarray(np.zeros((3, 3))), (l, m)),
+        }
+    )
+
+    t0 = time.perf_counter()
+    forward = loop_order_cost(expr, (i, j, k, l, m), sf, bindings)
+    forward_time = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    reverse = loop_order_cost(expr, (m, l, k, j, i), sf, bindings)
+    reverse_time = time.perf_counter() - t0
+
+    assert forward > reverse
+
+    total_time = time.perf_counter() - test_start
+    print(f"loop_order_cost forward: {forward_time:.4f}s")
+    print(f"loop_order_cost reverse: {reverse_time:.4f}s")
+    print(f"test total:              {total_time:.4f}s")
