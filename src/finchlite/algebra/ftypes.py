@@ -1,6 +1,6 @@
 import builtins
 from abc import ABC, abstractmethod
-from collections import namedtuple
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
@@ -132,6 +132,44 @@ class FDTypeFloat(FDTypeNumeric):
 
 
 class FDTypeBoolean(FDTypeOrdered): ...
+
+
+@dataclass(frozen=True, slots=True)
+class FInfo:
+    bits: builtins.int
+    eps: builtins.float
+    max: builtins.float
+    min: builtins.float
+    smallest_normal: builtins.float
+    dtype: FDTypeFloat
+
+
+@dataclass(frozen=True, slots=True)
+class IInfo:
+    bits: builtins.int
+    max: builtins.int
+    min: builtins.int
+    dtype: FDTypeInteger
+
+
+def _finfo(dtype: FDTypeFloat, info) -> FInfo:
+    return FInfo(
+        bits=builtins.int(info.bits),
+        eps=builtins.float(info.eps),
+        max=builtins.float(info.max),
+        min=builtins.float(info.min),
+        smallest_normal=builtins.float(info.smallest_normal),
+        dtype=dtype,
+    )
+
+
+def _iinfo(dtype: FDTypeInteger, info) -> IInfo:
+    return IInfo(
+        bits=builtins.int(info.bits),
+        max=builtins.int(info.max),
+        min=builtins.int(info.min),
+        dtype=dtype,
+    )
 
 
 class FDTypeBuiltin(FDType):
@@ -266,7 +304,7 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         """
         The finfo object for this float type.
         """
-        return np.float64.finfo
+        return _finfo(self, np.float64.finfo)
 
     @property
     def type_min(self):
@@ -290,7 +328,7 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
 
     @property
     def finfo(self):
-        return np.float64.finfo
+        return _finfo(self, np.float64.finfo)
 
     @property
     def type_min(self):
@@ -352,7 +390,7 @@ class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
         """
         The iinfo object for this integer type.
         """
-        return np.iinfo(self.dtype)
+        return _iinfo(self, np.iinfo(self.dtype))
 
     @property
     def type_min(self):
@@ -383,7 +421,7 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
         """
         The finfo object for this float type.
         """
-        return np.finfo(self.dtype)
+        return _finfo(self, np.finfo(self.dtype))
 
     @property
     def type_min(self):

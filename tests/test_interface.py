@@ -1,3 +1,4 @@
+import dataclasses
 import math
 import warnings
 
@@ -404,13 +405,30 @@ def test_array_object_metadata():
 
 def test_finfo_returns_python_scalars():
     info = finchlite.finfo(finchlite.float32)
+    property_info = finchlite.float32.finfo
 
+    assert dataclasses.is_dataclass(info)
+    assert isinstance(info, finchlite.FInfo)
+    assert info == property_info
     assert isinstance(info.bits, int)
     assert isinstance(info.eps, float)
     assert isinstance(info.max, float)
     assert isinstance(info.min, float)
     assert isinstance(info.smallest_normal, float)
     assert info.dtype == finchlite.float32
+
+
+def test_iinfo_returns_python_scalars():
+    info = finchlite.iinfo(finchlite.int16)
+    property_info = finchlite.int16.iinfo
+
+    assert dataclasses.is_dataclass(info)
+    assert isinstance(info, finchlite.IInfo)
+    assert info == property_info
+    assert isinstance(info.bits, int)
+    assert isinstance(info.max, int)
+    assert isinstance(info.min, int)
+    assert info.dtype == finchlite.int16
 
 
 def test_result_type():
