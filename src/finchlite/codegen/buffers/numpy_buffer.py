@@ -4,6 +4,7 @@ from typing import NamedTuple
 import numpy as np
 
 import numba
+from mlir.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 from finchlite.algebra import FType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
@@ -316,33 +317,24 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
         )
         return MLIRBufferFields(c0)
 
-    # def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
-    #     """
-    #     Unpack the buffer into MLIR context.
-    #     """
-    #     ...
+    def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
+        raw = ctx(val)
+        c0 = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{c0} = builtin.unrealized_conversion_cast {raw} "
+            f": !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> "
+            f"to {self.mlir_type()}"
+        )
+        return MLIRBufferFields(c0)
 
-    # def mlir_repack(self, ctx: "MLIRContext", lhs, obj):
-    #     """
-    #     Repack the buffer from MLIR context.
-    #     """
-    #     ...
+    def mlir_repack(self, ctx: "MLIRContext", lhs, obj):
+        raise NotImplementedError
 
-    # def serialize_to_mlir(self, obj):
-    #     """
-    #     Serialize the NumPy buffer to a MLIR-compatible structure.
-    #     """
-    #     ...
+    def serialize_to_mlir(self, obj):
+        return get_ranked_memref_descriptor(obj.arr)
 
-    # def deserialize_from_mlir(self, obj, mlir_buffer):
-    #     """
-    #     Update this buffer based on how the MLIR call modified the
-    #     MLIRNumpyBuffer structure.
-    #     """
-    #     ...
+    def deserialize_from_mlir(self, obj, mlir_buffer):
+        obj.arr = ranked_memref_to_numpy(ctypes.pointer(mlir_buffer))
 
-    # def construct_from_mlir(self, mlir_buffer):
-    #     """
-    #     Construct a NumpyBuffer from a MLIR-compatible structure.
-    #     """
-    #     ...
+    def construct_from_mlir(self, mlir_buffer):
+        return NumpyBuffer(ranked_memref_to_numpy(ctypes.pointer(mlir_buffer)))

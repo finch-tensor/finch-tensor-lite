@@ -1,11 +1,19 @@
+import ctypes
 from abc import ABC, abstractmethod
+from functools import cache
 from typing import Any
 
 import numpy as np
 
+from mlir.runtime import make_nd_memref_descriptor
+
 from finchlite import algebra
 from finchlite import finch_assembly as asm
-from finchlite.algebra import FType, ffuncs
+from finchlite.algebra import (
+    FType,
+    StructFType,
+    ffuncs,
+)
 from finchlite.finch_assembly import BufferFType
 from finchlite.symbolic import Context, ScopedDict
 
@@ -201,6 +209,35 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
+def mlir_getattr(fmt: FType, ctx, obj, attr):
+    idx = fmt.struct_fieldnames.index(attr)
+    res = ctx.new_ssa()
+    ctx.exec(
+        f"{ctx.feed}{res} = llvm.extractvalue {obj}[{idx}] : {mlir_struct_type(fmt)}"
+    )
+    return res
+
+
+def mlir_struct_type(fmt: StructFType) -> str:
+    fields = []
+    for _, t in fmt.struct_fields:
+        match t:
+            case StructFType():
+                fields.append(mlir_struct_type(t))
+            case _:
+                s = mlir_type(t)
+                if s.startswith("memref<") and s.endswith(">"):
+                    *dims, _ = s[len("memref<") : -1].split("x")
+                    s = (
+                        f"!llvm.struct<(ptr, ptr, i64, "
+                        f"array<{len(dims)} x i64>, array<{len(dims)} x i64>)>"
+                    )
+                elif s == "index":
+                    s = "i64"
+                fields.append(s)
+    return f"!llvm.struct<({', '.join(fields)})>"
+
+
 class MLIRArgumentFType(ABC):
     @abstractmethod
     def mlir_type(self): ...
@@ -213,20 +250,6 @@ class MLIRArgumentFType(ABC):
 
     @abstractmethod
     def construct_from_mlir(self, mlir_buffer): ...
-
-
-def numpy_to_mlir_types(t):
-    dt = np.dtype(t.dtype)
-    if dt.kind == "b":
-        return "i1"
-
-    bits = dt.itemsize * 8
-    if dt.kind in ("i", "u"):
-        return f"i{bits}"
-    if dt.kind == "f":
-        return f"f{bits}"
-
-    raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
 
 
 def mlir_type(t: FType):
@@ -245,6 +268,146 @@ def mlir_type(t: FType):
             return numpy_to_mlir_types(t)
         case _:
             raise NotImplementedError(f"No MLIR type mapping for {t}")
+
+
+def numpy_to_mlir_types(t):
+    dt = np.dtype(t.dtype)
+    if dt.kind == "b":
+        return "i1"
+
+    bits = dt.itemsize * 8
+    if dt.kind in ("i", "u"):
+        return f"i{bits}"
+    if dt.kind == "f":
+        return f"f{bits}"
+
+    raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
+
+
+def mlir_ctype(s: str):
+    if s.startswith("memref<") and s.endswith(">"):
+        return mlir_memref_ctype(s)
+
+    match s:
+        case "i1":
+            return ctypes.c_bool
+        case "i8":
+            return ctypes.c_int8
+        case "i16":
+            return ctypes.c_int16
+        case "i32":
+            return ctypes.c_int32
+        case "index" | "i64":
+            return ctypes.c_int64
+        case "f32":
+            return ctypes.c_float
+        case "f64":
+            return ctypes.c_double
+        case _:
+            raise NotImplementedError(f"No ctypes mapping for MLIR type {s}")
+
+
+@cache
+def mlir_memref_ctype(s: str):
+    *dims, elem = s[len("memref<") : -1].split("x")
+    return make_nd_memref_descriptor(len(dims), mlir_ctype(elem))
+
+
+@cache
+def mlir_struct_ctype(fmt: StructFType):
+    fields = [(name, mlir_field_ctype(t)) for name, t in fmt.struct_fields]
+    return type("MLIR" + fmt.struct_name, (ctypes.Structure,), {"_fields_": fields})
+
+
+def mlir_field_ctype(t: FType):
+    match t:
+        case StructFType():
+            return mlir_struct_ctype(t)
+        case _:
+            return mlir_ctype(mlir_type(t))
+
+
+def serialize_to_mlir(fmt: FType, obj):
+    match fmt:
+        case MLIRArgumentFType():
+            return fmt.serialize_to_mlir(obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype))
+        case algebra.int_ | algebra.float_ | algebra.bool_:
+            return mlir_ctype(mlir_type(fmt))(obj)
+        case algebra.none_:
+            return None
+        case StructFType():
+            return serialize_struct_to_mlir(fmt, obj)
+        case _:
+            raise NotImplementedError(f"No MLIR serialization mapping for {fmt}")
+
+
+def serialize_struct_to_mlir(fmt: StructFType, obj):
+    args = [
+        serialize_to_mlir(t, fmt.struct_getattr(obj, name))
+        for name, t in fmt.struct_fields
+    ]
+    return mlir_struct_ctype(fmt)(*args)
+
+
+def deserialize_from_mlir(fmt: FType, obj, c_obj):
+    match fmt:
+        case MLIRArgumentFType():
+            fmt.deserialize_from_mlir(obj, c_obj)
+        case StructFType():
+            deserialize_struct_from_mlir(fmt, obj, c_obj)
+        case _:
+            return
+
+
+def deserialize_struct_from_mlir(fmt: StructFType, obj, c_obj):
+    if not fmt.is_mutable:
+        return
+    for name, t in fmt.struct_fields:
+        fmt.struct_setattr(obj, name, construct_from_mlir(t, getattr(c_obj, name)))
+
+
+def construct_from_mlir(fmt: FType, mlir_obj):
+    match fmt:
+        case MLIRArgumentFType():
+            return fmt.construct_from_mlir(mlir_obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return fmt(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.int_:
+            return int(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.float_:
+            return float(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.bool_:
+            return bool(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.none_:
+            return None
+        case StructFType():
+            return construct_struct_from_mlir(fmt, mlir_obj)
+        case _:
+            return fmt(mlir_obj)
+
+
+def construct_struct_from_mlir(fmt: StructFType, mlir_obj):
+    return fmt.from_fields(
+        *(
+            construct_from_mlir(t, getattr(mlir_obj, name))
+            for name, t in fmt.struct_fields
+        )
+    )
+
+
+def resolve(self, node):
+    match node:
+        case asm.Slot(var_n, var_t):
+            if var_n in self.slots:
+                var_o = self.slots[var_n]
+                return asm.Stack(var_o, var_t)
+            raise KeyError(f"Slot {var_n} not found in context")
+        case asm.Stack(_, _):
+            return node
+        case _:
+            raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
 
 
 class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
@@ -282,20 +445,49 @@ class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
         ...
 
 
+class MLIRStackFType(ABC):
+    """
+    Abstract base class for symbolic formats in MLIR. Stack formats must also
+    support other functions with symbolic inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def mlir_unpack(self, ctx, lhs, rhs):
+        """
+        Convert a value to a symbolic representation in MLIR. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_repack(self, ctx, lhs, rhs):
+        """
+        Update an object based on a symbolic representation. The `rhs` is the
+        symbolic representation to update from, and `lhs` is a variable name referring
+        to the original object to update.
+        """
+        ...
+
+
 class MLIRContext(Context):
     def __init__(
         self,
         tab="  ",
         indent=1,
         bindings=None,
+        slots=None,
     ):
         if bindings is None:
             bindings = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
 
         super().__init__()
         self.tab = tab
         self.indent = indent
         self.bindings = bindings
+        self.slots = slots
 
     @property
     def feed(self) -> str:
@@ -315,12 +507,14 @@ class MLIRContext(Context):
         blk.tab = self.tab
         blk.indent = self.indent
         blk.bindings = self.bindings
+        blk.slots = self.slots
         return blk
 
     def subblock(self):
         blk = self.block()
         blk.indent = self.indent + 1
         blk.bindings = self.bindings.scope()
+        blk.slots = self.slots.scope()
         return blk
 
     def __call__(self, prgm: asm.AssemblyNode):
@@ -350,17 +544,52 @@ class MLIRContext(Context):
             case asm.Call(asm.Literal(op), args):
                 return mlir_function_call(op, self, *args)
 
-            case asm.Load(buffer, index):
-                buf_t = buffer.result_type
+            case asm.Length(buffer):
+                buf = self.resolve(buffer)
+                buf_t = buf.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_load(self, buffer, index)
+                return buf_t.mlir_length(self, buf)
+
+            case asm.Load(buffer, index):
+                buf = self.resolve(buffer)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                return buf_t.mlir_load(self, buf, index)
 
             case asm.Store(buffer, index, value):
-                buf_t = buffer.result_type
+                buf = self.resolve(buffer)
+                buf_t = buf.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_store(self, buffer, index, value)
+                return buf_t.mlir_store(self, buf, index, value)
+
+            case asm.Resize(buffer, size):
+                buf = self.resolve(buffer)
+                buf_t = buf.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                return buf_t.mlir_resize(self, buf, size)
+
+            case asm.GetAttr(obj, attr):
+                obj_t = obj.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                if not obj_t.struct_hasattr(attr.val):
+                    raise ValueError("trying to get missing attr")
+                return mlir_getattr(obj_t, self, self(obj), attr.val)
+
+            case asm.Unpack(asm.Slot(var_n, var_t), val):
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
+                self.slots[var_n] = var_t.mlir_unpack(self, var_n, val)
+                return None
+
+            case asm.Repack(asm.Slot(var_n, var_t)):
+                obj = self.slots[var_n]
+                var_t.mlir_repack(self, var_n, obj)
+                return None
 
             case asm.Block(bodies):
                 ctx_2 = self.block()
