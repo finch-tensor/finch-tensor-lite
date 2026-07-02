@@ -2036,11 +2036,26 @@ def cumulative(
     x,
     /,
     *,
-    axis: int = 0,
+    axis: int | None = None,
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
     x = lazy(x)
+    if x.ndim == 0:
+        raise ValueError("cumulative requires an array with at least one dimension")
+    if axis is None:
+        if x.ndim != 1:
+            raise ValueError(
+                "axis must be specified for arrays with more than one axis"
+            )
+        axis = 0
+    if not isinstance(include_initial, bool):
+        raise TypeError(
+            "include_initial must be a boolean, "
+            f"got {type(include_initial).__name__}"
+        )
+
+
     axis = normalize_axis_index(axis, x.ndim)
     explicit_dtype = dtype is not None
     dtype = ftype(dtype) if explicit_dtype else x.element_type
@@ -2132,20 +2147,6 @@ def cumulative_sum(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
-    x = lazy(x)
-    if x.ndim == 0:
-        raise ValueError("cumulative_sum requires an array with at least one dimension")
-    if axis is None:
-        if x.ndim != 1:
-            raise ValueError(
-                "axis must be specified for arrays with more than one axis"
-            )
-        axis = 0
-    if not isinstance(include_initial, bool):
-        raise TypeError(
-            "include_initial must be a boolean, "
-            f"got {type(include_initial).__name__}"
-        )
     if isinstance(x.element_type, FDTypeBoolean):
         raise TypeError("cumulative_sum requires a numeric input array")
 
@@ -2166,20 +2167,6 @@ def cumulative_prod(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
-    x = lazy(x)
-    if x.ndim == 0:
-        raise ValueError("cumulative_prod requires an array with at least one dimension")
-    if axis is None:
-        if x.ndim != 1:
-            raise ValueError(
-                "axis must be specified for arrays with more than one axis"
-            )
-        axis = 0
-    if not isinstance(include_initial, bool):
-        raise TypeError(
-            "include_initial must be a boolean, "
-            f"got {type(include_initial).__name__}"
-        )
     if isinstance(x.element_type, FDTypeBoolean):
         raise TypeError("cumulative_prod requires a numeric input array")
 
