@@ -2158,6 +2158,40 @@ def cumulative_sum(
     )
 
 
+def cumulative_prod(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    dtype=None,
+    include_initial: bool = False,
+) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim == 0:
+        raise ValueError("cumulative_prod requires an array with at least one dimension")
+    if axis is None:
+        if x.ndim != 1:
+            raise ValueError(
+                "axis must be specified for arrays with more than one axis"
+            )
+        axis = 0
+    if not isinstance(include_initial, bool):
+        raise TypeError(
+            "include_initial must be a boolean, "
+            f"got {type(include_initial).__name__}"
+        )
+    if isinstance(x.element_type, FDTypeBoolean):
+        raise TypeError("cumulative_prod requires a numeric input array")
+
+    return cumulative(
+        ffuncs.mul,
+        x,
+        axis=axis,
+        dtype=dtype,
+        include_initial=include_initial,
+    )
+
+
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.
@@ -2185,6 +2219,29 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
     """
     shape = _broadcast_shape(*(array.shape for array in arrays))
     return tuple(broadcast_to(arr, shape) for arr in arrays)
+
+
+def meshgrid(*arrays, indexing: str = "xy") -> tuple[LazyTensor, ...]:
+    if indexing not in {"xy", "ij"}:
+        raise ValueError("indexing must be either 'xy' or 'ij'")
+    arrays = tuple(lazy(arr) for arr in arrays)
+    for arr in arrays:
+        if arr.ndim != 1:
+            raise ValueError("meshgrid input arrays must be one-dimensional")
+
+    ndim = len(arrays)
+    shape = tuple(arr.shape[0] for arr in arrays)
+    if indexing == "xy" and ndim > 1:
+        shape = (shape[1], shape[0], *shape[2:])
+
+    out = []
+    for i, arr in enumerate(arrays):
+        axis = i
+        if indexing == "xy" and ndim > 1:
+            axis = 1 if i == 0 else 0 if i == 1 else i
+        arr = expand_dims(arr, axis=tuple(d for d in range(ndim) if d != axis))
+        out.append(broadcast_to(arr, shape))
+    return tuple(out)
 
 
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):

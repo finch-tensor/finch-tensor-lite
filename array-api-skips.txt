@@ -16,7 +16,6 @@ array_api_tests/test_signatures.py::test_func_signature[unique_counts]
 array_api_tests/test_signatures.py::test_func_signature[unique_inverse]
 array_api_tests/test_signatures.py::test_func_signature[unique_values]
 # creation functions
-array_api_tests/test_signatures.py::test_func_signature[meshgrid]
 # other functions
 array_api_tests/test_signatures.py::test_func_signature[argsort]
 array_api_tests/test_signatures.py::test_func_signature[sort]
@@ -33,7 +32,6 @@ array_api_tests/test_signatures.py::test_func_signature[repeat]
 array_api_tests/test_signatures.py::test_func_signature[tile]
 array_api_tests/test_signatures.py::test_func_signature[unstack]
 array_api_tests/test_signatures.py::test_func_signature[take_along_axis]
-array_api_tests/test_signatures.py::test_func_signature[cumulative_prod]
 # linalg namespace
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.cross]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.cholesky]
@@ -73,8 +71,6 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[f
 
 # test_data_type_functions
 
-# not implemented
-array_api_tests/test_data_type_functions.py::test_finfo[Float32]
 array_api_tests/test_searching_functions.py::test_searchsorted
 
 # test_has_names
@@ -99,7 +95,6 @@ array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
 array_api_tests/test_has_names.py::test_has_names[set-unique_values]
 array_api_tests/test_has_names.py::test_has_names[searching-searchsorted]
 array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
-array_api_tests/test_has_names.py::test_has_names[creation-meshgrid]
 array_api_tests/test_has_names.py::test_has_names[manipulation-flip]
 array_api_tests/test_has_names.py::test_has_names[manipulation-repeat]
 array_api_tests/test_has_names.py::test_has_names[manipulation-roll]
@@ -111,7 +106,6 @@ array_api_tests/test_has_names.py::test_has_names[indexing-take]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack__]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack_device__]
 array_api_tests/test_has_names.py::test_has_names[array_method-__setitem__]
-array_api_tests/test_has_names.py::test_has_names[array_attribute-T]
 array_api_tests/test_has_names.py::test_has_names[fft-irfft]
 array_api_tests/test_has_names.py::test_has_names[fft-ifft]
 array_api_tests/test_has_names.py::test_has_names[fft-rfftfreq]
@@ -127,7 +121,6 @@ array_api_tests/test_has_names.py::test_has_names[fft-fftshift]
 array_api_tests/test_has_names.py::test_has_names[fft-fftfreq]
 array_api_tests/test_has_names.py::test_has_names[fft-hfft]
 array_api_tests/test_has_names.py::test_has_names[fft-rfft]
-array_api_tests/test_has_names.py::test_has_names[statistical-cumulative_prod]
 array_api_tests/test_has_names.py::test_has_names[indexing-take_along_axis]
 
 # test_indexing_functions
@@ -261,23 +254,6 @@ array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i < 0 and x2_i 
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i > 0 and x2_i is +0) -> +infinity]
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i is -0 and x2_i < 0) -> +0]
 # test_statistical_functions
-
-# check for errors
-# not implemented
-array_api_tests/test_statistical_functions.py::test_cumulative_prod
-# issue: finfo-dtype0 — finfo does not handle finchlite dtype objects (only string names)
-array_api_tests/test_data_type_functions.py::test_finfo[dtype0]
-
-# issue: missing-device — device attribute and to_device method not implemented
-array_api_tests/test_has_names.py::test_has_names[array_attribute-device]
-array_api_tests/test_has_names.py::test_has_names[array_method-to_device]
-array_api_tests/test_signatures.py::test_array_method_signature[to_device]
-
-# issue: missing-mT — mT (matrix transpose) attribute not implemented
-array_api_tests/test_has_names.py::test_has_names[array_attribute-mT]
-
-# issue: missing-size — size attribute not implemented
-array_api_tests/test_has_names.py::test_has_names[array_attribute-size]
 
 # issue: nonzero-signature — nonzero signature mismatch
 array_api_tests/test_has_names.py::test_has_names[searching-nonzero]

@@ -269,6 +269,45 @@ def test_cumulative_sum(arr, axis, dtype, include_initial):
     assert lazy_result.to_numpy().dtype == expected.dtype
 
 
+@pytest.mark.parametrize(
+    "arr, axis, dtype, include_initial",
+    [
+        (np.arange(1, 6, dtype=np.int32), None, None, False),
+        (np.arange(1, 7, dtype=np.float32).reshape((2, 3)), 1, None, False),
+        (np.arange(1, 7, dtype=np.int16).reshape((2, 3)), 0, np.int64, False),
+        (np.arange(1, 7, dtype=np.uint8).reshape((2, 3)), -1, None, True),
+        (np.arange(1, 7, dtype=np.float64).reshape((2, 3)), 1, np.float32, True),
+    ],
+)
+def test_cumulative_prod(arr, axis, dtype, include_initial):
+    np_axis = 0 if axis is None else axis
+    expected = np.cumprod(arr, axis=np_axis, dtype=dtype)
+    if include_initial:
+        pad_shape = list(expected.shape)
+        pad_shape[np_axis] = 1
+        expected = np.concatenate(
+            (np.ones(tuple(pad_shape), dtype=expected.dtype), expected),
+            axis=np_axis,
+        )
+
+    result = finchlite.cumulative_prod(
+        arr, axis=axis, dtype=dtype, include_initial=include_initial
+    )
+    lazy_result = finchlite.compute(
+        finchlite.cumulative_prod(
+            finchlite.lazy(arr),
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    )
+
+    np.testing.assert_array_equal(result.to_numpy(), expected)
+    np.testing.assert_array_equal(lazy_result.to_numpy(), expected)
+    assert result.to_numpy().dtype == expected.dtype
+    assert lazy_result.to_numpy().dtype == expected.dtype
+
+
 @pytest.mark.parametrize("offset", [-1, 0, 1])
 def test_trace(offset):
     arr = np.arange(12, dtype=np.int32).reshape((3, 4))

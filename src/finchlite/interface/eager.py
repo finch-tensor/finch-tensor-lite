@@ -96,6 +96,31 @@ def cumulative_sum(
     )
 
 
+def cumulative_prod(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    dtype=None,
+    include_initial: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.cumulative_prod(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    return compute(
+        lazy.cumulative_prod(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    )
+
+
 def diagonal(x, /, *, offset: int = 0):
     if isinstance(x, lazy.LazyTensor):
         return lazy.diagonal(x, offset=offset)
@@ -645,6 +670,12 @@ def broadcast_arrays(*args):
         return lazy.broadcast_arrays(*args)
     # compute can take in a list of LazyTensors
     return compute(lazy.broadcast_arrays(*args))
+
+
+def meshgrid(*arrays, indexing: str = "xy"):
+    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
+        return lazy.meshgrid(*arrays, indexing=indexing)
+    return compute(lazy.meshgrid(*arrays, indexing=indexing))
 
 
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):

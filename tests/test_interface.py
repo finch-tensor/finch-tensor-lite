@@ -386,6 +386,33 @@ def test_array_namespace_info():
         info.default_dtypes(device="gpu")
 
 
+def test_array_object_metadata():
+    x = finchlite.asarray(np.arange(6).reshape(2, 3))
+
+    assert x.device is None
+    assert x.size == 6
+    assert x.to_device(None) is x
+    finch_assert_equal(x.T, x.to_numpy().T)
+
+    y = finchlite.asarray(np.arange(24).reshape(2, 3, 4))
+    finch_assert_equal(y.mT, np.swapaxes(y.to_numpy(), -1, -2))
+    with pytest.raises(ValueError):
+        y.T
+    with pytest.raises(ValueError):
+        x.to_device("gpu")
+
+
+def test_finfo_returns_python_scalars():
+    info = finchlite.finfo(finchlite.float32)
+
+    assert isinstance(info.bits, int)
+    assert isinstance(info.eps, float)
+    assert isinstance(info.max, float)
+    assert isinstance(info.min, float)
+    assert isinstance(info.smallest_normal, float)
+    assert info.dtype == finchlite.float32
+
+
 def test_result_type():
     assert finchlite.result_type(finchlite.int8, finchlite.int16) == finchlite.int16
     assert finchlite.result_type(finchlite.int32, finchlite.uint32) == finchlite.int64
@@ -1519,6 +1546,27 @@ def test_broadcast_to(x, shape, x_wrap):
         if isinstance(wx, finchlite.LazyTensor):
             out = finchlite.compute(out)
         finch_assert_equal(out, expected, strict=True)
+
+
+@pytest.mark.parametrize("indexing", ["xy", "ij"])
+def test_meshgrid(indexing):
+    arrays = [
+        np.array([1, 2], dtype=np.int32),
+        np.array([3, 4, 5], dtype=np.int32),
+        np.array([6, 7], dtype=np.int32),
+    ]
+    expected = np.meshgrid(*arrays, indexing=indexing)
+    result = finchlite.meshgrid(*arrays, indexing=indexing)
+    lazy_result = finchlite.meshgrid(
+        *(finchlite.lazy(array) for array in arrays),
+        indexing=indexing,
+    )
+
+    for result_arr, lazy_arr, expected_arr in zip(
+        result, lazy_result, expected, strict=True
+    ):
+        finch_assert_equal(result_arr, expected_arr, strict=True)
+        finch_assert_equal(finchlite.compute(lazy_arr), expected_arr, strict=True)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
