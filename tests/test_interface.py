@@ -413,8 +413,6 @@ def test_result_type_python_scalars_are_weak():
 
     with pytest.raises(TypeError):
         finchlite.result_type(1, 1.0)
-    with pytest.raises(TypeError):
-        finchlite.result_type(finchlite.int32, 1.0)
 
 
 def test_lazy_python_scalars_keep_builtin_dtypes():

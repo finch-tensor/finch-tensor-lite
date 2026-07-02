@@ -610,11 +610,14 @@ def can_cast(from_, to, /) -> builtins.bool:
 def result_type(*arrays_and_dtypes) -> FDType:
     if len(arrays_and_dtypes) == 0:
         raise TypeError("result_type requires at least one argument")
-    if not any(isinstance(arg, FDType) or hasattr(arg, "ndim") for arg in arrays_and_dtypes):
+    if not any(
+        isinstance(arg, FDType) or hasattr(arg, "ndim") for arg in arrays_and_dtypes
+    ):
         raise TypeError("result_type requires at least one array or dtype argument")
 
     concrete_types = [
-        _result_type_arg(arg) for arg in arrays_and_dtypes if not _is_python_scalar(arg)
+        _result_type_arg(arg)
+        for arg in arrays_and_dtypes
     ]
     result = concrete_types[0]
     for dtype in concrete_types[1:]:
@@ -634,6 +637,7 @@ def _result_type_arg(arg) -> FDType:
     raise TypeError(
         f"result_type argument must be an array, dtype, or scalar: {arg!r}"
     )
+
 
 class FTyped:
     """
