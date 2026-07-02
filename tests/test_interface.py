@@ -1376,6 +1376,19 @@ def test_concat_axis_none_lazy():
     )
 
 
+def test_concat_axis_none_promotes_dtype():
+    arrays = (
+        finchlite.asarray(np.array([1], dtype=np.int8)),
+        finchlite.asarray(np.array([128], dtype=np.int16)),
+    )
+
+    result = finchlite.concat(arrays, axis=None)
+    expected = np.concatenate(tuple(array.to_numpy().reshape(-1) for array in arrays))
+
+    assert result.dtype == ftype(expected.dtype.type)
+    finch_assert_equal(result, expected)
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 def test_concat_uses_first_fill_value():
     a = finchlite.BufferizedNDArray.from_numpy(

@@ -2018,6 +2018,11 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
             )
 
     fill = arrays[0].fill_value
+    concat_dtype = return_type(
+        ffuncs.choose(fill),
+        *(array.element_type for array in arrays),
+    )
+    fill = concat_dtype(fill)
     offset = 0
     skewed = []
     for array in arrays:
