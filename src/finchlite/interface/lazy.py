@@ -1609,8 +1609,11 @@ class MatrixPatternTensorFType(TensorFType):
 
 class MatrixPatternTensor(Tensor):
     def __init__(self, shape, *, k: int = 0, dtype=None):
-        shape = _matrix_shape(shape)
-        self._shape = shape
+        if isinstance(shape, int):
+            shape = (shape, shape)
+        self._shape = tuple(shape)
+        if len(self._shape) != 2:
+            raise ValueError(f"Expected a 2D shape, got {self._shape}")
         self._k = k
         self._element_type = ftype(dtype if dtype is not None else np.float64)
         self._fill_value = self._element_type(0)
@@ -1665,7 +1668,6 @@ class MatrixPatternTensor(Tensor):
             self._k,
         )
 
-
 class EyeTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
         return j - i == self._k
@@ -1680,15 +1682,13 @@ class LowerTriangleTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
         return j - i <= self._k
 
+class PairSumTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return j == i * 2 or j == -i * 2 - 1
 
-def _matrix_shape(shape: int | tuple[int, int]) -> tuple[int, int]:
-    if isinstance(shape, int):
-        return (shape, shape)
-    shape_tuple = tuple(shape)
-    if len(shape_tuple) != 2:
-        raise ValueError(f"Expected a 2D shape, got {shape_tuple}")
-    return shape_tuple
-
+class PairScatterTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return j == i // 2
 
 def eye(
     n_rows: int,
@@ -1831,6 +1831,65 @@ def diff(
         n=n - 1,
     )
 
+def cumulative(op:FinchOperator, x, /, *, axis: int = 0, dtype=None, out=None) -> LazyTensor:
+    """
+    Computes the cumulative operation along a specified axis.
+
+    Args:
+        op: The cumulative operation to perform (e.g., ffuncs.add for cumulative sum).
+        x: The input tensor.
+        axis: The axis along which to perform the cumulative operation.
+        dtype: The desired data type of the output tensor.
+        out: An optional output tensor to store the result.
+
+    Returns:
+        A new lazy tensor with the cumulative operation applied.
+    """
+    x = lazy(x)
+    axis = normalize_axis_index(axis, x.ndim)
+    if dtype is None:
+        dtype = x.element_type
+    if out is not None:
+        raise NotImplementedError("out parameter is not yet supported")
+    
+    n = x.shape[axis]
+
+    sums = []
+
+    z = initial_value(op, dtype)
+
+    m = n
+    while m >= 2:
+        p = m // 2
+        mask = PairSumTensor((p, m), k=0, dtype=np.bool_)
+        merge = reduce(
+            op,
+            where(
+                expand_dims(mask, axis=range(axis)),
+                expand_dims(x, axis=axis+1),
+                z
+            ),
+            axis=axis,
+        )
+        sums.append(merge)
+        m = p
+    
+    scattered = sums.pop()
+    while sums:
+        m, p = merge.shape[axis], merge.shape[axis+1]
+        scattered = reduce(
+            ffuncs.choose(z),
+            where(
+                expand_dims(mask, axis=range(axis)),
+                expand_dims(x, axis=axis+1),
+                z
+            ),
+            axis=axis,
+        )
+        sums[-1] += scattered
+        scattered = sums.pop()
+        
+    return scattered
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
