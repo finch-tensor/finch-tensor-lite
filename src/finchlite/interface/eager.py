@@ -116,6 +116,12 @@ def full_like(
     return compute(lazy.full_like(x, fill_value, dtype=dtype))
 
 
+def empty_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.empty_like(x, dtype=dtype)
+    return compute(lazy.empty_like(x, dtype=dtype))
+
+
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
     if isinstance(x, lazy.LazyTensor):
         return lazy.zeros_like(x, dtype=dtype)

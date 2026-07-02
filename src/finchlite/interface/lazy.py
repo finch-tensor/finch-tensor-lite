@@ -448,6 +448,11 @@ def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
     return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
 
 
+def empty_like(x, /, *, dtype=None) -> LazyTensor:
+    x = lazy(x)
+    return full_like(x, x.fill_value, dtype=dtype)
+
+
 def zeros_like(x, /, *, dtype=None) -> LazyTensor:
     return full_like(x, 0, dtype=dtype)
 

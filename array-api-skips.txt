@@ -52,9 +52,6 @@ array_api_tests/test_signatures.py::test_extension_func_signature[linalg.svd]
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack__]
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack_device__]
 
-# not implemented
-array_api_tests/test_creation_functions.py::test_meshgrid
-array_api_tests/test_creation_functions.py::test_empty_like
 
 # test_array_object
 
@@ -83,7 +80,6 @@ array_api_tests/test_searching_functions.py::test_searchsorted
 # test_has_names
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
-array_api_tests/test_has_names.py::test_has_names[creation-empty_like]
 array_api_tests/test_has_names.py::test_has_names[linalg-cholesky]
 array_api_tests/test_has_names.py::test_has_names[linalg-cross]
 array_api_tests/test_has_names.py::test_has_names[linalg-det]
@@ -286,6 +282,3 @@ array_api_tests/test_has_names.py::test_has_names[array_attribute-size]
 # issue: nonzero-signature — nonzero signature mismatch
 array_api_tests/test_has_names.py::test_has_names[searching-nonzero]
 array_api_tests/test_signatures.py::test_func_signature[nonzero]
-
-# issue: missing-empty_like-signature — empty_like exists in skips but signature test also fails
-array_api_tests/test_signatures.py::test_func_signature[empty_like]

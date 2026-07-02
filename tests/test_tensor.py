@@ -73,6 +73,24 @@ def test_bufferized_ndarray_custom_fill_value():
     assert hash(x.ftype) == hash(y.ftype)
 
 
+def test_empty_like_preserves_fill_value():
+    import importlib
+
+    lazy_interface = importlib.import_module("finchlite.interface.lazy")
+    arr = np.ones((2, 3), dtype=np.int32)
+    x = BufferizedNDArray.from_numpy(arr, fill_value=5)
+
+    lazy_x = finchlite.lazy(x)
+    lazy_out = lazy_interface.empty_like(lazy_x)
+    out = finchlite.empty_like(x)
+
+    assert lazy_out.fill_value == np.int32(5)
+    assert lazy_out.element_type == finchlite.int32
+    assert out.fill_value == np.int32(5)
+    assert out.element_type == finchlite.int32
+    np.testing.assert_array_equal(out.to_numpy(), np.full((2, 3), 5, dtype=np.int32))
+
+
 def test_index_tensor_returns_linear_indices():
     import importlib
 
