@@ -50,6 +50,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         ctx: LogicLoader | None = None,
         stats_factory: StatsFactory | None = None,
         cache: bool = False,
+        no_compute: bool = False,
     ):
         if ctx is None:
             ctx = DefaultLogicFormatter()
@@ -59,6 +60,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         self.stats_factory = stats_factory
         self.cache = cache
         self.cached_kernels: dict[tuple[Any, Any], Any] = {}
+        self.no_compute = no_compute
 
     def lower(
         self,
@@ -96,13 +98,17 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
                 fields = tuple(lgc.Field(f"d{i}") for i in range(len(shape)))
                 stats_bindings[var] = self.stats_factory(T, fields)
 
-            mod, binding_ftypes, binding_idxs = self.ctx(
+            outputs = self.ctx(
                 stmt,
                 binding_ftypes,
                 stats_bindings,
                 self.stats_factory,
             )
 
+            if self.no_compute:
+                return outputs
+
+            mod, binding_ftypes, binding_idxs = outputs
             if self.cache:
                 self.cached_kernels[key] = mod, binding_ftypes, binding_idxs
 

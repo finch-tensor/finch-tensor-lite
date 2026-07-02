@@ -27,6 +27,7 @@ from finchlite.autoschedule.tensor_stats import UniformStatsFactory
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.finch_notation.interpreter import NotationInterpreter
 from finchlite.symbolic import gensym
+from finchlite.symbolic.stage import NoOpStage
 
 from .utils import patch_benchmark
 
@@ -91,13 +92,22 @@ def _make_pipeline():
 def test_galley_matmul_chain(
     benchmark, monkeypatch, empty_last: bool, metric: Literal["optimize", "downstream"]
 ) -> None:
-    import finchlite.autoschedule.galley_optimize as galley
 
+    plan = _plan_from_lazy(_build_expr(empty_last))
     if metric == "optimize":
-        patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
+        opt_only = LogicNormalizer(
+            LogicExecutor(
+                GalleyLogicalOptimizer(
+                    DefaultLoopOrderer(
+                        LogicStandardizer(DefaultLogicFormatter(NoOpStage()))
+                    )
+                ),
+                no_compute=True,
+            )
+        )
+        benchmark(opt_only, plan)
     else:
         patch_benchmark(benchmark, monkeypatch, LogicStandardizer, "lower")
 
     pipeline = _make_pipeline()
-    plan = _plan_from_lazy(_build_expr(empty_last))
     pipeline(plan)
