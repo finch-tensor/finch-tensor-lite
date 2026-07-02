@@ -22,6 +22,7 @@ from finchlite.algebra import (
     fixpoint_type,
     ftype,
     init_value,
+    result_type,
     return_type,
 )
 from finchlite.algebra.ftypes import (
@@ -1461,6 +1462,7 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         ffuncs.add,
         multiply(conj(x1), x2),
         axis=axis,
+        dtype=result_type(x1.element_type, x2.element_type),
     )
 
 

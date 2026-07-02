@@ -1255,6 +1255,17 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
     finch_assert_allclose(result, expected)
 
 
+def test_vecdot_preserves_promoted_input_dtype():
+    x1 = finchlite.asarray(np.array([1, 2, 3], dtype=np.uint8))
+    x2 = finchlite.asarray(np.array([4, 5, 6], dtype=np.uint8))
+
+    result = finchlite.vecdot(x1, x2)
+
+    assert result.element_type == finchlite.uint8
+    assert result.fill_value == np.uint8(0)
+    assert result.item() == np.uint8(32)
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")
 @pytest.mark.parametrize(
     "kw",
