@@ -16,7 +16,7 @@ jobs:
         with:
           mode: simulation,memory
           run: |
-            pixi run -e benchmark pytest benchmarks/ --codspeed -vvv
+            pixi run benchmark -vvv
 
 on:
   push:
