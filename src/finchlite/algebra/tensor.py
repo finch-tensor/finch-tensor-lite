@@ -15,6 +15,13 @@ class TensorFType(FType, ABC):
         return np.intp(len(self.shape_type))
 
     @property
+    def size(self):
+        size = 1
+        for dim in self.shape:
+            size *= int(dim)
+        return size
+
+    @property
     @abstractmethod
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
