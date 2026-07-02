@@ -78,7 +78,7 @@ class MallocBufferBackend:
         elt_type = ctx.ctype_name(c_type(ftype.element_type))
         length_type = ctx.ctype_name(c_type(ftype.length_type))
 
-        inline_s = "static inline " if inline else ""
+        inline_s = "static inline " if inline else "FINCH_EXPORT "
         libcode = dedent(
             f"""
             {inline_s}{elt_type}*

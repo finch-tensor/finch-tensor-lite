@@ -34,6 +34,14 @@ from .stages import CCode, CLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)
 
+PROLOGUE = """
+#ifdef _WIN32
+    #define FINCH_EXPORT __declspec( dllexport )
+#else
+    #define FINCH_EXPORT
+#endif
+"""
+
 
 class COperator(ABC):
     """Abstract base class for C language operators."""
@@ -107,7 +115,6 @@ def create_shared_lib(filename, c_code, cc, cflags):
                 "Compilation failed with command:\n"
                 f"    {compile_command}\n"
                 f"on the following code:\n{c_code}"
-                f"\nError message: {e}"
             )
             raise RuntimeError("C Compilation failed") from e
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
@@ -123,8 +130,8 @@ def load_shared_lib(c_code, cc=None, cflags=None):
         cc = config.get("cc")
     if cflags is None:
         cflags = (
-            *config.get("cflags").split(),
             *config.get("shared_cflags").split(),
+            *config.get("cflags").split(),
         )
 
     shared_lib_path = create_shared_lib(
@@ -529,7 +536,7 @@ class CContext(Context):
         """
         Emit the headers for the C code.
         """
-        return "\n".join([*self.headers, self.emit()])
+        return "\n".join([PROLOGUE, *self.headers, self.emit()])
 
     def ctype_name(self, t: type) -> str:
         # Mapping from ctypes types to their C type names
@@ -827,9 +834,10 @@ class CContext(Context):
                 return_t_name = self.ctype_name(c_type(return_t))
                 feed = self.feed
                 self.exec(
-                    f"{feed}{return_t_name} {func_name}({', '.join(arg_decls)}) {{\n"
+                    f"{feed}FINCH_EXPORT {return_t_name} "
+                    f"{func_name}({', '.join(arg_decls)}) {{\n"
                     f"{body_code}\n"
-                    f"{feed}}}"
+                    f"{feed}}}\n"
                 )
                 return None
             case asm.Return(value):

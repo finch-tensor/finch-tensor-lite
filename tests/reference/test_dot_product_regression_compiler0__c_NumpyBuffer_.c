@@ -1,3 +1,10 @@
+
+#ifdef _WIN32
+    #define FINCH_EXPORT __declspec( dllexport )
+#else
+    #define FINCH_EXPORT
+#endif
+
 #include <stdint.h>
 typedef void* (*fptr)( void**, uint64_t );
 struct CNumpyBuffer {
@@ -7,7 +14,7 @@ struct CNumpyBuffer {
     fptr resize;
 };
 #include <stddef.h>
-double dot_product(struct CNumpyBuffer* a, struct CNumpyBuffer* b) {
+FINCH_EXPORT double dot_product(struct CNumpyBuffer* a, struct CNumpyBuffer* b) {
     double c = (double)0.0;
     struct CNumpyBuffer* a_ = a;
     double* a__data = (double*)a_->data;

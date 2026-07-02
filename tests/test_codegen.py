@@ -38,11 +38,18 @@ from finchlite.tensor import BufferizedNDArrayFType
 from .conftest import finch_assert_equal
 
 
+@pytest.mark.c_backend
 def test_add_function():
     c_code = """
     #include <stdio.h>
 
-    int add(int a, int b) {
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
+
+    FINCH_EXPORT int add(int a, int b) {
         return a + b;
     }
     """
@@ -51,12 +58,19 @@ def test_add_function():
     assert result == 7, f"Expected 7, got {result}"
 
 
+@pytest.mark.c_backend
 def test_buffer_function():
     c_code = """
     #include <stdio.h>
     #include <stdlib.h>
     #include <stdint.h>
     #include <string.h>
+
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
 
     typedef struct CNumpyBuffer {
         void* arr;
@@ -65,7 +79,7 @@ def test_buffer_function():
         void* (*resize)(void**, size_t);
     } CNumpyBuffer;
 
-    void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
+    FINCH_EXPORT void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
         // Get the original data pointer and length
         double* data = (double*)(buffer->data);
         size_t length = buffer->length;
@@ -98,7 +112,7 @@ def test_buffer_function():
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
+        pytest.param(CCompiler(), NumpyBuffer, marks=pytest.mark.c_backend),
         (NumbaCompiler(), NumpyBuffer),
     ],
 )
@@ -154,6 +168,7 @@ def test_codegen(compiler, buffer):
     finch_assert_equal(result, expected)
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
@@ -235,6 +250,7 @@ def test_dot_product_malloc(compiler, buffer):
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "new_size"],
     [
@@ -279,7 +295,7 @@ def test_malloc_resize(compiler, new_size):
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
+        pytest.param(CCompiler(), NumpyBuffer, marks=pytest.mark.c_backend),
         (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
@@ -357,6 +373,7 @@ def test_dot_product(compiler, buffer):
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "extension", "buffer"],
     [
@@ -497,7 +514,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
 @pytest.mark.parametrize(
     ["compiler"],
     [
-        (CCompiler(),),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
         (NumbaCompiler(),),
         (asm.AssemblyInterpreter(),),
     ],
@@ -578,7 +595,7 @@ def test_if_statement(compiler):
 @pytest.mark.parametrize(
     "compiler",
     [
-        CCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
         NumbaCompiler(),
     ],
 )
@@ -699,6 +716,7 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
     file_regression.check(str(output), extension=extension)
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     "size,idx",
     [(size, idx) for size in range(1, 4) for idx in range(-1, 4)],
@@ -825,6 +843,7 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
             change(ab)
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     "size,idx,value",
     [
