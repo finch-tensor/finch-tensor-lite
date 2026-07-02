@@ -25,9 +25,7 @@ array_api_tests/test_signatures.py::test_func_signature[sort]
 array_api_tests/test_signatures.py::test_func_signature[flip]
 array_api_tests/test_signatures.py::test_func_signature[roll]
 array_api_tests/test_signatures.py::test_func_signature[take]
-array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
-array_api_tests/test_signatures.py::test_func_signature[concat]
 array_api_tests/test_signatures.py::test_func_signature[stack]
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
 array_api_tests/test_signatures.py::test_func_signature[cumulative_sum]
@@ -92,7 +90,6 @@ array_api_tests/test_searching_functions.py::test_searchsorted
 array_api_tests/test_data_type_functions.py::TestResultType::test_arrays_and_dtypes
 
 # test_has_names
-array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
 array_api_tests/test_has_names.py::test_has_names[creation-empty_like]
 array_api_tests/test_has_names.py::test_has_names[linalg-cholesky]
@@ -179,7 +176,6 @@ array_api_tests/test_linalg.py::test_vecdot_conj
 # test_manipulation_functions
 
 # not implemented
-array_api_tests/test_manipulation_functions.py::test_concat
 array_api_tests/test_manipulation_functions.py::test_expand_dims
 array_api_tests/test_manipulation_functions.py::test_squeeze
 array_api_tests/test_manipulation_functions.py::test_flip

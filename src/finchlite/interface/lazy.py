@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import builtins
+import operator
 import sys
 import threading
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from itertools import accumulate, zip_longest
+from itertools import accumulate, product, zip_longest
 from typing import Any, cast, overload
 
 import numpy as np
@@ -281,6 +282,9 @@ class LazyTensor(OverrideTensor):
         raise ValueError(
             "Cannot convert LazyTensor to bool. Use compute() to evaluate it first."
         )
+
+    def reshape(self, shape, /, *, copy=None):
+        return reshape(self, shape, copy=copy)
 
 
 def asarray(
@@ -1553,6 +1557,130 @@ class FillTensor(Tensor):
         )
 
 
+def _shape_size(shape: tuple) -> int:
+    return int(np.prod(shape, dtype=np.intp)) if shape else 1
+
+
+@dataclass(frozen=True, eq=False)
+class ReshapeMaskTensorFType(TensorFType):
+    _old_shape: tuple
+    _new_shape: tuple
+    _element_type: FType
+
+    @property
+    def fill_value(self):
+        return self._element_type(False)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return tuple(ftype(dim) for dim in (*self._old_shape, *self._new_shape))
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, ReshapeMaskTensorFType):
+            return False
+        return (
+            self._old_shape == other._old_shape
+            and self._new_shape == other._new_shape
+            and self._element_type == other._element_type
+        )
+
+    def __hash__(self):
+        return hash((self._old_shape, self._new_shape, self._element_type))
+
+    def construct(self, shape: tuple) -> ReshapeMaskTensor:
+        return ReshapeMaskTensor(
+            self._old_shape,
+            self._new_shape,
+            dtype=self.element_type,
+        )
+
+    def __call__(self, val: Any) -> ReshapeMaskTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class ReshapeMaskTensor(Tensor):
+    def __init__(self, old_shape, new_shape, *, dtype=None):
+        self._old_shape = tuple(old_shape)
+        self._new_shape = tuple(new_shape)
+        if _shape_size(self._old_shape) != _shape_size(self._new_shape):
+            raise ValueError(
+                f"Cannot reshape array of size {_shape_size(self._old_shape)} "
+                f"into shape {self._new_shape}"
+            )
+        self._shape = (*self._old_shape, *self._new_shape)
+        self._old_ndim = len(self._old_shape)
+        self._element_type = ftype(dtype if dtype is not None else np.bool_)
+
+    @staticmethod
+    def _flat_index(idxs, shape) -> int:
+        flat_index = 0
+        for idx, dim in zip(idxs, shape, strict=True):
+            flat_index = flat_index * dim + idx
+        return flat_index
+
+    def _contains(self, old_idxs, new_idxs) -> bool:
+        return self._flat_index(old_idxs, self._old_shape) == self._flat_index(
+            new_idxs,
+            self._new_shape,
+        )
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != self.ndim:
+            raise ValueError("Reshape mask tensors require one index per dimension.")
+        old_idxs = idxs[: self._old_ndim]
+        new_idxs = idxs[self._old_ndim :]
+        return Scalar(
+            self._element_type(self._contains(old_idxs, new_idxs)),
+            fill_value=self.fill_value,
+        )
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
+        for idxs in product(*(range(dim) for dim in self.shape)):
+            arr[idxs] = self._element_type(
+                self._contains(idxs[: self._old_ndim], idxs[self._old_ndim :])
+            )
+        return arr
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return ReshapeMaskTensorFType(
+            self._old_shape,
+            self._new_shape,
+            self._element_type,
+        )
+
+
 @dataclass(frozen=True, eq=False)
 class MatrixPatternTensorFType(TensorFType):
     _fill_value: Any
@@ -1785,6 +1913,118 @@ def trace(x, /, *, offset: int = 0, dtype=None) -> LazyTensor:
     return sum(diagonal(x, offset=offset), axis=-1, dtype=dtype)
 
 
+def _normalize_reshape_shape(old_shape: tuple, shape) -> tuple:
+    if isinstance(shape, (int, np.integer)) and not isinstance(
+        shape,
+        (bool, np.bool_),
+    ):
+        shape = (shape,)
+    else:
+        try:
+            shape = tuple(shape)
+        except TypeError as exc:
+            raise TypeError("shape must be an integer or sequence of integers") from exc
+
+    old_size = _shape_size(old_shape)
+    unknown_axis = None
+    normalized = []
+    for i, dim in enumerate(shape):
+        if isinstance(dim, (bool, np.bool_)):
+            raise TypeError("shape dimensions must be integers")
+        try:
+            dim = operator.index(dim)
+        except TypeError as exc:
+            raise TypeError("shape dimensions must be integers") from exc
+        if dim < -1:
+            raise ValueError(f"shape dimensions must be non-negative or -1, got {dim}")
+        if dim == -1:
+            if unknown_axis is not None:
+                raise ValueError("can only specify one unknown dimension")
+            unknown_axis = i
+        normalized.append(dim)
+
+    if unknown_axis is not None:
+        known_size = _shape_size(tuple(dim for dim in normalized if dim != -1))
+        if known_size == 0 or old_size % known_size != 0:
+            raise ValueError(
+                f"Cannot reshape array of size {old_size} into shape {tuple(shape)}"
+            )
+        normalized[unknown_axis] = old_size // known_size
+    elif old_size != _shape_size(tuple(normalized)):
+        raise ValueError(
+            f"Cannot reshape array of size {old_size} into shape {tuple(normalized)}"
+        )
+
+    return tuple(normalized)
+
+
+def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
+    x = lazy(x)
+    shape = _normalize_reshape_shape(x.shape, shape)
+    if x.shape == shape:
+        return x
+
+    mask = ReshapeMaskTensor(x.shape, shape, dtype=np.bool_)
+    expanded = expand_dims(x, axis=tuple(range(x.ndim, x.ndim + len(shape))))
+    masked = where(mask, expanded, x.fill_value)
+    return reduce(
+        ffuncs.choose(x.fill_value),
+        masked,
+        axis=tuple(range(x.ndim)),
+        init=x.fill_value,
+    )
+
+
+def _concat_skew(x: LazyTensor, axis: int, offset: int, axis_size: int, fill):
+    mask = expand_dims(
+        eye(axis_size, x.shape[axis], k=-offset, dtype=np.bool_),
+        axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
+    )
+    masked = where(mask, expand_dims(x, axis=axis), fill)
+    return reduce(ffuncs.choose(fill), masked, axis=axis + 1, init=fill)
+
+
+def _flatten_for_concat(x: LazyTensor) -> LazyTensor:
+    return reshape(x, (_shape_size(x.shape),))
+
+
+def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
+    arrays = tuple(lazy(array) for array in arrays)
+    if len(arrays) == 0:
+        raise ValueError("concat requires at least one array")
+    if axis is None:
+        arrays = tuple(_flatten_for_concat(array) for array in arrays)
+        axis = 0
+
+    ndim = arrays[0].ndim
+    axis = normalize_axis_index(axis, ndim)
+    out_shape = list(arrays[0].shape)
+    out_shape[axis] = builtins.sum(array.shape[axis] for array in arrays)
+    shape = tuple(out_shape)
+
+    for array in arrays[1:]:
+        if array.ndim != ndim:
+            raise ValueError("All input arrays must have the same number of dimensions")
+        if builtins.any(
+            dim != expected
+            for i, (dim, expected) in enumerate(
+                zip(array.shape, arrays[0].shape, strict=True)
+            )
+            if i != axis
+        ):
+            raise ValueError(
+                "All input array dimensions except for the concatenation axis "
+                "must match"
+            )
+
+    fill = arrays[0].fill_value
+    offset = 0
+    skewed = []
+    for array in arrays:
+        skewed.append(_concat_skew(array, axis, offset, shape[axis], fill))
+        offset += array.shape[axis]
+
+    return elementwise(ffuncs.choose(fill), *skewed)
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.

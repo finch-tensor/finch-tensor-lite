@@ -540,6 +540,26 @@ def sign(x):
 # https://data-apis.org/array-api/2024.12/API_specification/manipulation_functions.html
 
 
+def _flatten_for_concat(array):
+    array = lazy.asarray(array)
+    size = int(np.prod(array.shape, dtype=np.intp)) if array.shape else 1
+    if hasattr(array, "reshape"):
+        return array.reshape((size,))
+    if hasattr(array, "to_numpy"):
+        return lazy.asarray(np.asarray(array.to_numpy()).reshape((size,)))
+    return lazy.asarray(np.asarray(array).reshape((size,)))
+
+
+def concat(arrays, /, *, axis: int | None = 0):
+    arrays = tuple(arrays)
+    if builtins.any(isinstance(array, lazy.LazyTensor) for array in arrays):
+        return lazy.concat(arrays, axis=axis)
+    if axis is None:
+        arrays = tuple(_flatten_for_concat(array) for array in arrays)
+        axis = 0
+    return compute(lazy.concat(arrays, axis=axis))
+
+
 def broadcast_to(x, /, shape: Sequence[int]):
     """
     Broadcasts an array to a new shape.
@@ -872,6 +892,8 @@ def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fa
 
 
 def reshape(x, /, shape: tuple, *, copy=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.reshape(x, shape, copy=copy)
     if not hasattr(x, "reshape"):
         raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
     return x.reshape(shape, copy=copy)

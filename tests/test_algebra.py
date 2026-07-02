@@ -47,8 +47,10 @@ def test_algebra_selected():
     assert is_identity(ffuncs.logical_and, True)
     assert is_identity(ffuncs.max, -math.inf)
     assert is_identity(ffuncs.min, math.inf)
+    assert is_identity(ffuncs.choose(0), 0)
     assert is_associative(ffuncs.add)
     assert is_associative(ffuncs.mul)
+    assert is_associative(ffuncs.choose(0))
     assert is_associative(ffuncs.logical_and)
     assert is_associative(ffuncs.logical_xor)
     assert is_associative(ffuncs.logical_or)
@@ -77,6 +79,9 @@ def test_algebra_selected():
     assert cansplitpush(ffuncs.add, ffuncs.add) is True
     assert cansplitpush(ffuncs.add, ffuncs.mul) is False
     assert cansplitpush(ffuncs.and_, ffuncs.and_) is False
+    assert ffuncs.choose(0)(0, 2, 3) == 2
+    assert ffuncs.choose(0)(0, 0) == 0
+    assert ffuncs.choose(np.nan)(np.nan, 4.0) == 4.0
 
 
 def test_python_scalar_promotion_uses_lattice_floor():
