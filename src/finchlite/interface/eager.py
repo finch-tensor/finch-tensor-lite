@@ -358,12 +358,17 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
-def inv(x, /):
-    if isinstance(x, lazy.LazyTensor):
-        raise ValueError("inv requires a materialized array; call compute() first")
+def _to_numpy(x):
     x = lazy.asarray(x)
     while hasattr(x, "to_numpy"):
         x = x.to_numpy()
+    return x
+
+
+def inv(x, /):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.inv(x)
+    x = _to_numpy(x)
     return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
 
 
@@ -376,6 +381,18 @@ def matrix_power(x, n, /):
     if isinstance(n, int) and n < 0:
         return matrix_power(inv(x), -n)
     return compute(lazy.matrix_power(x, n))
+
+
+def matrix_norm(x, /, *, keepdims=False, ord="fro"):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.matrix_norm(x, keepdims=keepdims, ord=ord)
+    x = _to_numpy(x)
+    matrix_norm_fn = getattr(np.linalg, "matrix_norm", None)
+    if matrix_norm_fn is None:
+        result = np.linalg.norm(x, ord=ord, axis=(-2, -1), keepdims=keepdims)
+    else:
+        result = matrix_norm_fn(x, keepdims=keepdims, ord=ord)
+    return lazy.asarray(np.asarray(result))
 
 
 def bitwise_invert(x):
@@ -481,6 +498,12 @@ def vecdot(x1, x2, /, *, axis=-1):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.vecdot(x1, x2, axis=axis)
     return compute(lazy.vecdot(x1, x2, axis=axis))
+
+
+def vector_norm(x, /, *, axis=None, keepdims=False, ord=2):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.vector_norm(x, axis=axis, keepdims=keepdims, ord=ord)
+    return compute(lazy.vector_norm(x, axis=axis, keepdims=keepdims, ord=ord))
 
 
 def any(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):

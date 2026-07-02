@@ -1240,6 +1240,11 @@ def matrix_transpose(x) -> LazyTensor:
     return permute_dims(x, axes=(*range(x.ndim - 2), x.ndim - 1, x.ndim - 2))
 
 
+def inv(x, /):
+    x = lazy(x)
+    raise ValueError("inv requires a materialized array; call compute() first")
+
+
 def matrix_power(x, n) -> LazyTensor:
     x = lazy(x)
 
@@ -1452,6 +1457,94 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
         multiply(conj(x1), x2),
         axis=axis,
     )
+
+
+def _norm_axes(axis: int | tuple[int, ...] | None, ndim: int) -> tuple[int, ...]:
+    if axis is None:
+        return tuple(range(ndim))
+    return normalize_axis_tuple(axis, ndim)
+
+
+def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
+    x = lazy(x)
+    axes = _norm_axes(axis, x.ndim)
+    abs_x = abs(x)
+
+    if not axes:
+        return abs_x
+
+    if ord == 0:
+        zero = x.element_type(0)
+        nonzero = astype(not_equal(x, zero), abs_x.element_type)
+        return sum(nonzero, axis=axes, keepdims=keepdims)
+    if ord == 1:
+        return sum(abs_x, axis=axes, keepdims=keepdims)
+    if ord == float("inf"):
+        return max(abs_x, axis=axes, keepdims=keepdims)
+    if ord == -float("inf"):
+        return min(abs_x, axis=axes, keepdims=keepdims)
+
+    try:
+        p = float(ord)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"ord must be a real number, got {ord!r}") from exc
+    if not np.isfinite(p):
+        raise ValueError(f"ord must be finite or +/-inf, got {ord!r}")
+    if p == 0.0:
+        zero = x.element_type(0)
+        nonzero = astype(not_equal(x, zero), abs_x.element_type)
+        return sum(nonzero, axis=axes, keepdims=keepdims)
+
+    zero = abs_x.element_type(0)
+    scale_keepdims = max(abs_x, axis=axes, keepdims=True, init=zero)
+    scale = max(abs_x, axis=axes, keepdims=keepdims, init=zero)
+    scale_is_zero = equal(scale_keepdims, zero)
+    denominator = where(scale_is_zero, abs_x.element_type(1), scale_keepdims)
+    scaled = divide(abs_x, denominator)
+
+    if p == 2.0:
+        return multiply(scale, sqrt(sum(square(scaled), axis=axes, keepdims=keepdims)))
+    return multiply(
+        scale,
+        power(sum(power(scaled, p), axis=axes, keepdims=keepdims), 1.0 / p),
+    )
+
+
+def matrix_norm(x, /, *, keepdims=False, ord="fro") -> LazyTensor:
+    x = lazy(x)
+    if x.ndim < 2:
+        raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
+
+    if ord is None or ord == "fro":
+        return vector_norm(x, axis=(-2, -1), keepdims=keepdims, ord=2)
+
+    abs_x = abs(x)
+    if ord == 1:
+        if keepdims:
+            col_sum = sum(abs_x, axis=-2, keepdims=True)
+            return max(
+                col_sum, axis=-1, keepdims=True, init=col_sum.element_type(0)
+            )
+        col_sum = sum(abs_x, axis=-2)
+        return max(col_sum, axis=-1, init=col_sum.element_type(0))
+    if ord == -1:
+        if keepdims:
+            return min(sum(abs_x, axis=-2, keepdims=True), axis=-1, keepdims=True)
+        return min(sum(abs_x, axis=-2), axis=-1)
+    if ord == float("inf"):
+        if keepdims:
+            row_sum = sum(abs_x, axis=-1, keepdims=True)
+            return max(
+                row_sum, axis=-2, keepdims=True, init=row_sum.element_type(0)
+            )
+        row_sum = sum(abs_x, axis=-1)
+        return max(row_sum, axis=-1, init=row_sum.element_type(0))
+    if ord == -float("inf"):
+        if keepdims:
+            return min(sum(abs_x, axis=-1, keepdims=True), axis=-2, keepdims=True)
+        return min(sum(abs_x, axis=-1), axis=-1)
+
+    raise NotImplementedError(f"matrix_norm does not support ord={ord!r} lazily")
 
 
 @dataclass(frozen=True, eq=False)
@@ -2320,8 +2413,14 @@ def std(
     Calculates the standard deviation of the input array ``x``.
     """
     x = lazy(x)
-    d = var(x, axis=axis, correction=correction, keepdims=keepdims)
-    return pow(d, 0.5)
+    n = (
+        np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
+        if isinstance(axis, tuple)
+        else (np.prod(x.shape) if axis is None else x.shape[axis])
+    )
+    m = mean(x, axis=axis, keepdims=True)
+    norm = vector_norm(x - m, axis=axis, keepdims=keepdims, ord=2)
+    return truediv(norm, sqrt(norm.element_type(n - correction)))
 
 
 def einop(prgm, **kwargs):

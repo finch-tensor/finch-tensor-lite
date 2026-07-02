@@ -1255,6 +1255,93 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
     finch_assert_allclose(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},
+        {"axis": 1},
+        {"axis": 0, "keepdims": True, "ord": 1},
+        {"axis": (0, 1), "ord": 0},
+        {"axis": 1, "ord": float("inf")},
+        {"axis": 1, "ord": -float("inf")},
+        {"axis": None, "ord": -2},
+    ],
+)
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_linalg_vector_norm(kw, wrap):
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
+    wx = wrap(x)
+    expected = np.linalg.vector_norm(x, **kw)
+
+    result = finchlite.linalg.vector_norm(wx, **kw)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},
+        {"ord": 1},
+        {"ord": -1},
+        {"ord": float("inf")},
+        {"ord": -float("inf"), "keepdims": True},
+        {"ord": 2},
+        {"ord": -2},
+        {"ord": "nuc"},
+    ],
+)
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+    ],
+)
+def test_linalg_matrix_norm_eager(kw, wrap):
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float32)
+    wx = wrap(x)
+    expected = np.linalg.matrix_norm(x, **kw)
+
+    result = finchlite.linalg.matrix_norm(wx, **kw)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},
+        {"ord": 1},
+        {"ord": -1},
+        {"ord": float("inf")},
+        {"ord": -float("inf"), "keepdims": True},
+    ],
+)
+def test_linalg_matrix_norm_lazy(kw):
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
+    expected = np.linalg.matrix_norm(x, **kw)
+
+    result = finchlite.linalg.matrix_norm(finchlite.lazy(x), **kw)
+    result = finchlite.compute(result)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, axis, expected",
