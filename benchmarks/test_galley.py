@@ -3,7 +3,7 @@ Galley ASV benchmark: report Galley ``optimize_time`` and ``downstream_time`` fo
 10-matrix matmul chain. One case uses dense matrices while the other
 uses a sparse input for the last matrix.
 
-Run: ``pixi run asv run --bench galley_benchmarks``
+Run: ``pixi run benchmark``
 """
 
 from functools import reduce
@@ -93,7 +93,7 @@ def _make_pipeline():
     "empty_last",
     [
         pytest.param(True, id="empty_last"),
-        pytest.param(False, id="dense_last", marks=pytest.mark.skip("slow")),
+        pytest.param(False, id="dense_last", marks=pytest.mark.slow),
     ],
 )
 def test_galley_matmul_chain(

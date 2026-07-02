@@ -16,7 +16,7 @@ jobs:
         with:
           mode: simulation,memory
           run: |
-            pixi run benchmark -vvv
+            pixi run benchmark -vvv -m "not slow"
 
 on:
   push:
