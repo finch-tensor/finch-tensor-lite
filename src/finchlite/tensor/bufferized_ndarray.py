@@ -48,6 +48,8 @@ class BufferizedNDArray(OverrideTensor):
 
     @classmethod
     def from_numpy(cls, arr: np.ndarray, fill_value: Any = 0) -> "BufferizedNDArray":
+        if not arr.flags["C_CONTIGUOUS"]:
+            arr = np.ascontiguousarray(arr)
         itemsize = arr.dtype.itemsize
         strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
         shape = tuple(np.intp(s) for s in arr.shape)
@@ -122,7 +124,7 @@ class BufferizedNDArray(OverrideTensor):
         Get an item from the bufferized NDArray.
         This allows for indexing into the bufferized array.
         """
-        if isinstance(index, (slice, np.ndarray)) or (
+        if isinstance(index, slice | np.ndarray) or (
             isinstance(index, tuple) and any(isinstance(i, slice) for i in index)
         ):
             result = self.to_numpy()[index]

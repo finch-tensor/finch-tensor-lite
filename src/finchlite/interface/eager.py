@@ -71,6 +71,31 @@ def diff(x, /, *, axis: int = -1, n: int = 1, prepend=None, append=None):
     return compute(lazy.diff(x, axis=axis, n=n, prepend=prepend, append=append))
 
 
+def cumulative_sum(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    dtype=None,
+    include_initial: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.cumulative_sum(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    return compute(
+        lazy.cumulative_sum(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    )
+
+
 def diagonal(x, /, *, offset: int = 0):
     if isinstance(x, lazy.LazyTensor):
         return lazy.diagonal(x, offset=offset)

@@ -80,7 +80,11 @@ class _Add(NAryFinchOperator):
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        return self(type_(0), type_(0))
+        if isinstance(type_, FDTypeInteger) and not isinstance(type_, FDTypeBoolean):
+            if isinstance(type_, FDTypeUnsignedInteger):
+                return self(type_(0), uint64(0))
+            return self(type_(0), int64(0))
+        return type_(0)
 
 
 add = _Add()
@@ -103,7 +107,7 @@ class _Mul(NAryFinchOperator):
         return pow
 
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
-        return isinstance(other_op, (_Add, _Sub))
+        return isinstance(other_op, _Add | _Sub)
 
     def is_annihilator(self, val):
         return val == 0
@@ -245,7 +249,7 @@ class _And(NAryFinchOperator):
         return not bool(arg)
 
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
-        return isinstance(other_op, (_Or, _Xor))
+        return isinstance(other_op, _Or | _Xor)
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
@@ -486,7 +490,7 @@ class _LogicalAnd(BinaryFinchOperator):
         return not builtins.bool(val)
 
     def is_distributive(self, other_op: FinchOperator) -> builtins.bool:
-        return isinstance(other_op, (_LogicalOr, _LogicalXor))
+        return isinstance(other_op, _LogicalOr | _LogicalXor)
 
     def init_value(self, type_: FType) -> Any:
         return True

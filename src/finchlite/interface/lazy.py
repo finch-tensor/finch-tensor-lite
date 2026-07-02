@@ -1682,13 +1682,112 @@ class LowerTriangleTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
         return j - i <= self._k
 
+
 class PairSumTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
-        return j == i * 2 or j == -i * 2 - 1
+        return j == i * 2 or j == i * 2 + 1
 
-class PairScatterTensor(MatrixPatternTensor):
+
+class PairCarryTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
-        return j == i // 2
+        return i > 0 and j == (i - 1) // 2
+
+
+@dataclass(frozen=True, eq=False)
+class ParityMaskTensorFType(TensorFType):
+    _element_type: FType
+    _shape_type: tuple
+    _parity: int
+
+    @property
+    def fill_value(self):
+        return self._element_type(False)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, ParityMaskTensorFType):
+            return False
+        return (
+            self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+            and self._parity == other._parity
+        )
+
+    def __hash__(self):
+        return hash((self._element_type, self._shape_type, self._parity))
+
+    def construct(self, shape: tuple) -> ParityMaskTensor:
+        return ParityMaskTensor(shape, parity=self._parity, dtype=self.element_type)
+
+    def __call__(self, val: Any) -> ParityMaskTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class ParityMaskTensor(Tensor):
+    def __init__(self, shape, *, parity: int = 0, dtype=None):
+        if isinstance(shape, int):
+            shape = (shape,)
+        self._shape = tuple(shape)
+        if len(self._shape) != 1:
+            raise ValueError(f"Expected a 1D shape, got {self._shape}")
+        self._parity = parity
+        self._element_type = ftype(dtype if dtype is not None else np.bool_)
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != 1:
+            raise ValueError("Parity mask tensors require one index.")
+        return Scalar(
+            self._element_type(idxs[0] % 2 == self._parity),
+            fill_value=self.fill_value,
+        )
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
+        for i in range(self.shape[0]):
+            arr[i] = self._element_type(i % 2 == self._parity)
+        return arr
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return ParityMaskTensorFType(
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            self._parity,
+        )
+
 
 def eye(
     n_rows: int,
@@ -1831,65 +1930,133 @@ def diff(
         n=n - 1,
     )
 
-def cumulative(op:FinchOperator, x, /, *, axis: int = 0, dtype=None, out=None) -> LazyTensor:
-    """
-    Computes the cumulative operation along a specified axis.
 
-    Args:
-        op: The cumulative operation to perform (e.g., ffuncs.add for cumulative sum).
-        x: The input tensor.
-        axis: The axis along which to perform the cumulative operation.
-        dtype: The desired data type of the output tensor.
-        out: An optional output tensor to store the result.
-
-    Returns:
-        A new lazy tensor with the cumulative operation applied.
-    """
+def cumulative(
+    op: FinchOperator,
+    x,
+    /,
+    *,
+    axis: int = 0,
+    dtype=None,
+    include_initial: bool = False,
+) -> LazyTensor:
     x = lazy(x)
     axis = normalize_axis_index(axis, x.ndim)
-    if dtype is None:
-        dtype = x.element_type
-    if out is not None:
-        raise NotImplementedError("out parameter is not yet supported")
-    
-    n = x.shape[axis]
+    explicit_dtype = dtype is not None
+    dtype = ftype(dtype) if explicit_dtype else x.element_type
+    if explicit_dtype and dtype != x.element_type:
+        x = astype(x, dtype)
+    init = init_value(op, dtype)
+    if explicit_dtype:
+        init = dtype(init)
+    dtype = fixpoint_type(op, init, x.element_type)
 
-    sums = []
+    def cumulative_axis(
+        arg: LazyTensor,
+    ) -> LazyTensor:
+        axis_size = arg.shape[axis]
+        if axis_size <= 1:
+            return astype(arg, dtype) if dtype != arg.element_type else arg
 
-    z = initial_value(op, dtype)
-
-    m = n
-    while m >= 2:
-        p = m // 2
-        mask = PairSumTensor((p, m), k=0, dtype=np.bool_)
-        merge = reduce(
+        pair_count = axis_size // 2
+        pair_totals = reduce(
             op,
             where(
-                expand_dims(mask, axis=range(axis)),
-                expand_dims(x, axis=axis+1),
-                z
+                expand_dims(
+                    PairSumTensor((pair_count, axis_size), dtype=np.bool_),
+                    axis=tuple(range(axis)) + tuple(range(axis + 2, arg.ndim + 1)),
+                ),
+                expand_dims(arg, axis=axis),
+                init,
             ),
-            axis=axis,
+            axis=axis + 1,
+            init=init,
         )
-        sums.append(merge)
-        m = p
-    
-    scattered = sums.pop()
-    while sums:
-        m, p = merge.shape[axis], merge.shape[axis+1]
-        scattered = reduce(
-            ffuncs.choose(z),
+        pair_prefixes = cumulative_axis(pair_totals)
+
+        carry = reduce(
+            op,
             where(
-                expand_dims(mask, axis=range(axis)),
-                expand_dims(x, axis=axis+1),
-                z
+                expand_dims(
+                    PairCarryTensor((axis_size, pair_count), dtype=np.bool_),
+                    axis=tuple(range(axis)) + tuple(range(axis + 2, arg.ndim + 1)),
+                ),
+                expand_dims(pair_prefixes, axis=axis),
+                init,
             ),
-            axis=axis,
+            axis=axis + 1,
+            init=init,
         )
-        sums[-1] += scattered
-        scattered = sums.pop()
-        
-    return scattered
+        even_positions = expand_dims(
+            ParityMaskTensor(axis_size, dtype=np.bool_),
+            axis=tuple(i for i in range(arg.ndim) if i != axis),
+        )
+        return where(
+            even_positions,
+            elementwise(op, carry, arg),
+            carry,
+        )
+
+    axis_size = x.shape[axis]
+    out_size = axis_size + int(include_initial)
+    out_shape = tuple(out_size if i == axis else dim for i, dim in enumerate(x.shape))
+    if builtins.any(dim == 0 for i, dim in enumerate(x.shape) if i != axis):
+        return empty(out_shape, dtype=dtype)
+    if axis_size == 0:
+        if include_initial:
+            return full(out_shape, init, dtype=dtype)
+        return empty(out_shape, dtype=dtype)
+
+    if include_initial:
+        x = reduce(
+            op,
+            where(
+                expand_dims(
+                    EyeTensor((out_size, axis_size), k=-1, dtype=np.bool_),
+                    axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
+                ),
+                expand_dims(x, axis=axis),
+                init,
+            ),
+            axis=axis + 1,
+            init=init,
+        )
+    return cumulative_axis(x)
+
+
+def cumulative_sum(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    dtype=None,
+    include_initial: bool = False,
+) -> LazyTensor:
+    x = lazy(x)
+    if x.ndim == 0:
+        raise ValueError("cumulative_sum requires an array with at least one dimension")
+    if axis is None:
+        if x.ndim != 1:
+            raise ValueError(
+                "axis must be specified for arrays with more than one axis"
+            )
+        axis = 0
+    if not isinstance(include_initial, bool):
+        raise TypeError(
+            "include_initial must be a boolean, "
+            f"got {type(include_initial).__name__}"
+        )
+    if isinstance(x.element_type, FDTypeBoolean):
+        raise TypeError("cumulative_sum requires a numeric input array")
+
+    return cumulative(
+        ffuncs.add,
+        x,
+        axis=axis,
+        dtype=dtype,
+        include_initial=include_initial,
+    )
+
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
     """

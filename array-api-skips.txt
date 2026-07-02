@@ -28,7 +28,6 @@ array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
 array_api_tests/test_signatures.py::test_func_signature[concat]
 array_api_tests/test_signatures.py::test_func_signature[stack]
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
-array_api_tests/test_signatures.py::test_func_signature[cumulative_sum]
 array_api_tests/test_signatures.py::test_func_signature[searchsorted]
 array_api_tests/test_signatures.py::test_func_signature[repeat]
 array_api_tests/test_signatures.py::test_func_signature[tile]
@@ -102,7 +101,6 @@ array_api_tests/test_has_names.py::test_has_names[linalg-solve]
 array_api_tests/test_has_names.py::test_has_names[linalg-svd]
 array_api_tests/test_has_names.py::test_has_names[linalg-svdvals]
 array_api_tests/test_has_names.py::test_has_names[linalg-vector_norm]
-array_api_tests/test_has_names.py::test_has_names[statistical-cumulative_sum]
 array_api_tests/test_has_names.py::test_has_names[set-unique_all]
 array_api_tests/test_has_names.py::test_has_names[set-unique_counts]
 array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
@@ -279,8 +277,6 @@ array_api_tests/test_statistical_functions.py::test_sum
 
 # not implemented
 array_api_tests/test_statistical_functions.py::test_cumulative_prod
-array_api_tests/test_statistical_functions.py::test_cumulative_sum
-
 # issue: finfo-dtype0 — finfo does not handle finchlite dtype objects (only string names)
 array_api_tests/test_data_type_functions.py::test_finfo[dtype0]
 
