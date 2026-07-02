@@ -356,8 +356,9 @@ def concordize(
 
     root = flatten_plans(root)
     match root:
-        case Plan((*bodies, Produces(_) as prod)):
-            root = Plan(tuple(bodies))
+        case Plan(bodies) if isinstance(bodies[-1], Produces):
+            prod = bodies[-1]
+            root = Plan(bodies[:-1])
             root = Rewrite(PostWalk(rule_0))(root)
             root = Rewrite(PostWalk(rule_1))(root)
             # Consider also aliases from input arguments.

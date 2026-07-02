@@ -645,7 +645,9 @@ def _result_type_arg(arg) -> FDType:
         return arg
     if hasattr(arg, "dtype"):
         return arg.dtype
-    return ftype(arg)
+    dtype = ftype(arg)
+    assert isinstance(dtype, FDType)
+    return dtype
 
 class FTyped:
     """
