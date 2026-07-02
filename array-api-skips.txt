@@ -267,8 +267,6 @@ array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i is -0 and x2_
 # test_statistical_functions
 
 # check for errors
-array_api_tests/test_statistical_functions.py::test_sum
-
 # not implemented
 array_api_tests/test_statistical_functions.py::test_cumulative_prod
 # issue: finfo-dtype0 — finfo does not handle finchlite dtype objects (only string names)
