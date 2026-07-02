@@ -79,25 +79,23 @@ def test_algebra_selected():
     assert cansplitpush(ffuncs.and_, ffuncs.and_) is False
 
 
-def test_python_scalar_promotion_uses_lattice_floor():
-    assert finchlite.bool_.np_type_bot == finchlite.bool
-    assert finchlite.int_.np_type_bot == finchlite.int8
-    assert finchlite.float_.np_type_bot == finchlite.float32
-    assert finchlite.complex_.np_type_bot == finchlite.complex64
-    assert finchlite.float32.np_type_bot == finchlite.float32
-
+def test_python_scalar_promotion_uses_weak_bottom():
     assert promote_type(finchlite.bool, finchlite.bool_) == finchlite.bool
     assert promote_type(finchlite.bool_, finchlite.bool) == finchlite.bool
     assert promote_type(finchlite.int8, finchlite.int_) == finchlite.int8
     assert promote_type(finchlite.int_, finchlite.int8) == finchlite.int8
     assert promote_type(finchlite.int32, finchlite.int_) == finchlite.int32
     assert promote_type(finchlite.int_, finchlite.int32) == finchlite.int32
-    assert promote_type(finchlite.uint8, finchlite.int_) == finchlite.int16
-    assert promote_type(finchlite.int_, finchlite.uint8) == finchlite.int16
+    assert promote_type(finchlite.uint8, finchlite.int_) == finchlite.uint8
+    assert promote_type(finchlite.int_, finchlite.uint8) == finchlite.uint8
     assert promote_type(finchlite.int64, finchlite.bool_) == finchlite.int64
     assert promote_type(finchlite.bool_, finchlite.int64) == finchlite.int64
+    assert promote_type(finchlite.float32, finchlite.int_) == finchlite.float32
+    assert promote_type(finchlite.int_, finchlite.float32) == finchlite.float32
     assert promote_type(finchlite.float32, finchlite.float_) == finchlite.float32
     assert promote_type(finchlite.float_, finchlite.float32) == finchlite.float32
+    assert promote_type(finchlite.complex64, finchlite.float_) == finchlite.complex64
+    assert promote_type(finchlite.float_, finchlite.complex64) == finchlite.complex64
     assert promote_type(finchlite.complex64, finchlite.complex_) == finchlite.complex64
     assert promote_type(finchlite.complex_, finchlite.complex64) == finchlite.complex64
 

@@ -48,10 +48,6 @@ class FType(ABC):
 
 
 class FDType(FType):
-    @property
-    def np_type_bot(self):
-        return self
-
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -196,10 +192,6 @@ class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     def type(self):
         return builtins.bool
 
-    @property
-    def np_type_bot(self):
-        return bool
-
     def __promote__(self, other):
         if isinstance(other, FDTypeBuiltin):
             return ftype(self.type(False) + other.type(False))
@@ -236,10 +228,6 @@ class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeSignedInteger, FDTypeReal):
     def type(self):
         return builtins.int
 
-    @property
-    def np_type_bot(self):
-        return int8
-
     def __repr__(self):
         return "finchlite.int_"
 
@@ -270,10 +258,6 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
     def type(self):
         return builtins.float
 
-    @property
-    def np_type_bot(self):
-        return float32
-
     def __repr__(self):
         return "finchlite.float_"
 
@@ -300,10 +284,6 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
     @property
     def type(self):
         return builtins.complex
-
-    @property
-    def np_type_bot(self):
-        return complex64
 
     def __repr__(self):
         return "finchlite.complex_"
@@ -347,18 +327,26 @@ class FDTypeNumpy(FDType):
 
     def __promote__(self, other):
         if isinstance(other, FDTypeNumpy):
-            promoted_dtype = np.promote_types(self.dtype, other.dtype)
-            return ftype(promoted_dtype.type)
-        if isinstance(other, FDTypeBuiltin):
-            other = other.np_type_bot
-            if not isinstance(other, FDTypeNumpy):
-                return None
-            promoted_dtype = np.promote_types(self.dtype, other.dtype)
-            return ftype(promoted_dtype.type)
+            return _promote_numpy_dtypes(self, other)
         return None
 
 
+def _promote_numpy_dtypes(T1: FDTypeNumpy, T2: FDTypeNumpy):
+    promoted_dtype = np.promote_types(T1.dtype, T2.dtype)
+    return ftype(promoted_dtype.type)
+
+
 class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            if other in (bool_, int_):
+                return self
+            if other == float_:
+                return _promote_numpy_dtypes(self, float32)
+            if other == complex_:
+                return _promote_numpy_dtypes(self, complex64)
+        return super().__promote__(other)
+
     @property
     def iinfo(self):
         """
@@ -382,6 +370,14 @@ class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
 
 
 class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            if other in (bool_, int_, float_):
+                return self
+            if other == complex_:
+                return _promote_numpy_dtypes(self, complex64)
+        return super().__promote__(other)
+
     @property
     def finfo(self):
         """
@@ -403,9 +399,27 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
         """
         return self.dtype(np.inf)
 
+class FDTypeNumpyComplex(FDTypeNumpyFloat, FDTypeComplex):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin) and other in (
+            bool_,
+            int_,
+            float_,
+            complex_,
+        ):
+            return self
+        return super().__promote__(other)
+
 
 # FTypes for numpy built-in datatypes
 class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            if other == bool_:
+                return self
+            return None
+        return super().__promote__(other)
+
     @property
     def dtype(self):
         return np.bool_
@@ -557,7 +571,7 @@ class _FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
 float64 = _FDTypeFloat64()
 
 
-class _FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
+class _FDTypeComplex64(FDTypeNumpyComplex):
     @property
     def dtype(self):
         return np.complex64
@@ -569,7 +583,7 @@ class _FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
 complex64 = _FDTypeComplex64()
 
 
-class _FDTypeComplex128(FDTypeNumpyFloat, FDTypeComplex):
+class _FDTypeComplex128(FDTypeNumpyComplex):
     @property
     def dtype(self):
         return np.complex128
@@ -630,14 +644,8 @@ def _result_type_arg(arg) -> FDType:
     if isinstance(arg, FDType):
         return arg
     if hasattr(arg, "dtype"):
-        return ftype(arg.dtype)
-    arg_type = ftype(arg)
-    if isinstance(arg_type, FDType):
-        return arg_type
-    raise TypeError(
-        f"result_type argument must be an array, dtype, or scalar: {arg!r}"
-    )
-
+        return arg.dtype
+    return ftype(arg)
 
 class FTyped:
     """
