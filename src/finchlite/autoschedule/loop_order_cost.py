@@ -5,8 +5,8 @@ from finchlite.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    LogicExpression,
     Literal,
+    LogicExpression,
     Reorder,
     StatsFactory,
     Table,
@@ -61,14 +61,12 @@ def get_conjunctive_and_disjunctive_inputs(
                     stats_factory, arg, stats_bindings, replace=False, cache=cache
                 )
                 arg_is_conjunct = op_node.val.is_annihilator(arg_stats.fill_value)
-                arg_conjuncts, arg_disjuncts = (
-                    get_conjunctive_and_disjunctive_inputs(
-                        arg,
-                        stats_factory,
-                        stats_bindings,
-                        cache,
-                        disjunct_branch or not arg_is_conjunct,
-                    )
+                arg_conjuncts, arg_disjuncts = get_conjunctive_and_disjunctive_inputs(
+                    arg,
+                    stats_factory,
+                    stats_bindings,
+                    cache,
+                    disjunct_branch or not arg_is_conjunct,
                 )
                 conjuncts.extend(arg_conjuncts)
                 disjuncts.extend(arg_disjuncts)
@@ -108,9 +106,7 @@ def get_loop_lookups(
     elif not rel_conjuncts:
         loop_stats = merge_prefix_stats(stats_factory, ffuncs.or_, rel_disjuncts)
     else:
-        disjunct_union = merge_prefix_stats(
-            stats_factory, ffuncs.or_, rel_disjuncts
-        )
+        disjunct_union = merge_prefix_stats(stats_factory, ffuncs.or_, rel_disjuncts)
         loop_stats = merge_prefix_stats(
             stats_factory,
             ffuncs.and_,
