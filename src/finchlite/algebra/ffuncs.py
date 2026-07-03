@@ -1328,6 +1328,52 @@ class _FirstArg(FinchOperator):
 first_arg = _FirstArg()
 
 
+class _Choose(FinchOperator):
+    is_associative = True
+
+    def __init__(self, fill_value):
+        self.fill_value = fill_value
+
+    def __eq__(self, other):
+        return isinstance(other, _Choose) and builtins.bool(
+            np.all(same(self.fill_value, other.fill_value))
+        )
+
+    def __hash__(self):
+        return hash((type(self), samehash(self.fill_value)))
+
+    def __call__(self, *args: Any) -> Any:
+        for arg in args:
+            if not np.all(same(arg, self.fill_value)):
+                return arg
+        return self.fill_value
+
+    def return_type(self, *args: FType) -> FType:
+        if not args:
+            return ftype(self.fill_value)
+        result_arg = args[0]
+        assert isinstance(result_arg, FDType)
+        result: FDType = result_arg
+        for arg in args[1:]:
+            assert isinstance(arg, FDType)
+            result = promote_type(result, arg)
+        return result
+
+    def is_identity(self, val: Any) -> builtins.bool:
+        return builtins.bool(np.all(same(val, self.fill_value)))
+
+    def init_value(self, type_: FType) -> Any:
+        assert isinstance(type_, FDType)
+        return type_(self.fill_value)
+
+    def __repr__(self) -> str:
+        return f"choose({self.fill_value!r})"
+
+
+def choose(fill_value):
+    return _Choose(fill_value)
+
+
 class _Identity(FinchOperator):
     """
     Returns the input value unchanged.
@@ -1485,6 +1531,7 @@ __all__ = [
     "atan2",
     "atanh",
     "ceil",
+    "choose",
     "clip",
     "conjugate",
     "copysign",

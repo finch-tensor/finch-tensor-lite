@@ -20,9 +20,7 @@ array_api_tests/test_signatures.py::test_func_signature[sort]
 array_api_tests/test_signatures.py::test_func_signature[flip]
 array_api_tests/test_signatures.py::test_func_signature[roll]
 array_api_tests/test_signatures.py::test_func_signature[take]
-array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
-array_api_tests/test_signatures.py::test_func_signature[concat]
 array_api_tests/test_signatures.py::test_func_signature[stack]
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
 array_api_tests/test_signatures.py::test_func_signature[searchsorted]
@@ -71,7 +69,6 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[f
 array_api_tests/test_searching_functions.py::test_searchsorted
 
 # test_has_names
-array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-concat]
 array-api-tests/array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
 array_api_tests/test_has_names.py::test_has_names[linalg-cholesky]
 array_api_tests/test_has_names.py::test_has_names[linalg-cross]
@@ -141,7 +138,8 @@ array_api_tests/test_linalg.py::test_svd
 # test_manipulation_functions
 
 # not implemented
-array_api_tests/test_manipulation_functions.py::test_concat
+array_api_tests/test_manipulation_functions.py::test_expand_dims
+array_api_tests/test_manipulation_functions.py::test_squeeze
 array_api_tests/test_manipulation_functions.py::test_flip
 array_api_tests/test_manipulation_functions.py::test_roll
 array_api_tests/test_manipulation_functions.py::test_stack

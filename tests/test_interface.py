@@ -1588,6 +1588,163 @@ def test_scalar_coerce(x, func):
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
+    "arrays, axis",
+    [
+        (
+            (
+                np.arange(6, dtype=np.int64).reshape(2, 3),
+                np.arange(6, 15, dtype=np.int64).reshape(3, 3),
+            ),
+            0,
+        ),
+        (
+            (
+                np.arange(6, dtype=np.int64).reshape(2, 3),
+                np.arange(6, 10, dtype=np.int64).reshape(2, 2),
+            ),
+            1,
+        ),
+        (
+            (
+                np.arange(24, dtype=np.int64).reshape(2, 3, 4),
+                np.arange(24, 48, dtype=np.int64).reshape(2, 3, 4),
+            ),
+            -1,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "array_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_concat(arrays, axis, array_wrap):
+    wrapped = tuple(array_wrap(array) for array in arrays)
+    result = finchlite.concat(wrapped, axis=axis)
+    expected = np.concatenate(arrays, axis=axis)
+
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    finch_assert_equal(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+@pytest.mark.parametrize(
+    "array_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+    ],
+)
+def test_concat_axis_none_eager(array_wrap):
+    arrays = (
+        np.arange(6, dtype=np.int64).reshape(2, 3),
+        np.arange(6, 8, dtype=np.int64).reshape(1, 2),
+    )
+    wrapped = tuple(array_wrap(array) for array in arrays)
+
+    result = finchlite.concat(wrapped, axis=None)
+
+    finch_assert_equal(
+        result,
+        np.concatenate(tuple(array.reshape(-1) for array in arrays), axis=0),
+    )
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_concat_axis_none_lazy():
+    raw_arrays = (
+        np.arange(6, dtype=np.int64).reshape(2, 3),
+        np.arange(6, 8, dtype=np.int64).reshape(1, 2),
+    )
+    arrays = tuple(finchlite.lazy(array) for array in raw_arrays)
+
+    result = finchlite.compute(finchlite.concat(arrays, axis=None))
+
+    finch_assert_equal(
+        result,
+        np.concatenate(tuple(array.reshape(-1) for array in raw_arrays), axis=0),
+    )
+
+
+def test_concat_axis_none_promotes_dtype():
+    arrays = (
+        finchlite.asarray(np.array([1], dtype=np.int8)),
+        finchlite.asarray(np.array([128], dtype=np.int16)),
+    )
+
+    result = finchlite.concat(arrays, axis=None)
+    expected = np.concatenate(tuple(array.to_numpy().reshape(-1) for array in arrays))
+
+    assert result.dtype == ftype(expected.dtype.type)
+    finch_assert_equal(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_concat_uses_first_fill_value():
+    a = finchlite.BufferizedNDArray.from_numpy(
+        np.array([[0, 1], [2, 0]], dtype=np.int64),
+        fill_value=0,
+    )
+    b = finchlite.BufferizedNDArray.from_numpy(
+        np.array([[7, 3]], dtype=np.int64),
+        fill_value=7,
+    )
+
+    result = finchlite.concat((finchlite.lazy(a), finchlite.lazy(b)), axis=0)
+
+    assert result.fill_value == a.fill_value
+    result = finchlite.compute(result)
+    assert result.fill_value == a.fill_value
+    finch_assert_equal(result, np.concatenate((a.to_numpy(), b.to_numpy()), axis=0))
+
+
+def test_concat_rejects_mismatched_shapes():
+    with pytest.raises(ValueError, match="dimensions except"):
+        finchlite.concat((np.ones((2, 3)), np.ones((3, 4))), axis=0)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+@pytest.mark.parametrize(
+    "array, shape",
+    [
+        (np.arange(6, dtype=np.int64).reshape(2, 3), (3, 2)),
+        (np.arange(6, dtype=np.int64).reshape(2, 3), (-1,)),
+        (np.arange(6, dtype=np.int64), (2, 3)),
+        (np.array(5, dtype=np.int64), (1,)),
+    ],
+)
+def test_lazy_reshape(array, shape):
+    result = finchlite.reshape(finchlite.lazy(array), shape)
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_equal(finchlite.compute(result), np.reshape(array, shape))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_reshape_preserves_fill_value():
+    array = finchlite.BufferizedNDArray.from_numpy(
+        np.array([[9, 1], [2, 9]], dtype=np.int64),
+        fill_value=9,
+    )
+
+    result = finchlite.reshape(finchlite.lazy(array), (4,))
+
+    assert result.fill_value == array.fill_value
+    result = finchlite.compute(result)
+    finch_assert_equal(result, array.to_numpy().reshape((4,)))
+
+
+def test_lazy_reshape_rejects_invalid_shape():
+    with pytest.raises(ValueError, match="Cannot reshape"):
+        finchlite.reshape(finchlite.lazy(np.arange(6)), (4,))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+@pytest.mark.parametrize(
     "x, shape",
     [
         # ——— VALID CASES ———

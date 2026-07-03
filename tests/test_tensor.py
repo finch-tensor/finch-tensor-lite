@@ -173,6 +173,20 @@ def test_lazy_matrix_pattern_tensor_compute():
     np.testing.assert_array_equal(result.to_numpy(), np.eye(2, 3, dtype=np.int32))
 
 
+def test_reshape_mask_tensor_to_numpy():
+    mask = finchlite.ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_)
+    expected = np.zeros((2, 3, 3, 2), dtype=np.bool_)
+    for i in range(2):
+        for j in range(3):
+            old_flat = np.ravel_multi_index((i, j), (2, 3))
+            for k in range(3):
+                for l in range(2):
+                    new_flat = np.ravel_multi_index((k, l), (3, 2))
+                    expected[i, j, k, l] = old_flat == new_flat
+
+    np.testing.assert_array_equal(mask.to_numpy(), expected)
+
+
 @pytest.mark.parametrize("k", [-1, 0, 1])
 def test_triu_tril(k):
     arr = np.arange(12, dtype=np.int32).reshape((3, 4))
