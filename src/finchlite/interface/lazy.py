@@ -1670,6 +1670,10 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
     _eager_only("eigvalsh")
 
 
+def lu(x, /, *, permute_l=False, p_indices=False):
+    _eager_only("lu")
+
+
 def matrix_rank(x, /, *, rtol=None, atol=None):
     _eager_only("matrix_rank")
 

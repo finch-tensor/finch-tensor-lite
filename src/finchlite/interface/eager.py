@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import scipy.fft as scipy_fft
+import scipy.linalg as scipy_linalg
 import scipy.sparse.linalg as scipy_sparse_linalg
 
 from finchlite.algebra import FinchOperator, to_numpy, to_scipy
@@ -436,11 +437,66 @@ def cross(x1, x2, /, *, axis=-1):
     cross_func = getattr(np.linalg, "cross", np.cross)
     return lazy.asarray(cross_func(x1, x2, axis=axis))
 
+def minimumSwaps(arr): 
+    """
+    Minimum number of swaps needed to order a
+    permutation array
+    """
+    # from https://www.thepoorcoder.com/hackerrank-minimum-swaps-2-solution/
+    a = dict(enumerate(arr))
+    b = {v:k for k,v in a.items()}
+    count = 0
+    for i in a:
+        x = a[i]
+        if x!=i:
+            y = b[i]
+            a[y] = x
+            b[x] = y
+            count+=1
+    return count
 
 def det(x, /):
     x = _warn_compute(x, "det")
+    try:
+        x_sp = to_scipy(lazy.asarray(x))
+        lu = scipy_sparse_linalg.splu(x_sp.tocsc())
+        diag_u = lu.U.diagonal()
+
+        perm_sign = 1
+        for perm in (lu.perm_r, lu.perm_c):
+            seen = np.zeros(perm.size, dtype=bool)
+            swaps = 0
+            for i in range(perm.size):
+                if seen[i]:
+                    continue
+                j = i
+                cycle_len = 0
+                while not seen[j]:
+                    seen[j] = True
+                    j = perm[j]
+                    cycle_len += 1
+                swaps += builtins.max(cycle_len - 1, 0)
+            if swaps % 2:
+                perm_sign *= -1
+
+        return lazy.asarray(np.asarray(perm_sign * diag_u.prod()))
+    except Exception:
+        pass
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.asarray(np.linalg.det(x)))
+
+
+def lu(x, /, *, permute_l=False, p_indices=False):
+    x = _warn_compute(x, "lu")
+    try:
+        return scipy_sparse_linalg.splu(to_scipy(lazy.asarray(x)).tocsc())
+    except Exception:
+        pass
+    x = to_numpy(lazy.asarray(x))
+    return tuple(
+        lazy.asarray(part)
+        for part in scipy_linalg.lu(x, permute_l=permute_l, p_indices=p_indices)
+    )
 
 
 def eigh(x, /, *, k=None, rtol=None, atol=None):
@@ -458,7 +514,7 @@ def eigh(x, /, *, k=None, rtol=None, atol=None):
                     RuntimeWarning,
                     stacklevel=2,
                 )
-                tol = min(rtol, atol)
+                tol = builtins.min(rtol, atol)
             elif rtol is not None:
                 tol = rtol
             else:
@@ -496,7 +552,7 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
                     RuntimeWarning,
                     stacklevel=2,
                 )
-                tol = min(rtol, atol)
+                tol = builtins.min(rtol, atol)
             elif rtol is not None:
                 tol = rtol
             else:
@@ -598,7 +654,7 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
                     RuntimeWarning,
                     stacklevel=2,
                 )
-                tol = min(rtol, atol)
+                tol = builtins.min(rtol, atol)
             elif rtol is not None:
                 tol = rtol
             else:
@@ -636,7 +692,7 @@ def svdvals(x, /, *, k=None, rtol=None, atol=None):
                     RuntimeWarning,
                     stacklevel=2,
                 )
-                tol = min(rtol, atol)
+                tol = builtins.min(rtol, atol)
             elif rtol is not None:
                 tol = rtol
             else:

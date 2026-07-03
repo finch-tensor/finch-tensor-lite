@@ -1492,6 +1492,7 @@ def test_linalg_inv_lazy_warns_and_computes():
         "eigh",
         "eigvalsh",
         "matrix_rank",
+        "lu",
         "pinv",
         "qr",
         "slogdet",
@@ -1537,6 +1538,41 @@ def test_linalg_new_eager_methods_use_numpy_fallback():
         finchlite.linalg.svdvals(x),
         np.linalg.svd(x, compute_uv=False),
     )
+
+
+def test_linalg_sparse_det_uses_superlu():
+    x = scipy_sparse.csc_matrix(
+        np.array(
+            [
+                [0.0, 2.0, 0.0],
+                [3.0, 0.0, 4.0],
+                [0.0, 5.0, 6.0],
+            ]
+        )
+    )
+
+    result = finchlite.linalg.det(x)
+
+    finch_assert_allclose(result, np.linalg.det(x.toarray()))
+
+
+def test_linalg_lu_uses_dense_fallback():
+    x = np.array([[2.0, 5.0, 8.0], [5.0, 2.0, 2.0], [7.0, 5.0, 6.0]])
+
+    p, lower, upper = finchlite.linalg.lu(x)
+
+    finch_assert_allclose(p @ lower @ upper, x)
+
+
+def test_linalg_lu_uses_sparse_superlu():
+    x = scipy_sparse.csc_matrix(
+        np.array([[4.0, 0.0, 1.0], [0.0, 3.0, 2.0], [1.0, 0.0, 5.0]])
+    )
+    b = np.array([1.0, 2.0, 3.0])
+
+    result = finchlite.linalg.lu(x)
+
+    finch_assert_allclose(result.solve(b), np.linalg.solve(x.toarray(), b))
 
 
 def test_linalg_partial_sparse_eigen_kwargs():
