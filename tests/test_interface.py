@@ -829,7 +829,8 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
 @pytest.mark.usefixtures("interpreter_scheduler")
 def test_std_nan_propagation():
     x = np.array([np.nan], dtype=np.float64)
-    result = finchlite.compute(finchlite.std(finchlite.lazy(x)))
+    with np.errstate(invalid="ignore"):
+        result = finchlite.compute(finchlite.std(finchlite.lazy(x)))
     assert np.isnan(result.item())
 
 
