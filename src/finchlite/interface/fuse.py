@@ -111,7 +111,7 @@ def compute(arg, ctx=None):
                 # finch `Scalar`
                 outputs[out_idx] = asarray(res[lazy_idx][()], device=device)
             else:
-                outputs[out_idx] = res[lazy_idx].to_device(device)
+                outputs[out_idx] = asarray(res[lazy_idx], device=device)
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 

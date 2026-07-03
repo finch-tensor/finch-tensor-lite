@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from os import cpu_count
-from typing import Any
+from typing import Any, cast
 
 from .ftypes import FType, FTyped, ftype
 
@@ -449,7 +449,7 @@ class CPUFType(DeviceFType):
 
     def __call__(self, parent=None, n: int | None = None):
         if parent is None:
-            parent = self.parent_type()
+            parent = cast(Any, self.parent_type)()
         return CPU(parent, id=self.id, n=n)
 
     @property
@@ -514,7 +514,7 @@ class CPUThreadFType(TaskFType):
     def __hash__(self):
         return hash((CPUThreadFType, self.parent_type, self.pool_type))
 
-    def __call__(self, tid: int, pool: CPUPool | CPU, parent=None):
+    def __call__(self, tid: int, pool: CPUPool | CPU, parent=None):  # type: ignore[override]
         return CPUThread(tid, pool, parent)
 
     @property
@@ -586,4 +586,4 @@ def is_on_pool(task: Any, pool: AbstractPool) -> bool:
 
 
 def is_on_device(task: Any, dev: AbstractPool | AbstractDevice) -> bool:
-    return is_on_pool(task, dev)
+    return is_on_pool(task, normalize_pool(dev))

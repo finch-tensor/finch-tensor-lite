@@ -2216,6 +2216,7 @@ def cumulative_sum(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
+    x = lazy(x)
     if isinstance(x.element_type, FDTypeBoolean):
         raise TypeError("cumulative_sum requires a numeric input array")
 
@@ -2236,6 +2237,7 @@ def cumulative_prod(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
+    x = lazy(x)
     if isinstance(x.element_type, FDTypeBoolean):
         raise TypeError("cumulative_prod requires a numeric input array")
 

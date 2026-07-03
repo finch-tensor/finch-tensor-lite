@@ -2,8 +2,6 @@
 array_api_tests/test_searching_functions.py::test_nonzero_zerodim_error
 # flaky test
 array_api_tests/test_special_cases.py::test_unary[sign((x_i is -0 or x_i == +0)) -> 0]
-# `broadcast_to` is not defined in Finch, hangs as xfail
-array_api_tests/test_searching_functions.py::test_where
 # `test_solve` is not defined in Finch, hangs as xfail
 array_api_tests/test_linalg.py::test_solve
 
@@ -41,7 +39,6 @@ array_api_tests/test_signatures.py::test_extension_func_signature[linalg.svdvals
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.det]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.eigh]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.eigvalsh]
-array_api_tests/test_signatures.py::test_extension_func_signature[linalg.inv]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.qr]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.slogdet]
 array_api_tests/test_signatures.py::test_extension_func_signature[linalg.solve]
@@ -81,7 +78,6 @@ array_api_tests/test_has_names.py::test_has_names[linalg-cross]
 array_api_tests/test_has_names.py::test_has_names[linalg-det]
 array_api_tests/test_has_names.py::test_has_names[linalg-eigh]
 array_api_tests/test_has_names.py::test_has_names[linalg-eigvalsh]
-array_api_tests/test_has_names.py::test_has_names[linalg-inv]
 array_api_tests/test_has_names.py::test_has_names[linalg-matrix_rank]
 array_api_tests/test_has_names.py::test_has_names[linalg-pinv]
 array_api_tests/test_has_names.py::test_has_names[linalg-qr]
@@ -113,7 +109,6 @@ array_api_tests/test_has_names.py::test_has_names[fft-ifftshift]
 array_api_tests/test_has_names.py::test_has_names[fft-ihfft]
 array_api_tests/test_has_names.py::test_has_names[fft-ifftn]
 array_api_tests/test_has_names.py::test_has_names[fft-irfftn]
-array_api_tests/test_has_names.py::test_has_names[elementwise-nextafter]
 array_api_tests/test_has_names.py::test_has_names[fft-fft]
 array_api_tests/test_has_names.py::test_has_names[fft-rfftn]
 array_api_tests/test_has_names.py::test_has_names[fft-fftn]
@@ -134,7 +129,6 @@ array_api_tests/test_indexing_functions.py::test_take
 array_api_tests/test_linalg.py::test_cross
 array_api_tests/test_linalg.py::test_eigh
 array_api_tests/test_linalg.py::test_eigvalsh
-array_api_tests/test_linalg.py::test_inv
 array_api_tests/test_linalg.py::test_matrix_rank
 array_api_tests/test_linalg.py::test_pinv
 array_api_tests/test_linalg.py::test_qr
@@ -143,16 +137,12 @@ array_api_tests/test_linalg.py::test_cholesky
 array_api_tests/test_linalg.py::test_det
 array_api_tests/test_linalg.py::test_svdvals
 array_api_tests/test_linalg.py::test_svd
-array_api_tests/test_linalg.py::test_linalg_vecdot
 array_api_tests/test_linalg.py::test_linalg_tensordot
-array_api_tests/test_linalg.py::test_vecdot_conj
 
 # test_manipulation_functions
 
 # not implemented
 array_api_tests/test_manipulation_functions.py::test_concat
-array_api_tests/test_manipulation_functions.py::test_expand_dims
-array_api_tests/test_manipulation_functions.py::test_squeeze
 array_api_tests/test_manipulation_functions.py::test_flip
 array_api_tests/test_manipulation_functions.py::test_roll
 array_api_tests/test_manipulation_functions.py::test_stack
