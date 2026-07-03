@@ -1592,19 +1592,39 @@ def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
         nonzero = astype(not_equal(x, zero), abs_x.element_type)
         return sum(nonzero, axis=axes, keepdims=keepdims)
 
-    zero = abs_x.element_type(0)
-    scale_keepdims = max(abs_x, axis=axes, keepdims=True, init=zero)
-    scale = max(abs_x, axis=axes, keepdims=keepdims, init=zero)
-    scale_is_zero = equal(scale_keepdims, zero)
-    denominator = where(scale_is_zero, abs_x.element_type(1), scale_keepdims)
-    scaled = divide(abs_x, denominator)
+    if p < 0.0:
+        zero = abs_x.element_type(0)
+        scale_keepdims = max(abs_x, axis=axes, keepdims=True, init=zero)
+        scale = max(abs_x, axis=axes, keepdims=keepdims, init=zero)
+        scale_is_zero = equal(scale_keepdims, zero)
+        denominator = where(scale_is_zero, abs_x.element_type(1), scale_keepdims)
+        scaled = divide(abs_x, denominator)
+        return multiply(
+            scale,
+            power(sum(power(scaled, p), axis=axes, keepdims=keepdims), 1.0 / p),
+        )
 
     if p == 2.0:
-        return multiply(scale, sqrt(sum(square(scaled), axis=axes, keepdims=keepdims)))
-    return multiply(
-        scale,
-        power(sum(power(scaled, p), axis=axes, keepdims=keepdims), 1.0 / p),
+        scaled_square_type = ffuncs.scaled_square.return_type(abs_x.element_type)
+        scaled_square_sum = reduce(
+            ffuncs.add_scaled_square,
+            elementwise(ffuncs.scaled_square, abs_x),
+            axis=axes,
+            keepdims=keepdims,
+            init=scaled_square_type((0, 0)),
+        )
+        return elementwise(ffuncs.root_scaled_square, scaled_square_sum)
+
+    scaled_power = ffuncs.scaled_power(p)
+    scaled_type = scaled_power.return_type(abs_x.element_type)
+    scaled_sum = reduce(
+        ffuncs.add_scaled_power(p),
+        elementwise(scaled_power, abs_x),
+        axis=axes,
+        keepdims=keepdims,
+        init=scaled_type((0, 0)),
     )
+    return elementwise(ffuncs.root_scaled_power(p), scaled_sum)
 
 
 def matrix_norm(x, /, *, keepdims=False, ord="fro") -> LazyTensor:

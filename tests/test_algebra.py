@@ -91,6 +91,14 @@ def test_algebra_selected():
     assert ffuncs.maxby((1, 10), (2, 20)) == (2, 20)
     assert ffuncs.maxby((1, 10), (1, 20)) == (1, 10)
     assert ffuncs.last((1, 2, 3)) == 3
+    assert ffuncs.scaled_power(2.0) is ffuncs.scaled_square
+    assert ffuncs.add_scaled_power(2.0) is ffuncs.add_scaled_square
+    assert ffuncs.root_scaled_power(2.0) is ffuncs.root_scaled_square
+    assert ffuncs.scaled_square(np.float64(0.0)) == (np.float64(0.0), 0.0)
+    assert ffuncs.scaled_square(np.float64(3.0)) == (np.float64(1.0), 3.0)
+    scaled_sum = ffuncs.add_scaled_square((1.0, 3.0), (1.0, 4.0))
+    assert scaled_sum == (1.5625, 4.0)
+    assert ffuncs.root_scaled_square(scaled_sum) == 5.0
 
 
 def test_python_scalar_promotion_uses_weak_bottom():

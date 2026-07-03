@@ -1413,6 +1413,17 @@ def test_linalg_vector_norm(kw, wrap):
     finch_assert_allclose(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")
+def test_linalg_vector_norm_large_values():
+    x = np.array([1e308, 1e308], dtype=np.float64)
+    expected = np.float64(math.sqrt(2.0) * 1e308)
+
+    result = finchlite.compute(finchlite.linalg.vector_norm(finchlite.lazy(x)))
+
+    assert np.isfinite(result.item())
+    finch_assert_allclose(result, expected)
+
+
 @pytest.mark.parametrize(
     "kw",
     [

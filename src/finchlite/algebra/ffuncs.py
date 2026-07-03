@@ -644,7 +644,7 @@ class _MinBy(FinchOperator):
             return y
         return x if x_last <= y_last else y
 
-    def return_type(self, x: FType, y: FType) -> FType:
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
         if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
             raise TypeError("Tuple operands must have the same length.")
@@ -678,7 +678,7 @@ class _MaxBy(FinchOperator):
             return y
         return x if x_last <= y_last else y
 
-    def return_type(self, x: FType, y: FType) -> FType:
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
         if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
             raise TypeError("Tuple operands must have the same length.")
@@ -1512,6 +1512,198 @@ class _Last(FinchOperator):
 last = _Last()
 
 
+class _ScaledSquare(FinchOperator):
+    def __call__(self, x: Any) -> tuple:
+        if x == 0:
+            return (np.true_divide(type(x)(0), type(x)(1)), x)
+        return (np.true_divide(type(x)(1), type(x)(1)), x)
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, FDType)
+        return TupleFType.from_tuple((truediv.return_type(x, x), x))
+
+    def __repr__(self) -> str:
+        return "scaled_square"
+
+
+scaled_square = _ScaledSquare()
+
+
+class _ScaledPower(FinchOperator):
+    def __init__(self, exponent: float):
+        self.exponent = exponent
+
+    def __call__(self, x: Any) -> tuple:
+        return scaled_square(x)
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        return scaled_square.return_type(x)
+
+    def __eq__(self, other):
+        return isinstance(other, _ScaledPower) and self.exponent == other.exponent
+
+    def __hash__(self):
+        return hash((type(self), self.exponent))
+
+    def __repr__(self) -> str:
+        return f"scaled_power({self.exponent!r})"
+
+
+def scaled_power(exponent: float):
+    if exponent == 2.0:
+        return scaled_square
+    return _ScaledPower(exponent)
+
+
+class _AddScaledPower(FinchOperator):
+    is_associative = True
+    is_commutative = True
+
+    def __init__(self, exponent: float):
+        self.exponent = exponent
+
+    def __call__(self, x: tuple, y: tuple) -> tuple:
+        x_arg, x_scale = x
+        y_arg, y_scale = y
+        if x_scale < y_scale:
+            x_arg, y_arg = y_arg, x_arg
+            x_scale, y_scale = y_scale, x_scale
+        if x_scale > y_scale:
+            return (
+                x_arg
+                + y_arg * np.power(np.true_divide(y_scale, x_scale), self.exponent),
+                x_scale,
+            )
+        return (x_arg + y_arg, x_scale)
+
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
+        if len(x.struct_fieldtypes) != 2 or len(y.struct_fieldtypes) != 2:
+            raise TypeError("Scaled power operands must be 2-tuples.")
+        x_arg, x_scale = x.struct_fieldtypes
+        y_arg, y_scale = y.struct_fieldtypes
+        assert (
+            isinstance(x_arg, FDType)
+            and isinstance(x_scale, FDType)
+            and isinstance(y_arg, FDType)
+            and isinstance(y_scale, FDType)
+        )
+        return TupleFType.from_tuple(
+            (promote_type(x_arg, y_arg), promote_type(x_scale, y_scale))
+        )
+
+    def is_identity(self, val: Any) -> builtins.bool:
+        return builtins.bool(val[0] == 0 and val[1] == 0)
+
+    def __eq__(self, other):
+        return isinstance(other, _AddScaledPower) and self.exponent == other.exponent
+
+    def __hash__(self):
+        return hash((type(self), self.exponent))
+
+    def __repr__(self) -> str:
+        return f"add_scaled_power({self.exponent!r})"
+
+
+class _AddScaledSquare(FinchOperator):
+    is_associative = True
+    is_commutative = True
+
+    def __call__(self, x: tuple, y: tuple) -> tuple:
+        x_arg, x_scale = x
+        y_arg, y_scale = y
+        if x_scale < y_scale:
+            x_arg, y_arg = y_arg, x_arg
+            x_scale, y_scale = y_scale, x_scale
+        if x_scale > y_scale:
+            ratio = np.true_divide(y_scale, x_scale)
+            return (x_arg + y_arg * ratio * ratio, x_scale)
+        return (x_arg + y_arg, x_scale)
+
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
+        if len(x.struct_fieldtypes) != 2 or len(y.struct_fieldtypes) != 2:
+            raise TypeError("Scaled square operands must be 2-tuples.")
+        x_arg, x_scale = x.struct_fieldtypes
+        y_arg, y_scale = y.struct_fieldtypes
+        assert (
+            isinstance(x_arg, FDType)
+            and isinstance(x_scale, FDType)
+            and isinstance(y_arg, FDType)
+            and isinstance(y_scale, FDType)
+        )
+        return TupleFType.from_tuple(
+            (promote_type(x_arg, y_arg), promote_type(x_scale, y_scale))
+        )
+
+    def is_identity(self, val: Any) -> builtins.bool:
+        return builtins.bool(val[0] == 0 and val[1] == 0)
+
+    def __repr__(self) -> str:
+        return "add_scaled_square"
+
+
+add_scaled_square = _AddScaledSquare()
+
+
+def add_scaled_power(exponent: float):
+    if exponent == 2.0:
+        return add_scaled_square
+    return _AddScaledPower(exponent)
+
+
+class _RootScaledPower(FinchOperator):
+    def __init__(self, exponent: float):
+        self.exponent = exponent
+
+    def __call__(self, x: tuple) -> Any:
+        arg, scale = x
+        return np.power(arg, 1.0 / self.exponent) * scale
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType)
+        if len(x.struct_fieldtypes) != 2:
+            raise TypeError("Scaled power roots must be taken from 2-tuples.")
+        arg, scale = x.struct_fieldtypes
+        assert isinstance(arg, FDType) and isinstance(scale, FDType)
+        return mul.return_type(pow.return_type(arg, ftype(float)), scale)
+
+    def __eq__(self, other):
+        return isinstance(other, _RootScaledPower) and self.exponent == other.exponent
+
+    def __hash__(self):
+        return hash((type(self), self.exponent))
+
+    def __repr__(self) -> str:
+        return f"root_scaled_power({self.exponent!r})"
+
+
+class _RootScaledSquare(FinchOperator):
+    def __call__(self, x: tuple) -> Any:
+        arg, scale = x
+        return np.sqrt(arg) * scale
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType)
+        if len(x.struct_fieldtypes) != 2:
+            raise TypeError("Scaled square roots must be taken from 2-tuples.")
+        arg, scale = x.struct_fieldtypes
+        assert isinstance(arg, FDType) and isinstance(scale, FDType)
+        return mul.return_type(sqrt.return_type(arg), scale)
+
+    def __repr__(self) -> str:
+        return "root_scaled_square"
+
+
+root_scaled_square = _RootScaledSquare()
+
+
+def root_scaled_power(exponent: float):
+    if exponent == 2.0:
+        return root_scaled_square
+    return _RootScaledPower(exponent)
+
+
 class _Scansearch(FinchOperator):
     """
     Scansearch is a search operator that performs a scan search on a sorted array.
@@ -1600,6 +1792,8 @@ __all__ = [
     "acos",
     "acosh",
     "add",
+    "add_scaled_power",
+    "add_scaled_square",
     "and_",
     "arccos",
     "arccosh",
@@ -1678,12 +1872,16 @@ __all__ = [
     "remainder",
     "resize_if_smaller",
     "round",
+    "root_scaled_power",
+    "root_scaled_square",
     "rshift",
     "same",
     "samehash",
     "scansearch",
     "sign",
     "signbit",
+    "scaled_power",
+    "scaled_square",
     "sin",
     "sinh",
     "sqrt",

@@ -94,6 +94,19 @@ def test_bufferized_ndarray_to_numpy_returns_view():
     assert np.shares_memory(result, tensor.val.arr)
 
 
+def test_numpy_buffer_tuple_dtype_load_store():
+    dtype = np.dtype([("element_0", np.float64), ("element_1", np.int32)])
+    buf = NumpyBuffer(np.zeros(2, dtype=dtype))
+
+    assert buf.ftype.element_type == finchlite.algebra.TupleFType.from_tuple(
+        (finchlite.float64, finchlite.int32)
+    )
+    assert buf.load(0) == (np.float64(0.0), np.int32(0))
+
+    buf.store(1, (np.float64(1.5), np.int32(2)))
+
+    assert buf.load(1) == (np.float64(1.5), np.int32(2))
+
 
 def test_tensor_conversion_helpers_accept_scipy_sparse():
     arr = np.array([[0, 2, 0], [3, 0, 4]], dtype=np.int32)
