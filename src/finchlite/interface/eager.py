@@ -443,14 +443,6 @@ def det(x, /):
     return lazy.asarray(np.asarray(np.linalg.det(x)))
 
 
-def _sparse_tol(rtol=None, atol=None):
-    if rtol is None:
-        return atol
-    if atol is None:
-        return rtol
-    return min(rtol, atol)
-
-
 def eigh(x, /, *, k=None, rtol=None, atol=None):
     x = _warn_compute(x, "eigh")
     if k is not None:
@@ -459,7 +451,18 @@ def eigh(x, /, *, k=None, rtol=None, atol=None):
                 "k": k,
                 "return_eigenvectors": True,
             }
-            tol = _sparse_tol(rtol, atol)
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "eigh sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
             return lazy.asarray(
@@ -467,6 +470,13 @@ def eigh(x, /, *, k=None, rtol=None, atol=None):
             )
         except Exception:
             pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "eigh dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.linalg.eigh(x))
 
@@ -479,7 +489,18 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
                 "k": k,
                 "return_eigenvectors": False,
             }
-            tol = _sparse_tol(rtol, atol)
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "eigvalsh sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
             return lazy.asarray(
@@ -487,6 +508,13 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
             )
         except Exception:
             pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "eigvalsh dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.linalg.eigvalsh(x))
 
@@ -495,12 +523,25 @@ def matrix_rank(x, /, *, rtol=None, atol=None):
     x = _warn_compute(x, "matrix_rank")
     x = to_numpy(lazy.asarray(x))
     if atol is not None:
+        if rtol is not None:
+            warnings.warn(
+                "matrix_rank cannot apply both rtol and atol with this fallback; "
+                "using atol.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, tol=atol)))
     if rtol is None:
         return lazy.asarray(np.asarray(np.linalg.matrix_rank(x)))
     try:
         return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, rtol=rtol)))
     except TypeError:
+        warnings.warn(
+            "matrix_rank fallback cannot apply rtol as a relative tolerance with "
+            "this NumPy version; using it as an absolute tolerance.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, tol=rtol)))
 
 
@@ -550,7 +591,18 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
                 "k": k,
                 "return_singular_vectors": True,
             }
-            tol = _sparse_tol(rtol, atol)
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "svd sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
             return lazy.asarray(
@@ -558,6 +610,13 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
             )
         except Exception:
             pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "svd dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.linalg.svd(x, full_matrices=full_matrices))
 
@@ -570,7 +629,18 @@ def svdvals(x, /, *, k=None, rtol=None, atol=None):
                 "k": k,
                 "return_singular_vectors": False,
             }
-            tol = _sparse_tol(rtol, atol)
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "svdvals sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
             return lazy.asarray(
@@ -578,6 +648,13 @@ def svdvals(x, /, *, k=None, rtol=None, atol=None):
             )
         except Exception:
             pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "svdvals dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     x = to_numpy(lazy.asarray(x))
     svdvals_func = getattr(np.linalg, "svdvals", None)
     if svdvals_func is None:
