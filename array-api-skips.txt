@@ -137,7 +137,6 @@ array_api_tests/test_linalg.py::test_cholesky
 array_api_tests/test_linalg.py::test_det
 array_api_tests/test_linalg.py::test_svdvals
 array_api_tests/test_linalg.py::test_svd
-array_api_tests/test_linalg.py::test_linalg_tensordot
 
 # test_manipulation_functions
 

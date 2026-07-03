@@ -498,7 +498,7 @@ def remainder(x1, x2):
     return compute(lazy.remainder(x1, x2))
 
 
-def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
+def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]] = 2):
     """
     Computes the tensordot operation.
 

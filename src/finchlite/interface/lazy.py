@@ -1448,7 +1448,7 @@ def count_nonfill(
 
 
 def tensordot(
-    x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]
+    x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]] = 2
 ) -> LazyTensor:
     """
     Computes the tensordot operation.
@@ -1504,7 +1504,13 @@ def tensordot(
     expanded_product = multiply(x1p, x2p)
 
     sum_axes = tuple(range(len(notin_a), len(notin_a) + len(axes_a)))
-    return sum(expanded_product, axis=sum_axes)
+    if not sum_axes:
+        return expanded_product
+    return sum(
+        expanded_product,
+        axis=sum_axes,
+        dtype=result_type(x1.element_type, x2.element_type),
+    )
 
 
 def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:

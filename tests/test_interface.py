@@ -1216,6 +1216,7 @@ def test_matrix_transpose(a, a_wrap):
         # axes=0 (outer product)
         (np.arange(3), np.arange(4), 0),
         (np.arange(8 * 7 * 5).reshape(8, 7, 5), np.arange(12).reshape(3, 4, 1), 0),
+        (np.arange(3, dtype=np.uint8), np.arange(4, dtype=np.uint8), ((), ())),
         # complex
         (random_array((2, 3)), random_array((3, 4)), 1),
         (
@@ -1263,6 +1264,17 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
         assert isinstance(result, finchlite.LazyTensor)
         result = finchlite.compute(result)
     finch_assert_allclose(result, expected)
+    assert result.to_numpy().dtype == expected.dtype
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_tensordot_default_axes():
+    a = np.arange(24).reshape(2, 3, 4)
+    b = np.arange(24).reshape(3, 4, 2)
+
+    result = finchlite.tensordot(a, b)
+
+    finch_assert_allclose(result, np.tensordot(a, b))
 
 
 @pytest.mark.parametrize(
