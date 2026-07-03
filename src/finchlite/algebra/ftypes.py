@@ -954,7 +954,17 @@ def ftype(x) -> FType:
     if isinstance(x, FTyped):
         return x.ftype
     if isinstance(x, np.dtype):
+        if x.fields is not None:
+            assert x.names is not None
+            return TupleFType.from_tuple(
+                tuple(ftype(x.fields[name][0]) for name in x.names)
+            )
         x = x.type
+    if isinstance(x, np.void) and x.dtype.fields is not None:
+        assert x.dtype.names is not None
+        return TupleFType.from_tuple(
+            tuple(ftype(x.dtype.fields[name][0]) for name in x.dtype.names)
+        )
     if type(x) is builtins.bool or x is builtins.bool:
         return bool_
     if type(x) is builtins.int or x is builtins.int:

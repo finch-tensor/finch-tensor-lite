@@ -630,6 +630,74 @@ class _Max(NAryFinchOperator):
 max = _Max()
 
 
+class _MinBy(FinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, x: tuple, y: tuple) -> tuple:
+        x_key, y_key = x[0], y[0]
+        x_last, y_last = x[-1], y[-1]
+        if x_key < y_key:
+            return x
+        if y_key < x_key:
+            return y
+        return x if x_last <= y_last else y
+
+    def return_type(self, x: FType, y: FType) -> FType:
+        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
+        if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
+            raise TypeError("Tuple operands must have the same length.")
+        return TupleFType.from_tuple(
+            tuple(
+                promote_type(x_type, y_type)
+                for x_type, y_type in zip(
+                    x.struct_fieldtypes, y.struct_fieldtypes, strict=True
+                )
+            )
+        )
+
+    def __repr__(self) -> str:
+        return "minby"
+
+
+minby = _MinBy()
+
+
+class _MaxBy(FinchOperator):
+    is_associative = True
+    is_commutative = True
+    is_idempotent = True
+
+    def __call__(self, x: tuple, y: tuple) -> tuple:
+        x_key, y_key = x[0], y[0]
+        x_last, y_last = x[-1], y[-1]
+        if x_key > y_key:
+            return x
+        if y_key > x_key:
+            return y
+        return x if x_last <= y_last else y
+
+    def return_type(self, x: FType, y: FType) -> FType:
+        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
+        if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
+            raise TypeError("Tuple operands must have the same length.")
+        return TupleFType.from_tuple(
+            tuple(
+                promote_type(x_type, y_type)
+                for x_type, y_type in zip(
+                    x.struct_fieldtypes, y.struct_fieldtypes, strict=True
+                )
+            )
+        )
+
+    def __repr__(self) -> str:
+        return "maxby"
+
+
+maxby = _MaxBy()
+
+
 class _Remainder(BinaryFinchOperator):
     def __call__(self, a, b):
         return np.remainder(a, b)
@@ -1429,6 +1497,21 @@ class _MakeTuple(FinchOperator):
 make_tuple = _MakeTuple()
 
 
+class _Last(FinchOperator):
+    def __call__(self, x: tuple) -> Any:
+        return x[-1]
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType)
+        return x.struct_fieldtypes[-1]
+
+    def __repr__(self) -> str:
+        return "last"
+
+
+last = _Last()
+
+
 class _Scansearch(FinchOperator):
     """
     Scansearch is a search operator that performs a scan search on a sorted array.
@@ -1557,6 +1640,7 @@ __all__ = [
     "isfinite",
     "isinf",
     "isnan",
+    "last",
     "le",
     "less",
     "less_equal",
@@ -1574,8 +1658,10 @@ __all__ = [
     "make_tuple",
     "max",
     "max",
+    "maxby",
     "min",
     "min",
+    "minby",
     "mod",
     "mul",
     "ne",

@@ -1057,16 +1057,15 @@ def argmin(
         sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
         indices = lazy(IndexTensor(x.shape, np.intp))
 
-    return reduce(
-        ffuncs.min,
-        where(
-            equal(x, reduce(ffuncs.min, x, axis=axis, keepdims=True)),
-            indices,
-            sentinel,
+    return elementwise(
+        ffuncs.last,
+        reduce(
+            ffuncs.minby,
+            elementwise(ffuncs.make_tuple, x, indices),
+            axis=axis,
+            keepdims=keepdims,
+            init=(ffuncs.min.init_value(x.element_type), sentinel),
         ),
-        axis=axis,
-        keepdims=keepdims,
-        init=sentinel,
     )
 
 
@@ -1090,16 +1089,15 @@ def argmax(
         sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
         indices = lazy(IndexTensor(x.shape, np.intp))
 
-    return reduce(
-        ffuncs.min,
-        where(
-            equal(x, reduce(ffuncs.max, x, axis=axis, keepdims=True)),
-            indices,
-            sentinel,
+    return elementwise(
+        ffuncs.last,
+        reduce(
+            ffuncs.maxby,
+            elementwise(ffuncs.make_tuple, x, indices),
+            axis=axis,
+            keepdims=keepdims,
+            init=(ffuncs.max.init_value(x.element_type), sentinel),
         ),
-        axis=axis,
-        keepdims=keepdims,
-        init=sentinel,
     )
 
 

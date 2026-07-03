@@ -292,7 +292,8 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self,
         shape: tuple[int, ...],
     ) -> BufferizedNDArray:
-        arr = np.full(shape, self.fill_value, dtype=to_numpy_type(self.element_type))
+        arr = np.empty(shape, dtype=to_numpy_type(self.element_type))
+        arr[...] = self.fill_value
         return self.from_numpy(arr)
 
     def __call__(
@@ -317,7 +318,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return (
             self.buf_t == other.buf_t
             and self.ndim == other.ndim
-            and ffuncs.same(self.fill_value, other.fill_value)
+            and bool(np.all(ffuncs.same(self.fill_value, other.fill_value)))
             and self.device == other.device
         )
 

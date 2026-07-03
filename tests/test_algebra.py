@@ -68,6 +68,8 @@ def test_algebra_selected():
     assert is_idempotent(ffuncs.logical_or)
     assert is_idempotent(ffuncs.min)
     assert is_idempotent(ffuncs.max)
+    assert is_idempotent(ffuncs.minby)
+    assert is_idempotent(ffuncs.maxby)
     assert is_idempotent(ffuncs.add) is False
     assert is_idempotent(ffuncs.mul) is False
     assert is_idempotent(ffuncs.xor) is False
@@ -82,6 +84,13 @@ def test_algebra_selected():
     assert ffuncs.choose(0)(0, 2, 3) == 2
     assert ffuncs.choose(0)(0, 0) == 0
     assert ffuncs.choose(np.nan)(np.nan, 4.0) == 4.0
+    assert ffuncs.minby((1, 10), (2, 20)) == (1, 10)
+    assert ffuncs.minby((2, 10), (1, 20)) == (1, 20)
+    assert ffuncs.minby((1, 10), (1, 20)) == (1, 10)
+    assert ffuncs.maxby((2, 10), (1, 20)) == (2, 10)
+    assert ffuncs.maxby((1, 10), (2, 20)) == (2, 20)
+    assert ffuncs.maxby((1, 10), (1, 20)) == (1, 10)
+    assert ffuncs.last((1, 2, 3)) == 3
 
 
 def test_python_scalar_promotion_uses_weak_bottom():
