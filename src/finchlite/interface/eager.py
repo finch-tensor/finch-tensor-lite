@@ -542,7 +542,7 @@ def sign(x):
 
 def _flatten_for_concat(array):
     array = lazy.asarray(array)
-    size = int(np.prod(array.shape, dtype=np.intp)) if array.shape else 1
+    size = functools.reduce(operator.mul, array.shape, 1)
     if hasattr(array, "reshape"):
         return array.reshape((size,))
     if hasattr(array, "to_numpy"):
