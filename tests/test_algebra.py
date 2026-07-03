@@ -110,6 +110,11 @@ def test_algebra_selected():
         ffuncs.root_scaled_negative_power(-2.0)(scaled_negative_sum),
         2.0 / math.sqrt(1.25),
     )
+    scaled_negative_nan = ffuncs.add_scaled_negative_power(-2.0)(
+        (1.0, 2.0), (1.0, math.nan)
+    )
+    assert math.isnan(scaled_negative_nan[0])
+    assert math.isnan(scaled_negative_nan[1])
     assert ffuncs.root_scaled_negative_power(-2.0)(
         ffuncs.add_scaled_negative_power(-2.0)((1.0, 2.0), (math.inf, 0.0))
     ) == 0.0

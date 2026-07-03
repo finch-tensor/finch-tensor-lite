@@ -1438,6 +1438,12 @@ def test_linalg_vector_norm_negative_ord_stable_values():
     )
     finch_assert_allclose(zero_result, np.float64(0.0))
 
+    nan = np.array([1.0, np.nan], dtype=np.float64)
+    nan_result = finchlite.compute(
+        finchlite.linalg.vector_norm(finchlite.lazy(nan), ord=-2)
+    )
+    assert np.isnan(nan_result.item())
+
 
 @pytest.mark.parametrize(
     "kw",

@@ -1693,6 +1693,13 @@ class _AddScaledNegativePower(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
         y_arg, y_scale = y
+        if (
+            np.isnan(x_arg)
+            or np.isnan(x_scale)
+            or np.isnan(y_arg)
+            or np.isnan(y_scale)
+        ):
+            return (np.nan, np.nan)
         if x_scale == 0 or y_scale == 0:
             return (np.inf, 0)
         if x_scale > y_scale:
@@ -1800,6 +1807,10 @@ class _RootScaledNegativePower(FinchOperator):
 
     def __call__(self, x: tuple) -> Any:
         arg, scale = x
+        if scale == 0:
+            return scale
+        if arg == 0 and np.isinf(scale):
+            return scale
         return np.power(arg, 1.0 / self.exponent) * scale
 
     def return_type(self, x: FType) -> FType:  # type: ignore[override]
