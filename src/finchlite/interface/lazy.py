@@ -1662,15 +1662,15 @@ def det(x, /):
     _eager_only("det")
 
 
-def eigh(x, /, *, UPLO="L"):
+def eigh(x, /, *, k=None, rtol=None, atol=None):
     _eager_only("eigh")
 
 
-def eigvalsh(x, /, *, UPLO="L"):
+def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
     _eager_only("eigvalsh")
 
 
-def matrix_rank(x, /, *, rtol=None):
+def matrix_rank(x, /, *, rtol=None, atol=None):
     _eager_only("matrix_rank")
 
 
@@ -1690,11 +1690,11 @@ def solve(x1, x2, /):
     _eager_only("solve")
 
 
-def svd(x, /, *, full_matrices=True):
+def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
     _eager_only("svd")
 
 
-def svdvals(x, /):
+def svdvals(x, /, *, k=None, rtol=None, atol=None):
     _eager_only("svdvals")
 
 

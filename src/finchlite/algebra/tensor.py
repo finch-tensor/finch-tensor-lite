@@ -4,9 +4,26 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
+import scipy.sparse as scipy_sparse
 
 from .devices import normalize_device, serial
 from .ftypes import FType, FTyped
+
+
+def to_numpy(x):
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    if scipy_sparse.issparse(x):
+        return x.toarray()
+    return np.asarray(x)
+
+
+def to_scipy(x):
+    if hasattr(x, "to_scipy"):
+        return x.to_scipy()
+    if scipy_sparse.issparse(x):
+        return x
+    raise NotImplementedError(f"{type(x).__name__} does not support to_scipy.")
 
 
 class TensorFType(FType, ABC):

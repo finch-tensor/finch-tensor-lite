@@ -78,6 +78,8 @@ from .ftypes import (
 from .tensor import (
     Tensor,
     TensorFType,
+    to_numpy,
+    to_scipy,
 )
 
 __all__ = [
@@ -107,6 +109,8 @@ __all__ = [
     "Tensor",
     "TensorFType",
     "TupleFType",
+    "to_numpy",
+    "to_scipy",
     "TupleFType",
     "bool",
     "bool_",

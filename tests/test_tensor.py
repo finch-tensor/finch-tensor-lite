@@ -1,6 +1,7 @@
 import pytest
 
 import numpy as np
+import scipy.sparse
 
 import finchlite
 from finchlite import (
@@ -128,6 +129,14 @@ def test_sparse_tensor_to_scipy():
     scipy_tensor = tensor.to_scipy()
 
     np.testing.assert_array_equal(scipy_tensor.toarray(), arr)
+
+
+def test_tensor_conversion_helpers_accept_scipy_sparse():
+    arr = np.array([[0, 2, 0], [3, 0, 4]], dtype=np.int32)
+    scipy_tensor = scipy.sparse.csr_matrix(arr)
+
+    np.testing.assert_array_equal(finchlite.to_numpy(scipy_tensor), arr)
+    assert finchlite.to_scipy(scipy_tensor) is scipy_tensor
 
 
 def test_dense_tensor_to_scipy_rejects():

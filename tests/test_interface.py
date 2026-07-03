@@ -6,6 +6,7 @@ import warnings
 import pytest
 
 import numpy as np
+import scipy.sparse as scipy_sparse
 
 import finchlite
 from finchlite import ffuncs
@@ -1536,6 +1537,47 @@ def test_linalg_new_eager_methods_use_numpy_fallback():
         finchlite.linalg.svdvals(x),
         np.linalg.svd(x, compute_uv=False),
     )
+
+
+def test_linalg_partial_sparse_eigen_kwargs():
+    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+
+    vals = finchlite.linalg.eigvalsh(x, k=2, rtol=1e-12)
+    eig_vals, eig_vecs = finchlite.linalg.eigh(x, k=2, atol=1e-12)
+
+    finch_assert_allclose(np.sort(vals.to_numpy()), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(eig_vals), np.array([3.0, 4.0]))
+    assert eig_vecs.shape == (4, 2)
+
+
+def test_linalg_partial_sparse_svd_kwargs():
+    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+
+    vals = finchlite.linalg.svdvals(x, k=2, rtol=1e-12)
+    u, s, vh = finchlite.linalg.svd(x, k=2, atol=1e-12)
+
+    finch_assert_allclose(np.sort(vals.to_numpy()), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(s), np.array([3.0, 4.0]))
+    assert u.shape == (4, 2)
+    assert vh.shape == (2, 4)
+
+
+def test_linalg_partial_sparse_kwargs_dense_fallback_returns_full_results():
+    x = np.diag([1.0, 2.0, 3.0, 4.0])
+
+    eig_vals = finchlite.linalg.eigvalsh(x, k=2, rtol=1e-12)
+    singular_vals = finchlite.linalg.svdvals(x, k=2, atol=1e-12)
+
+    finch_assert_allclose(eig_vals, np.linalg.eigvalsh(x))
+    finch_assert_allclose(singular_vals, np.linalg.svd(x, compute_uv=False))
+
+
+def test_linalg_matrix_rank_accepts_atol():
+    x = np.diag([1.0, 1e-12])
+
+    result = finchlite.linalg.matrix_rank(x, atol=1e-10)
+
+    finch_assert_equal(result, np.linalg.matrix_rank(x, tol=1e-10))
 
 
 def test_fft_eager_methods_use_numpy_fallback():
