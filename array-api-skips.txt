@@ -67,15 +67,6 @@ array_api_tests/test_has_names.py::test_has_names[indexing-take_along_axis]
 # not implemented
 array_api_tests/test_indexing_functions.py::test_take
 
-# test_linalg
-
-# not implemented
-array_api_tests/test_linalg.py::test_cross
-array_api_tests/test_linalg.py::test_eigh
-array_api_tests/test_linalg.py::test_qr
-array_api_tests/test_linalg.py::test_slogdet
-array_api_tests/test_linalg.py::test_svd
-
 # test_manipulation_functions
 
 # not implemented

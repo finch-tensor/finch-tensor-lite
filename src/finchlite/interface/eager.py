@@ -2,6 +2,7 @@ import builtins
 import functools
 import operator
 import warnings
+from collections import namedtuple
 from collections.abc import Sequence
 from typing import Any
 
@@ -14,6 +15,11 @@ from finchlite.algebra import FinchOperator, to_numpy, to_scipy
 
 from . import lazy
 from .fuse import compute
+
+EighResult = namedtuple("EighResult", ["eigenvalues", "eigenvectors"])
+QRResult = namedtuple("QRResult", ["Q", "R"])
+SlogdetResult = namedtuple("SlogdetResult", ["sign", "logabsdet"])
+SVDResult = namedtuple("SVDResult", ["U", "S", "Vh"])
 
 
 def _warn_compute(x, op_name: str):
@@ -432,7 +438,9 @@ def cholesky(x, /, *, upper=False):
 def cross(x1, x2, /, *, axis=-1):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.cross(x1, x2, axis=axis)
-    return compute(lazy.cross(x1, x2, axis=axis))
+    return lazy.asarray(
+        np.cross(to_numpy(lazy.asarray(x1)), to_numpy(lazy.asarray(x2)), axis=axis)
+    )
 
 
 def _min_perm_swaps(arr):
@@ -504,9 +512,10 @@ def eigh(x, /, *, k=None, rtol=None, atol=None):
                 tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
-            return lazy.asarray(
-                scipy_sparse_linalg.eigsh(to_scipy(lazy.asarray(x)), **kwargs)
+            eigenvalues, eigenvectors = scipy_sparse_linalg.eigsh(
+                to_scipy(lazy.asarray(x)), **kwargs
             )
+            return EighResult(lazy.asarray(eigenvalues), lazy.asarray(eigenvectors))
         except Exception:
             pass
     if rtol is not None or atol is not None:
@@ -517,7 +526,8 @@ def eigh(x, /, *, k=None, rtol=None, atol=None):
             stacklevel=2,
         )
     x = to_numpy(lazy.asarray(x))
-    return lazy.asarray(np.linalg.eigh(x))
+    eigenvalues, eigenvectors = np.linalg.eigh(x)
+    return EighResult(lazy.asarray(eigenvalues), lazy.asarray(eigenvectors))
 
 
 def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
@@ -598,13 +608,15 @@ def pinv(x, /, *, rtol=None):
 def qr(x, /, *, mode="reduced"):
     x = _warn_compute(x, "qr")
     x = to_numpy(lazy.asarray(x))
-    return lazy.asarray(np.linalg.qr(x, mode=mode))
+    q, r = np.linalg.qr(x, mode=mode)
+    return QRResult(lazy.asarray(q), lazy.asarray(r))
 
 
 def slogdet(x, /):
     x = _warn_compute(x, "slogdet")
     x = to_numpy(lazy.asarray(x))
-    return lazy.asarray(np.linalg.slogdet(x))
+    sign, logabsdet = np.linalg.slogdet(x)
+    return SlogdetResult(lazy.asarray(sign), lazy.asarray(logabsdet))
 
 
 def solve(x1, x2, /):
@@ -644,9 +656,10 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
                 tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
-            return lazy.asarray(
-                scipy_sparse_linalg.svds(to_scipy(lazy.asarray(x)), **kwargs)
+            u, s, vh = scipy_sparse_linalg.svds(
+                to_scipy(lazy.asarray(x)), **kwargs
             )
+            return SVDResult(lazy.asarray(u), lazy.asarray(s), lazy.asarray(vh))
         except Exception:
             pass
     if rtol is not None or atol is not None:
@@ -657,7 +670,8 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
             stacklevel=2,
         )
     x = to_numpy(lazy.asarray(x))
-    return lazy.asarray(np.linalg.svd(x, full_matrices=full_matrices))
+    u, s, vh = np.linalg.svd(x, full_matrices=full_matrices)
+    return SVDResult(lazy.asarray(u), lazy.asarray(s), lazy.asarray(vh))
 
 
 def svdvals(x, /, *, k=None, rtol=None, atol=None):

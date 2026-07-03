@@ -1607,7 +1607,7 @@ def test_linalg_partial_sparse_eigen_kwargs():
     eig_vals, eig_vecs = finchlite.linalg.eigh(x, k=2, atol=1e-12)
 
     finch_assert_allclose(np.sort(vals.to_numpy()), np.array([3.0, 4.0]))
-    finch_assert_allclose(np.sort(eig_vals), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(eig_vals.to_numpy()), np.array([3.0, 4.0]))
     assert eig_vecs.shape == (4, 2)
 
 
@@ -1618,7 +1618,7 @@ def test_linalg_partial_sparse_svd_kwargs():
     u, s, vh = finchlite.linalg.svd(x, k=2, atol=1e-12)
 
     finch_assert_allclose(np.sort(vals.to_numpy()), np.array([3.0, 4.0]))
-    finch_assert_allclose(np.sort(s), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(s.to_numpy()), np.array([3.0, 4.0]))
     assert u.shape == (4, 2)
     assert vh.shape == (2, 4)
 

@@ -1676,31 +1676,31 @@ _cross_E = [
 def cross(x1, x2, /, *, axis=-1):
     x1 = lazy(x1)
     x2 = lazy(x2)
-    axis1 = normalize_axis_index(axis, x1.ndim)
-    axis2 = normalize_axis_index(axis, x2.ndim)
+    shape = _broadcast_shape(x1.shape, x2.shape)
+    x1 = broadcast_to(x1, shape)
+    x2 = broadcast_to(x2, shape)
+    axis = normalize_axis_index(axis, x1.ndim)
 
-    if x1.shape[axis1] != 3:
+    if x1.shape[axis] != 3:
         raise ValueError(f"x1 cross product axis must have length 3, got {x1.shape}")
-    if x2.shape[axis2] != 3:
+    if x2.shape[axis] != 3:
         raise ValueError(f"x2 cross product axis must have length 3, got {x2.shape}")
 
-    if x1.ndim != x2.ndim:
-        raise ValueError("cross operands must have the same number of dimensions")
-    if axis1 != axis2:
-        raise ValueError("cross operands must use the same normalized axis")
-
-    e_axes = tuple(range(axis1)) + tuple(range(axis1 + 3, x1.ndim + 2))
+    e_axes = tuple(range(axis)) + tuple(range(axis + 3, x1.ndim + 2))
     terms = multiply(
         multiply(
             expand_dims(
                 asarray(_cross_E, device=common_device(x1.device, x2.device)),
                 axis=e_axes,
             ),
-            expand_dims(expand_dims(x1, axis=axis1), axis=axis1 + 2),
+            expand_dims(expand_dims(x1, axis=axis), axis=axis + 2),
         ),
-        expand_dims(expand_dims(x2, axis=axis1), axis=axis1 + 1),
+        expand_dims(expand_dims(x2, axis=axis), axis=axis + 1),
     )
-    return reduce(ffuncs.add, terms, axis=(axis1 + 1, axis1 + 2))
+    return astype(
+        reduce(ffuncs.add, terms, axis=(axis + 1, axis + 2)),
+        result_type(x1.element_type, x2.element_type),
+    )
 
 
 def det(x, /):
