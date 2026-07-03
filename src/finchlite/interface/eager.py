@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
+import scipy.fft as scipy_fft
+import scipy.sparse.linalg as scipy_sparse_linalg
 
 from finchlite.algebra import FinchOperator
 
@@ -403,20 +405,6 @@ def matrix_transpose(x, /):
     if isinstance(x, lazy.LazyTensor):
         return lazy.matrix_transpose(x)
     return compute(lazy.matrix_transpose(x))
-
-
-def _to_numpy(x, op_name: str):
-    x = _warn_compute(x, op_name)
-    x = lazy.asarray(x)
-    while hasattr(x, "to_numpy"):
-        x = x.to_numpy()
-    return x
-
-
-def inv(x, /):
-    x = _to_numpy(x, "inv")
-    return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
-
 
 def matrix_power(x, n, /):
     """

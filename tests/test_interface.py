@@ -1482,6 +1482,92 @@ def test_linalg_inv_lazy_warns_and_computes():
     finch_assert_allclose(result, expected)
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "cholesky",
+        "cross",
+        "det",
+        "eigh",
+        "eigvalsh",
+        "matrix_rank",
+        "pinv",
+        "qr",
+        "slogdet",
+        "solve",
+        "svd",
+        "svdvals",
+    ],
+)
+def test_linalg_missing_methods_are_exposed(name):
+    assert hasattr(finchlite.linalg, name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "fft",
+        "ifft",
+        "fftn",
+        "ifftn",
+        "rfft",
+        "irfft",
+        "rfftn",
+        "irfftn",
+        "hfft",
+        "ihfft",
+        "fftshift",
+        "ifftshift",
+        "fftfreq",
+        "rfftfreq",
+    ],
+)
+def test_fft_methods_are_exposed(name):
+    assert hasattr(finchlite.fft, name)
+
+
+def test_linalg_new_eager_methods_use_numpy_fallback():
+    x = np.array([[3.0, 1.0], [1.0, 3.0]])
+    b = np.array([1.0, 2.0])
+
+    finch_assert_allclose(finchlite.linalg.det(x), np.linalg.det(x))
+    finch_assert_allclose(finchlite.linalg.solve(x, b), np.linalg.solve(x, b))
+    finch_assert_allclose(
+        finchlite.linalg.svdvals(x),
+        np.linalg.svd(x, compute_uv=False),
+    )
+
+
+def test_fft_eager_methods_use_numpy_fallback():
+    x = np.arange(4, dtype=np.float64)
+
+    finch_assert_allclose(finchlite.fft.fft(x), np.fft.fft(x))
+    finch_assert_allclose(finchlite.fft.rfft(x), np.fft.rfft(x))
+    finch_assert_allclose(finchlite.fft.fftfreq(4), np.fft.fftfreq(4))
+
+
+def test_new_eager_only_methods_warn_compute_lazy_operands():
+    x = np.array([[3.0, 1.0], [1.0, 3.0]])
+
+    with pytest.warns(RuntimeWarning, match="det"):
+        det_result = finchlite.linalg.det(finchlite.lazy(x))
+    with pytest.warns(RuntimeWarning, match="fft"):
+        fft_result = finchlite.fft.fft(finchlite.lazy(x[0]))
+
+    finch_assert_allclose(det_result, np.linalg.det(x))
+    finch_assert_allclose(fft_result, np.fft.fft(x[0]))
+
+
+def test_new_lazy_methods_error_directly():
+    lazy_mod = importlib.import_module("finchlite.interface.lazy")
+    x = finchlite.lazy(np.eye(2))
+
+    with pytest.raises(NotImplementedError, match="det is eager-only"):
+        lazy_mod.det(x)
+    with pytest.raises(NotImplementedError, match="fft is eager-only"):
+        lazy_mod.fft(x)
+
+
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "x, axis, expected",

@@ -1646,6 +1646,114 @@ def matrix_norm(x, /, *, keepdims=False, ord="fro") -> LazyTensor:
     raise NotImplementedError(f"matrix_norm does not support ord={ord!r} lazily")
 
 
+def _eager_only(name):
+    raise NotImplementedError(f"{name} is eager-only and cannot be fused lazily")
+
+
+def cholesky(x, /, *, upper=False):
+    _eager_only("cholesky")
+
+
+def cross(x1, x2, /, *, axis=-1):
+    _eager_only("cross")
+
+
+def det(x, /):
+    _eager_only("det")
+
+
+def eigh(x, /, *, UPLO="L"):
+    _eager_only("eigh")
+
+
+def eigvalsh(x, /, *, UPLO="L"):
+    _eager_only("eigvalsh")
+
+
+def matrix_rank(x, /, *, rtol=None):
+    _eager_only("matrix_rank")
+
+
+def pinv(x, /, *, rtol=None):
+    _eager_only("pinv")
+
+
+def qr(x, /, *, mode="reduced"):
+    _eager_only("qr")
+
+
+def slogdet(x, /):
+    _eager_only("slogdet")
+
+
+def solve(x1, x2, /):
+    _eager_only("solve")
+
+
+def svd(x, /, *, full_matrices=True):
+    _eager_only("svd")
+
+
+def svdvals(x, /):
+    _eager_only("svdvals")
+
+
+def fft(x, /, *, n=None, axis=-1, norm=None):
+    _eager_only("fft")
+
+
+def ifft(x, /, *, n=None, axis=-1, norm=None):
+    _eager_only("ifft")
+
+
+def fftn(x, /, *, s=None, axes=None, norm=None):
+    _eager_only("fftn")
+
+
+def ifftn(x, /, *, s=None, axes=None, norm=None):
+    _eager_only("ifftn")
+
+
+def rfft(x, /, *, n=None, axis=-1, norm=None):
+    _eager_only("rfft")
+
+
+def irfft(x, /, *, n=None, axis=-1, norm=None):
+    _eager_only("irfft")
+
+
+def rfftn(x, /, *, s=None, axes=None, norm=None):
+    _eager_only("rfftn")
+
+
+def irfftn(x, /, *, s=None, axes=None, norm=None):
+    _eager_only("irfftn")
+
+
+def hfft(x, /, *, n=None, axis=-1, norm=None):
+    _eager_only("hfft")
+
+
+def ihfft(x, /, *, n=None, axis=-1, norm=None):
+    _eager_only("ihfft")
+
+
+def fftshift(x, /, *, axes=None):
+    _eager_only("fftshift")
+
+
+def ifftshift(x, /, *, axes=None):
+    _eager_only("ifftshift")
+
+
+def fftfreq(n, /, *, d=1.0, device=None):
+    _eager_only("fftfreq")
+
+
+def rfftfreq(n, /, *, d=1.0, device=None):
+    _eager_only("rfftfreq")
+
+
 @dataclass(frozen=True, eq=False)
 class FillTensorFType(TensorFType):
     _fill_value: Any

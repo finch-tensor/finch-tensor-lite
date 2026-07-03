@@ -2,6 +2,7 @@ from finchlite.autoschedule import get_default_scheduler, set_default_scheduler
 from finchlite.tensor.np_wrapper import NumPyFType, NumPyWrapper
 from finchlite.tensor.scalar import Scalar, ScalarFType
 
+from . import fft, linalg
 from .eager import (
     abs,
     acos,
@@ -207,6 +208,7 @@ __all__ = [
     "full_like",
     "fuse",
     "fused",
+    "fft",
     "get_default_scheduler",
     "greater",
     "greater_equal",
@@ -218,6 +220,7 @@ __all__ = [
     "lazy",
     "less",
     "less_equal",
+    "linalg",
     "linspace",
     "log",
     "log1p",
