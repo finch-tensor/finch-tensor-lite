@@ -99,6 +99,12 @@ def test_algebra_selected():
     scaled_sum = ffuncs.add_scaled_square((1.0, 3.0), (1.0, 4.0))
     assert scaled_sum == (1.5625, 4.0)
     assert ffuncs.root_scaled_square(scaled_sum) == 5.0
+    scaled_square_nan = ffuncs.add_scaled_square((0.0, 0.0), (1.0, math.nan))
+    assert math.isnan(scaled_square_nan[0])
+    assert math.isnan(scaled_square_nan[1])
+    scaled_power_nan = ffuncs.add_scaled_power(3.0)((0.0, 0.0), (1.0, math.nan))
+    assert math.isnan(scaled_power_nan[0])
+    assert math.isnan(scaled_power_nan[1])
     scaled_negative_zero = ffuncs.scaled_negative_power(-2.0)(np.float64(0.0))
     assert math.isinf(scaled_negative_zero[0])
     assert scaled_negative_zero[1] == 0.0

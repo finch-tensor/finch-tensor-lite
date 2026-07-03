@@ -826,6 +826,13 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_equal(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")
+def test_std_nan_propagation():
+    x = np.array([np.nan], dtype=np.float64)
+    result = finchlite.compute(finchlite.std(finchlite.lazy(x)))
+    assert np.isnan(result.item())
+
+
 @pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
 @pytest.mark.parametrize(
     "op, np_op", [(finchlite.argmin, np.argmin), (finchlite.argmax, np.argmax)]

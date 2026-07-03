@@ -1565,6 +1565,13 @@ class _AddScaledPower(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
         y_arg, y_scale = y
+        if (
+            np.isnan(x_arg)
+            or np.isnan(x_scale)
+            or np.isnan(y_arg)
+            or np.isnan(y_scale)
+        ):
+            return (np.nan, np.nan)
         if x_scale < y_scale:
             x_arg, y_arg = y_arg, x_arg
             x_scale, y_scale = y_scale, x_scale
@@ -1612,6 +1619,13 @@ class _AddScaledSquare(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
         y_arg, y_scale = y
+        if (
+            np.isnan(x_arg)
+            or np.isnan(x_scale)
+            or np.isnan(y_arg)
+            or np.isnan(y_scale)
+        ):
+            return (np.nan, np.nan)
         if x_scale < y_scale:
             x_arg, y_arg = y_arg, x_arg
             x_scale, y_scale = y_scale, x_scale
