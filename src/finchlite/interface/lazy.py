@@ -2428,21 +2428,91 @@ def _normalize_reshape_shape(old_shape: tuple, shape) -> tuple:
     return tuple(normalized)
 
 
+def _reshape_groups(old_shape: tuple, new_shape: tuple):
+    old_pos = 0
+    new_pos = 0
+    while old_pos < len(old_shape) or new_pos < len(new_shape):
+        old_start = old_pos
+        new_start = new_pos
+        old_prod = 1
+        new_prod = 1
+        if old_pos < len(old_shape):
+            old_prod *= old_shape[old_pos]
+            old_pos += 1
+        if new_pos < len(new_shape):
+            new_prod *= new_shape[new_pos]
+            new_pos += 1
+
+        while old_prod != new_prod:
+            if (old_prod < new_prod and old_pos < len(old_shape)) or (
+                new_pos == len(new_shape) and old_pos < len(old_shape)
+            ):
+                old_prod *= old_shape[old_pos]
+                old_pos += 1
+            elif new_pos < len(new_shape):
+                new_prod *= new_shape[new_pos]
+                new_pos += 1
+            else:
+                raise ValueError(
+                    f"Cannot reshape array of shape {old_shape} into {new_shape}"
+                )
+
+        yield (
+            old_start,
+            old_shape[old_start:old_pos],
+            new_shape[new_start:new_pos],
+        )
+
+
+def _reshape_group(
+    x: LazyTensor,
+    axis: int,
+    old_group: tuple,
+    new_group: tuple,
+) -> LazyTensor:
+    if old_group == new_group:
+        return x
+
+    suffix_ndim = x.ndim - axis - len(old_group)
+    expanded = expand_dims(
+        x,
+        axis=tuple(range(axis + len(old_group), axis + len(old_group) + len(new_group))),
+    )
+    mask = expand_dims(
+        ReshapeMaskTensor(old_group, new_group, dtype=np.bool_),
+        axis=tuple(range(axis))
+        + tuple(
+            range(
+                axis + len(old_group) + len(new_group),
+                axis + len(old_group) + len(new_group) + suffix_ndim,
+            )
+        ),
+    )
+    masked = where(mask, expanded, x.fill_value)
+    return reduce(
+        ffuncs.choose(x.fill_value),
+        masked,
+        axis=tuple(range(axis, axis + len(old_group))),
+        init=x.fill_value,
+    )
+
+
 def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
     x = lazy(x)
     shape = _normalize_reshape_shape(x.shape, shape)
     if x.shape == shape:
         return x
+    if _shape_size(shape) == 0:
+        return full(shape, x.fill_value, dtype=x.element_type, device=x.device)
+    if x.shape == ():
+        return broadcast_to(x, shape)
 
-    mask = ReshapeMaskTensor(x.shape, shape, dtype=np.bool_)
-    expanded = expand_dims(x, axis=tuple(range(x.ndim, x.ndim + len(shape))))
-    masked = where(mask, expanded, x.fill_value)
-    return reduce(
-        ffuncs.choose(x.fill_value),
-        masked,
-        axis=tuple(range(x.ndim)),
-        init=x.fill_value,
-    )
+    axis = 0
+    out = x
+    for _, old_group, new_group in _reshape_groups(x.shape, shape):
+        out = _reshape_group(out, axis, old_group, new_group)
+        axis += len(new_group)
+    return out
 
 
 def _concat_skew(x: LazyTensor, axis: int, offset: int, axis_size: int, fill):

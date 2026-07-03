@@ -1,4 +1,5 @@
 import dataclasses
+import importlib
 import math
 import warnings
 
@@ -1736,6 +1737,25 @@ def test_lazy_reshape_preserves_fill_value():
     assert result.fill_value == array.fill_value
     result = finchlite.compute(result)
     finch_assert_equal(result, array.to_numpy().reshape((4,)))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_reshape_uses_grouped_masks(monkeypatch):
+    lazy_module = importlib.import_module("finchlite.interface.lazy")
+    original = lazy_module.ReshapeMaskTensor
+    mask_shapes = []
+
+    def recording_mask(old_shape, new_shape, *args, **kwargs):
+        mask_shapes.append((tuple(old_shape), tuple(new_shape)))
+        return original(old_shape, new_shape, *args, **kwargs)
+
+    monkeypatch.setattr(lazy_module, "ReshapeMaskTensor", recording_mask)
+    array = np.arange(24, dtype=np.int64).reshape(2, 3, 4)
+
+    result = finchlite.reshape(finchlite.lazy(array), (6, 4))
+
+    assert mask_shapes == [((2, 3), (6,))]
+    finch_assert_equal(finchlite.compute(result), array.reshape(6, 4))
 
 
 def test_lazy_reshape_rejects_invalid_shape():
