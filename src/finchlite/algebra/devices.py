@@ -1,4 +1,4 @@
-"""Device policies, execution pools, and tasks for Finch metadata."""
+"""Device policies and execution tasks for Finch metadata."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ def _default_num_tasks() -> int:
     return cpu_count() or 1
 
 
-class PoolFType(FType, ABC):
+class DeviceFType(FType, ABC):
     @property
     @abstractmethod
     def num_tasks(self):
@@ -20,14 +20,7 @@ class PoolFType(FType, ABC):
 
     @property
     @abstractmethod
-    def pool(self):
-        ...
-
-
-class DeviceFType(FType, ABC):
-    @property
-    @abstractmethod
-    def pool_type(self) -> PoolFType:
+    def device(self):
         ...
 
     @property
@@ -49,7 +42,7 @@ class TaskFType(FType, ABC):
 
     @property
     @abstractmethod
-    def pool(self):
+    def device(self):
         ...
 
     @property
@@ -58,7 +51,7 @@ class TaskFType(FType, ABC):
         ...
 
 
-class AbstractPool(FTyped, ABC):
+class AbstractDevice(FTyped, ABC):
     @property
     @abstractmethod
     def num_tasks(self):
@@ -66,24 +59,13 @@ class AbstractPool(FTyped, ABC):
 
     @property
     @abstractmethod
-    def pool(self):
-        ...
-
-
-class AbstractDevice(FTyped, ABC):
-    @property
-    @abstractmethod
-    def pool(self) -> AbstractPool:
+    def device(self):
         ...
 
     @property
     @abstractmethod
     def parent_device(self):
         ...
-
-    @property
-    def num_tasks(self):
-        return self.pool.num_tasks
 
 
 class AbstractTask(FTyped, ABC):
@@ -99,7 +81,7 @@ class AbstractTask(FTyped, ABC):
 
     @property
     @abstractmethod
-    def pool(self):
+    def device(self):
         ...
 
     @property
@@ -107,69 +89,14 @@ class AbstractTask(FTyped, ABC):
     def parent_task(self):
         ...
 
-    def is_on_pool(self, pool: AbstractPool) -> bool:
-        pool = normalize_pool(pool)
+    def is_on_device(self, device: Any) -> bool:
+        device = normalize_device(device)
         task = self
         while task is not None:
-            if task.pool == pool:
+            if task.device == device:
                 return True
             task = task.parent_task
         return False
-
-
-@dataclass(frozen=True, slots=True)
-class SerialPool(AbstractPool):
-    @property
-    def ftype(self):
-        return SerialPoolFType()
-
-    @property
-    def num_tasks(self):
-        return 1
-
-    @property
-    def pool(self):
-        return CPUPool(1)
-
-
-def serial_pool() -> SerialPool:
-    return SerialPool()
-
-
-@dataclass(frozen=True, slots=True, eq=False)
-class CPUPool(AbstractPool):
-    n: int
-    id: Any = "default"
-
-    def __post_init__(self):
-        if self.n < 1:
-            raise ValueError(f"CPU pool requires at least one task, got {self.n}")
-
-    @property
-    def ftype(self):
-        return CPUPoolFType(self.id)
-
-    @property
-    def num_tasks(self):
-        return self.n
-
-    @property
-    def pool(self):
-        return self
-
-    def __eq__(self, other):
-        match other:
-            case CPUPool(id=other_id):
-                return self.id == other_id
-            case _:
-                return False
-
-    def __hash__(self):
-        return hash((CPUPool, self.id))
-
-
-def cpu_pool(id: Any = "default", n: int | None = None) -> CPUPool:
-    return CPUPool(_default_num_tasks() if n is None else n, id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,8 +106,12 @@ class Serial(AbstractDevice):
         return SerialFType()
 
     @property
-    def pool(self):
-        return serial_pool()
+    def num_tasks(self):
+        return 1
+
+    @property
+    def device(self):
+        return self
 
     @property
     def parent_device(self):
@@ -231,8 +162,12 @@ class CPU(AbstractDevice):
         return CPUFType(self.parent.ftype, self.id)
 
     @property
-    def pool(self):
-        return CPUPool(_default_num_tasks() if self.n is None else self.n, self.id)
+    def num_tasks(self):
+        return _default_num_tasks() if self.n is None else self.n
+
+    @property
+    def device(self):
+        return self
 
     @property
     def parent_device(self):
@@ -274,8 +209,8 @@ class SerialTask(AbstractTask):
         return 1
 
     @property
-    def pool(self):
-        return serial_pool()
+    def device(self):
+        return serial()
 
     @property
     def parent_task(self):
@@ -284,24 +219,20 @@ class SerialTask(AbstractTask):
 
 @dataclass(frozen=True, slots=True, init=False)
 class CPUThread(AbstractTask):
-    __match_args__ = ("tid", "pool", "parent")
+    __match_args__ = ("tid", "device", "parent")
 
     tid: int
-    _pool: CPUPool
+    _device: CPU
     parent: AbstractTask | None = None
 
-    def __init__(
-        self, tid: int, pool: CPUPool | CPU, parent: AbstractTask | None = None
-    ):
-        match pool:
+    def __init__(self, tid: int, device: CPU, parent: AbstractTask | None = None):
+        match device:
             case CPU():
-                pool = pool.pool
-            case CPUPool():
                 pass
             case _:
-                raise ValueError(f"CPUThread pool is not supported; got {pool!r}")
+                raise ValueError(f"CPUThread device is not supported; got {device!r}")
         object.__setattr__(self, "tid", tid)
-        object.__setattr__(self, "_pool", pool)
+        object.__setattr__(self, "_device", device)
         object.__setattr__(self, "parent", parent)
 
     @property
@@ -309,19 +240,19 @@ class CPUThread(AbstractTask):
         parent_type = (
             ftype(self.parent_task) if self.parent_task is not None else ftype(None)
         )
-        return CPUThreadFType(parent_type, self.pool.ftype)
+        return CPUThreadFType(parent_type, self.device.ftype)
 
     @property
     def num_tasks(self):
-        return self.pool.num_tasks
+        return self.device.num_tasks
 
     @property
     def task_num(self):
         return self.tid
 
     @property
-    def pool(self):
-        return self._pool
+    def device(self):
+        return self._device
 
     @property
     def parent_task(self):
@@ -330,66 +261,8 @@ class CPUThread(AbstractTask):
     def __repr__(self):
         return (
             f"CPUThread(tid={self.tid!r}, "
-            f"pool={self.pool!r}, parent={self.parent!r})"
+            f"device={self.device!r}, parent={self.parent!r})"
         )
-
-
-@dataclass(frozen=True, slots=True, eq=False)
-class SerialPoolFType(PoolFType):
-    def __eq__(self, other):
-        match other:
-            case SerialPoolFType():
-                return True
-            case _:
-                return False
-
-    def __hash__(self):
-        return hash(SerialPoolFType)
-
-    def __call__(self, *args):
-        if args:
-            raise TypeError("SerialPoolFType expects no arguments")
-        return SerialPool()
-
-    @property
-    def num_tasks(self):
-        return 1
-
-    @property
-    def pool(self):
-        return CPUPoolFType()
-
-    def __repr__(self):
-        return "SerialPool"
-
-
-@dataclass(frozen=True, slots=True, eq=False)
-class CPUPoolFType(PoolFType):
-    id: Any = "default"
-
-    def __eq__(self, other):
-        match other:
-            case CPUPoolFType(id=other_id):
-                return self.id == other_id
-            case _:
-                return False
-
-    def __hash__(self):
-        return hash((CPUPoolFType, self.id))
-
-    def __call__(self, n: int | None = None):
-        return CPUPool(_default_num_tasks() if n is None else n, self.id)
-
-    @property
-    def num_tasks(self):
-        return _default_num_tasks()
-
-    @property
-    def pool(self):
-        return self
-
-    def __repr__(self):
-        return f"CPUPool{{{self.id!r}}}"
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -410,8 +283,12 @@ class SerialFType(DeviceFType):
         return Serial()
 
     @property
-    def pool_type(self):
-        return SerialPoolFType()
+    def num_tasks(self):
+        return 1
+
+    @property
+    def device(self):
+        return self
 
     @property
     def parent_device_type(self):
@@ -453,8 +330,12 @@ class CPUFType(DeviceFType):
         return CPU(parent, id=self.id, n=n)
 
     @property
-    def pool_type(self):
-        return CPUPoolFType(self.id)
+    def num_tasks(self):
+        return _default_num_tasks()
+
+    @property
+    def device(self):
+        return self
 
     @property
     def parent_device_type(self):
@@ -491,8 +372,8 @@ class SerialTaskFType(TaskFType):
         return 1
 
     @property
-    def pool(self):
-        return SerialPoolFType()
+    def device(self):
+        return SerialFType()
 
     @property
     def parent_task(self):
@@ -502,48 +383,39 @@ class SerialTaskFType(TaskFType):
 @dataclass(frozen=True, slots=True, eq=False)
 class CPUThreadFType(TaskFType):
     parent_type: FType
-    pool_type: CPUPoolFType
+    device_type: CPUFType
 
     def __eq__(self, other):
         match other:
-            case CPUThreadFType(parent_type=parent_type, pool_type=pool_type):
-                return self.parent_type == parent_type and self.pool_type == pool_type
+            case CPUThreadFType(parent_type=parent_type, device_type=device_type):
+                return (
+                    self.parent_type == parent_type
+                    and self.device_type == device_type
+                )
             case _:
                 return False
 
     def __hash__(self):
-        return hash((CPUThreadFType, self.parent_type, self.pool_type))
+        return hash((CPUThreadFType, self.parent_type, self.device_type))
 
-    def __call__(self, tid: int, pool: CPUPool | CPU, parent=None):  # type: ignore[override]
-        return CPUThread(tid, pool, parent)
+    def __call__(self, tid: int, device: CPU, parent=None):  # type: ignore[override]
+        return CPUThread(tid, device, parent)
 
     @property
     def num_tasks(self):
-        return self.pool_type.num_tasks
+        return self.device_type.num_tasks
 
     @property
     def task_num(self):
         raise TypeError("CPUThreadFType does not carry a task number")
 
     @property
-    def pool(self):
-        return self.pool_type
+    def device(self):
+        return self.device_type
 
     @property
     def parent_task(self):
         return self.parent_type
-
-
-def normalize_pool(pool: Any) -> AbstractPool:
-    if pool is None:
-        return serial_pool()
-    match pool:
-        case AbstractDevice():
-            return pool.pool
-        case AbstractPool():
-            return pool
-        case _:
-            raise ValueError(f"pool argument is not supported; got {pool!r}")
 
 
 def normalize_device(device: Any) -> AbstractDevice:
@@ -581,9 +453,5 @@ def common_device(*devices: Any) -> AbstractDevice:
     return device
 
 
-def is_on_pool(task: Any, pool: AbstractPool) -> bool:
-    return task.is_on_pool(pool)
-
-
-def is_on_device(task: Any, dev: AbstractPool | AbstractDevice) -> bool:
-    return is_on_pool(task, normalize_pool(dev))
+def is_on_device(task: Any, dev: Any) -> bool:
+    return task.is_on_device(dev)
