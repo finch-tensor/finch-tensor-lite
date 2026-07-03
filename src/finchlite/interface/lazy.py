@@ -1593,16 +1593,16 @@ def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
         return sum(nonzero, axis=axes, keepdims=keepdims)
 
     if p < 0.0:
-        zero = abs_x.element_type(0)
-        scale_keepdims = max(abs_x, axis=axes, keepdims=True, init=zero)
-        scale = max(abs_x, axis=axes, keepdims=keepdims, init=zero)
-        scale_is_zero = equal(scale_keepdims, zero)
-        denominator = where(scale_is_zero, abs_x.element_type(1), scale_keepdims)
-        scaled = divide(abs_x, denominator)
-        return multiply(
-            scale,
-            power(sum(power(scaled, p), axis=axes, keepdims=keepdims), 1.0 / p),
+        scaled_negative_power = ffuncs.scaled_negative_power(p)
+        scaled_type = scaled_negative_power.return_type(abs_x.element_type)
+        scaled_sum = reduce(
+            ffuncs.add_scaled_negative_power(p),
+            elementwise(scaled_negative_power, abs_x),
+            axis=axes,
+            keepdims=keepdims,
+            init=scaled_type((0, np.inf)),
         )
+        return elementwise(ffuncs.root_scaled_negative_power(p), scaled_sum)
 
     if p == 2.0:
         scaled_square_type = ffuncs.scaled_square.return_type(abs_x.element_type)
