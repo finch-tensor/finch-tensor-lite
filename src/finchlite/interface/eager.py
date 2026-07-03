@@ -809,19 +809,23 @@ def ifftshift(x, /, *, axes=None):
         return lazy.asarray(np.fft.ifftshift(x, axes=axes))
 
 
-def fftfreq(n, /, *, d=1.0, device=None):
+def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
     try:
         result = scipy_fft.fftfreq(n, d=d)
     except Exception:
         result = np.fft.fftfreq(n, d=d)
+    if dtype is not None:
+        result = result.astype(lazy._np_dtype(dtype))
     return lazy.asarray(result, device=device)
 
 
-def rfftfreq(n, /, *, d=1.0, device=None):
+def rfftfreq(n, /, *, d=1.0, dtype=None, device=None):
     try:
         result = scipy_fft.rfftfreq(n, d=d)
     except Exception:
         result = np.fft.rfftfreq(n, d=d)
+    if dtype is not None:
+        result = result.astype(lazy._np_dtype(dtype))
     return lazy.asarray(result, device=device)
 
 

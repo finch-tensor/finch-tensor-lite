@@ -1795,11 +1795,11 @@ def ifftshift(x, /, *, axes=None):
     _eager_only("ifftshift")
 
 
-def fftfreq(n, /, *, d=1.0, device=None):
+def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
     _eager_only("fftfreq")
 
 
-def rfftfreq(n, /, *, d=1.0, device=None):
+def rfftfreq(n, /, *, d=1.0, dtype=None, device=None):
     _eager_only("rfftfreq")
 
 

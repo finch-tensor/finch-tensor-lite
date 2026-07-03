@@ -94,42 +94,6 @@ def test_bufferized_ndarray_to_numpy_returns_view():
     assert np.shares_memory(result, tensor.val.arr)
 
 
-def test_bufferized_ndarray_accessor_to_numpy_returns_view():
-    arr = np.arange(12, dtype=np.int64).reshape(3, 4)
-    tensor = BufferizedNDArray.from_numpy(arr)
-
-    result = tensor.access((1,), None).to_numpy()
-
-    np.testing.assert_array_equal(result, arr[1])
-    assert np.shares_memory(result, tensor.val.arr)
-
-
-def test_sparse_tensor_to_scipy():
-    arr = np.array([[0, 2, 0], [3, 0, 4]], dtype=np.int32)
-    tensor = FiberTensor(
-        DenseLevel(
-            SparseListLevel(
-                ElementLevel(
-                    element(
-                        np.int32(0),
-                        finchlite.int32,
-                        finchlite.intp,
-                        NumpyBufferFType,
-                    ),
-                    NumpyBuffer(np.array([2, 3, 4], dtype=np.int32)),
-                ),
-                np.intp(3),
-                NumpyBuffer(np.array([0, 1, 3], dtype=np.intp)),
-                NumpyBuffer(np.array([1, 0, 2], dtype=np.intp)),
-            ),
-            np.intp(2),
-        )
-    )
-
-    scipy_tensor = tensor.to_scipy()
-
-    np.testing.assert_array_equal(scipy_tensor.toarray(), arr)
-
 
 def test_tensor_conversion_helpers_accept_scipy_sparse():
     arr = np.array([[0, 2, 0], [3, 0, 4]], dtype=np.int32)

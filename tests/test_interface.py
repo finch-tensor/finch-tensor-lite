@@ -1670,6 +1670,14 @@ def test_fft_eager_methods_use_numpy_fallback():
     finch_assert_allclose(finchlite.fft.fft(x), np.fft.fft(x))
     finch_assert_allclose(finchlite.fft.rfft(x), np.fft.rfft(x))
     finch_assert_allclose(finchlite.fft.fftfreq(4), np.fft.fftfreq(4))
+    assert (
+        finchlite.fft.fftfreq(4, dtype=finchlite.float32).to_numpy().dtype
+        == np.float32
+    )
+    assert (
+        finchlite.fft.rfftfreq(4, dtype=finchlite.float32).to_numpy().dtype
+        == np.float32
+    )
 
 
 def test_new_eager_only_methods_warn_compute_lazy_operands():
