@@ -337,8 +337,8 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         )
 
     @property
-    def ndim(self) -> np.intp:
-        return np.intp(self._ndim)
+    def ndim(self) -> int:
+        return int(self._ndim)
 
     @ndim.setter
     def ndim(self, val):
@@ -599,7 +599,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         )
 
     @property
-    def ndim(self) -> np.intp:
+    def ndim(self) -> int:
         return self.tns.ndim - self.nind
 
     @property

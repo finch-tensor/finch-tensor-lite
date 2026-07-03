@@ -1110,6 +1110,61 @@ def concat(arrays, /, *, axis: int | None = 0):
     return compute(lazy.concat(arrays, axis=axis))
 
 
+def flip(x, /, *, axis: int | tuple[int, ...] | None = None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.flip(x, axis=axis)
+    return compute(lazy.flip(x, axis=axis))
+
+
+def repeat(x, repeats, /, *, axis: int | None = None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.repeat(x, repeats, axis=axis)
+    return compute(lazy.repeat(x, repeats, axis=axis))
+
+
+def roll(
+    x,
+    /,
+    shift: int | tuple[int, ...],
+    *,
+    axis: int | tuple[int, ...] | None = None,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.roll(x, shift, axis=axis)
+    return compute(lazy.roll(x, shift, axis=axis))
+
+
+def stack(arrays, /, *, axis: int = 0):
+    arrays = tuple(arrays)
+    if builtins.any(isinstance(array, lazy.LazyTensor) for array in arrays):
+        return lazy.stack(arrays, axis=axis)
+    return compute(lazy.stack(arrays, axis=axis))
+
+
+def tile(x, repetitions: tuple[int, ...], /):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tile(x, repetitions)
+    return compute(lazy.tile(x, repetitions))
+
+
+def unstack(x, /, *, axis: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.unstack(x, axis=axis)
+    return compute(lazy.unstack(x, axis=axis))
+
+
+def take(x, indices, /, *, axis: int | None = None):
+    if isinstance(x, lazy.LazyTensor) or isinstance(indices, lazy.LazyTensor):
+        return lazy.take(x, indices, axis=axis)
+    return compute(lazy.take(x, indices, axis=axis))
+
+
+def take_along_axis(x, indices, /, *, axis: int = -1):
+    if isinstance(x, lazy.LazyTensor) or isinstance(indices, lazy.LazyTensor):
+        return lazy.take_along_axis(x, indices, axis=axis)
+    return compute(lazy.take_along_axis(x, indices, axis=axis))
+
+
 def broadcast_to(x, /, shape: Sequence[int]):
     """
     Broadcasts an array to a new shape.

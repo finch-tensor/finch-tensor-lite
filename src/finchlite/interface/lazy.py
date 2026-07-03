@@ -2179,6 +2179,22 @@ class PairCarryTensor(MatrixPatternTensor):
         return i > 0 and j == (i - 1) // 2
 
 
+class ReverseTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return j == self.shape[1] - i - 1
+
+
+class RollTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        axis_size = self.shape[1]
+        return axis_size > 0 and j == (i - self._k) % axis_size
+
+
+class RepeatTensor(MatrixPatternTensor):
+    def _contains(self, i, j) -> bool:
+        return self._k > 0 and j == i // self._k
+
+
 @dataclass(frozen=True, eq=False)
 class ParityMaskTensorFType(TensorFType):
     _element_type: FType
@@ -2705,6 +2721,17 @@ def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
     return out
 
 
+def _axis_select(x: LazyTensor, axis: int, mask, fill=None) -> LazyTensor:
+    if fill is None:
+        fill = x.fill_value
+    mask = expand_dims(
+        mask,
+        axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
+    )
+    masked = where(mask, expand_dims(x, axis=axis), fill)
+    return reduce(ffuncs.choose(fill), masked, axis=axis + 1, init=fill)
+
+
 def _concat_skew(x: LazyTensor, axis: int, offset: int, axis_size: int, fill):
     mask = expand_dims(
         eye(axis_size, x.shape[axis], k=-offset, dtype=np.bool_),
@@ -2760,6 +2787,220 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
         offset += array.shape[axis]
 
     return elementwise(ffuncs.choose(fill), *skewed)
+
+
+def flip(x, /, *, axis: int | tuple[int, ...] | None = None) -> LazyTensor:
+    x = lazy(x)
+    axes = tuple(range(x.ndim)) if axis is None else normalize_axis_tuple(axis, x.ndim)
+    out = x
+    for ax in axes:
+        axis_size = out.shape[ax]
+        if axis_size > 1:
+            out = _axis_select(
+                out,
+                ax,
+                ReverseTensor((axis_size, axis_size), dtype=np.bool_),
+            )
+    return out
+
+
+def roll(
+    x,
+    /,
+    shift: int | tuple[int, ...],
+    *,
+    axis: int | tuple[int, ...] | None = None,
+) -> LazyTensor:
+    x = lazy(x)
+    if axis is None:
+        original_shape = x.shape
+        flat = reshape(x, (_shape_size(x.shape),))
+        return reshape(roll(flat, shift, axis=0), original_shape)
+
+    axes = normalize_axis_tuple(axis, x.ndim)
+    if isinstance(shift, (bool, np.bool_)):
+        raise TypeError("shift must be an integer or a tuple of integers")
+    if isinstance(shift, (int, np.integer)):
+        shifts = (operator.index(shift),) * len(axes)
+    else:
+        try:
+            shifts = tuple(operator.index(s) for s in shift)
+        except TypeError as exc:
+            raise TypeError(
+                "shift must be an integer or a tuple of integers"
+            ) from exc
+        if len(shifts) != len(axes):
+            raise ValueError("shift and axis must have the same size")
+
+    out = x
+    for ax, amount in zip(axes, shifts, strict=True):
+        axis_size = out.shape[ax]
+        if axis_size > 1:
+            out = _axis_select(
+                out,
+                ax,
+                RollTensor((axis_size, axis_size), k=amount, dtype=np.bool_),
+            )
+    return out
+
+
+def _axis_indices(size: int, dtype=np.intp) -> LazyTensor:
+    return cast(LazyTensor, lazy(IndexTensor((size,), dtype)))
+
+
+def _normalize_take_indices(indices: LazyTensor, axis_size: int) -> LazyTensor:
+    return where(less(indices, 0), add(indices, np.intp(axis_size)), indices)
+
+
+def _take_mask(indices: LazyTensor, axis_size: int) -> LazyTensor:
+    if axis_size == 0:
+        if indices.shape[0] == 0:
+            return full((0, 0), False, dtype=np.bool_, device=indices.device)
+        raise ValueError("cannot take from an empty axis")
+    normalized = _normalize_take_indices(indices, axis_size)
+    return equal(
+        expand_dims(normalized, axis=1),
+        expand_dims(_axis_indices(axis_size), axis=0),
+    )
+
+
+def take(x, indices, /, *, axis: int | None = None) -> LazyTensor:
+    x = lazy(x)
+    indices = lazy(indices)
+    if indices.ndim != 1:
+        raise ValueError("indices must be a one-dimensional array")
+    if axis is None:
+        if x.ndim != 1:
+            raise ValueError("axis is required when x is not one-dimensional")
+        axis = 0
+    axis = normalize_axis_index(axis, x.ndim)
+    return _axis_select(x, axis, _take_mask(indices, x.shape[axis]))
+
+
+def take_along_axis(x, indices, /, *, axis: int = -1) -> LazyTensor:
+    x = lazy(x)
+    indices = lazy(indices)
+    if indices.ndim != x.ndim:
+        raise ValueError("indices must have the same rank as x")
+    axis = normalize_axis_index(axis, x.ndim)
+    axis_size = x.shape[axis]
+    if axis_size == 0:
+        if indices.shape[axis] == 0:
+            return empty(indices.shape, dtype=x.element_type, device=x.device)
+        raise ValueError("cannot take from an empty axis")
+
+    out_dims = []
+    x_dims = []
+    for i, (x_dim, indices_dim) in enumerate(zip(x.shape, indices.shape, strict=True)):
+        if i == axis:
+            out_dims.append(indices_dim)
+            x_dims.append(x_dim)
+        else:
+            dim = _broadcast_shape((x_dim,), (indices_dim,))[0]
+            out_dims.append(dim)
+            x_dims.append(dim)
+    out_shape = tuple(out_dims)
+    x_shape = tuple(x_dims)
+
+    x = broadcast_to(x, x_shape)
+    indices = broadcast_to(indices, out_shape)
+    positions = _axis_indices(axis_size)
+    positions = expand_dims(
+        positions,
+        axis=tuple(i for i in range(indices.ndim + 1) if i != axis + 1),
+    )
+    mask = equal(
+        expand_dims(_normalize_take_indices(indices, axis_size), axis=axis + 1),
+        positions,
+    )
+    masked = where(mask, expand_dims(x, axis=axis), x.fill_value)
+    return reduce(ffuncs.choose(x.fill_value), masked, axis=axis + 1, init=x.fill_value)
+
+
+def _literal_repeat_count(repeats) -> int | None:
+    if isinstance(repeats, (bool, np.bool_)):
+        raise TypeError("repeats must be an integer or an integer array")
+    if isinstance(repeats, (int, np.integer)):
+        return operator.index(repeats)
+    return None
+
+
+def repeat(x, repeats, /, *, axis: int | None = None) -> LazyTensor:
+    x = lazy(x)
+    if axis is None:
+        x = reshape(x, (_shape_size(x.shape),))
+        axis = 0
+    else:
+        axis = normalize_axis_index(axis, x.ndim)
+    axis_size = x.shape[axis]
+
+    repeat_count = _literal_repeat_count(repeats)
+    if repeat_count is not None:
+        if repeat_count < 0:
+            raise ValueError("repeats must be non-negative")
+        out_shape = tuple(
+            axis_size * repeat_count if i == axis else dim
+            for i, dim in enumerate(x.shape)
+        )
+        if axis_size == 0 or repeat_count == 0:
+            return empty(out_shape, dtype=x.element_type, device=x.device)
+        return _axis_select(
+            x,
+            axis,
+            RepeatTensor(
+                (axis_size * repeat_count, axis_size),
+                k=repeat_count,
+                dtype=np.bool_,
+            ),
+        )
+
+    raise NotImplementedError(
+        "repeat with repeat-count arrays has a data-dependent output shape"
+    )
+
+
+def stack(arrays: Sequence[Any], /, *, axis: int = 0) -> LazyTensor:
+    arrays = tuple(lazy(array) for array in arrays)
+    if len(arrays) == 0:
+        raise ValueError("stack requires at least one array")
+    axis = normalize_axis_index(axis, arrays[0].ndim + 1)
+    return concat(tuple(expand_dims(array, axis=axis) for array in arrays), axis=axis)
+
+
+def tile(x, repetitions: tuple[int, ...], /) -> LazyTensor:
+    x = lazy(x)
+    if isinstance(repetitions, (bool, np.bool_)):
+        raise TypeError("repetitions must be an integer or a tuple of integers")
+    if isinstance(repetitions, (int, np.integer)):
+        repetitions = (operator.index(repetitions),)
+    else:
+        repetitions = tuple(operator.index(rep) for rep in repetitions)
+    if builtins.any(rep < 0 for rep in repetitions):
+        raise ValueError("repetitions must be non-negative")
+
+    if len(repetitions) > x.ndim:
+        x = reshape(x, (1,) * (len(repetitions) - x.ndim) + x.shape)
+    elif len(repetitions) < x.ndim:
+        repetitions = (1,) * (x.ndim - len(repetitions)) + repetitions
+
+    out_shape = tuple(dim * rep for dim, rep in zip(x.shape, repetitions, strict=True))
+    if builtins.any(rep == 0 for rep in repetitions):
+        return empty(out_shape, dtype=x.element_type, device=x.device)
+
+    out = x
+    for axis, rep in enumerate(repetitions):
+        if rep > 1:
+            out = concat((out,) * rep, axis=axis)
+    return out
+
+
+def unstack(x, /, *, axis: int = 0) -> tuple[LazyTensor, ...]:
+    x = lazy(x)
+    axis = normalize_axis_index(axis, x.ndim)
+    return tuple(
+        squeeze(take(x, asarray([i], dtype=np.intp, device=x.device), axis=axis), axis)
+        for i in range(x.shape[axis])
+    )
 
 
 def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:

@@ -28,9 +28,9 @@ def to_scipy(x):
 
 class TensorFType(FType, ABC):
     @property
-    def ndim(self) -> np.intp:
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        return np.intp(len(self.shape_type))
+        return len(self.shape_type)
 
     @property
     def size(self):
@@ -99,9 +99,9 @@ class Tensor(FTyped, ABC):
     """
 
     @property
-    def ndim(self) -> np.intp:
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        return self.ftype.ndim
+        return int(self.ftype.ndim)
 
     @property
     def size(self):

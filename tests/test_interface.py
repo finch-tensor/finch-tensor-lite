@@ -1929,6 +1929,78 @@ def test_concat_rejects_mismatched_shapes():
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_shape_ops_use_symbolic_selectors():
+    array = np.arange(24, dtype=np.int64).reshape(2, 3, 4)
+
+    cases = [
+        (
+            finchlite.flip(finchlite.lazy(array), axis=(0, 2)),
+            np.flip(array, axis=(0, 2)),
+        ),
+        (
+            finchlite.roll(finchlite.lazy(array), shift=(1, -2), axis=(0, 2)),
+            np.roll(array, shift=(1, -2), axis=(0, 2)),
+        ),
+        (
+            finchlite.take(finchlite.lazy(array), finchlite.asarray([2, 0]), axis=1),
+            np.take(array, [2, 0], axis=1),
+        ),
+        (
+            finchlite.repeat(finchlite.lazy(array), 2, axis=None),
+            np.repeat(array, 2, axis=None),
+        ),
+        (
+            finchlite.tile(finchlite.lazy(array), (2, 1, 1)),
+            np.tile(array, (2, 1, 1)),
+        ),
+    ]
+
+    for result, expected in cases:
+        assert isinstance(result, finchlite.LazyTensor)
+        finch_assert_equal(finchlite.compute(result), expected)
+
+
+def test_repeat_rejects_data_dependent_repeats():
+    with pytest.raises(NotImplementedError, match="data-dependent output shape"):
+        finchlite.repeat(
+            finchlite.lazy(np.arange(6, dtype=np.int64).reshape(2, 3)),
+            finchlite.asarray([1, 2, 1]),
+            axis=1,
+        )
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_stack_and_unstack():
+    arrays = (
+        np.arange(6, dtype=np.int64).reshape(2, 3),
+        np.arange(6, 12, dtype=np.int64).reshape(2, 3),
+    )
+
+    stacked = finchlite.stack(tuple(finchlite.lazy(array) for array in arrays), axis=1)
+
+    assert isinstance(stacked, finchlite.LazyTensor)
+    finch_assert_equal(finchlite.compute(stacked), np.stack(arrays, axis=1))
+
+    parts = finchlite.unstack(stacked, axis=1)
+    assert isinstance(parts, tuple)
+    assert len(parts) == len(arrays)
+    for part, expected in zip(parts, arrays, strict=True):
+        assert isinstance(part, finchlite.LazyTensor)
+        finch_assert_equal(finchlite.compute(part), expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_take_along_axis():
+    array = np.arange(6, dtype=np.int64).reshape(2, 3)
+    indices = np.array([[2, 0], [1, 1]], dtype=np.intp)
+
+    result = finchlite.take_along_axis(finchlite.lazy(array), indices, axis=1)
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_equal(finchlite.compute(result), np.take_along_axis(array, indices, axis=1))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
     "array, shape",
     [
