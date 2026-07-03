@@ -165,4 +165,4 @@ section-order = [
 
 [tool.mypy]
 ignore_missing_imports = true
-exclude = ["tests/reference", "(^|/)benchmarks/"]
+exclude = ["array-api-tests", "tests/reference", "(^|/)benchmarks/"]
