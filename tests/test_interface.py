@@ -1424,6 +1424,21 @@ def test_linalg_vector_norm_large_values():
     finch_assert_allclose(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")
+def test_linalg_vector_norm_negative_ord_stable_values():
+    tiny = np.array([1e-308, 1e308], dtype=np.float64)
+    tiny_result = finchlite.compute(
+        finchlite.linalg.vector_norm(finchlite.lazy(tiny), ord=-2)
+    )
+    finch_assert_allclose(tiny_result, np.float64(1e-308))
+
+    zero = np.array([0.0, 2.0], dtype=np.float64)
+    zero_result = finchlite.compute(
+        finchlite.linalg.vector_norm(finchlite.lazy(zero), ord=-2)
+    )
+    finch_assert_allclose(zero_result, np.float64(0.0))
+
+
 @pytest.mark.parametrize(
     "kw",
     [

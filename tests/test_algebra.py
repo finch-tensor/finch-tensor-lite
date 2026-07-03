@@ -99,6 +99,20 @@ def test_algebra_selected():
     scaled_sum = ffuncs.add_scaled_square((1.0, 3.0), (1.0, 4.0))
     assert scaled_sum == (1.5625, 4.0)
     assert ffuncs.root_scaled_square(scaled_sum) == 5.0
+    scaled_negative_zero = ffuncs.scaled_negative_power(-2.0)(np.float64(0.0))
+    assert math.isinf(scaled_negative_zero[0])
+    assert scaled_negative_zero[1] == 0.0
+    scaled_negative_sum = ffuncs.add_scaled_negative_power(-2.0)(
+        (1.0, 2.0), (1.0, 4.0)
+    )
+    assert scaled_negative_sum == (1.25, 2.0)
+    assert math.isclose(
+        ffuncs.root_scaled_negative_power(-2.0)(scaled_negative_sum),
+        2.0 / math.sqrt(1.25),
+    )
+    assert ffuncs.root_scaled_negative_power(-2.0)(
+        ffuncs.add_scaled_negative_power(-2.0)((1.0, 2.0), (math.inf, 0.0))
+    ) == 0.0
 
 
 def test_python_scalar_promotion_uses_weak_bottom():
