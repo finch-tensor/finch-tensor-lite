@@ -406,6 +406,359 @@ def matrix_transpose(x, /):
         return lazy.matrix_transpose(x)
     return compute(lazy.matrix_transpose(x))
 
+
+def inv(x, /):
+    x = _warn_compute(x, "inv")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
+
+
+def cholesky(x, /, *, upper=False):
+    x = _warn_compute(x, "cholesky")
+    sparse_cholesky = getattr(scipy_sparse_linalg, "cholesky", None)
+    if sparse_cholesky is not None:
+        try:
+            return lazy.asarray(sparse_cholesky(lazy.asarray(x).to_scipy()))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    result = np.linalg.cholesky(x)
+    if upper:
+        result = np.swapaxes(np.conjugate(result), -1, -2)
+    return lazy.asarray(result)
+
+
+def cross(x1, x2, /, *, axis=-1):
+    x1 = _warn_compute(x1, "cross")
+    x1 = lazy.asarray(x1)
+    while hasattr(x1, "to_numpy"):
+        x1 = x1.to_numpy()
+    x2 = _warn_compute(x2, "cross")
+    x2 = lazy.asarray(x2)
+    while hasattr(x2, "to_numpy"):
+        x2 = x2.to_numpy()
+    cross_func = getattr(np.linalg, "cross", np.cross)
+    return lazy.asarray(cross_func(x1, x2, axis=axis))
+
+
+def det(x, /):
+    x = _warn_compute(x, "det")
+    sparse_det = getattr(scipy_sparse_linalg, "det", None)
+    if sparse_det is not None:
+        try:
+            return lazy.asarray(np.asarray(sparse_det(lazy.asarray(x).to_scipy())))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.asarray(np.linalg.det(x)))
+
+
+def eigh(x, /, *, UPLO="L"):
+    x = _warn_compute(x, "eigh")
+    sparse_eigh = getattr(scipy_sparse_linalg, "eigh", None)
+    if sparse_eigh is not None:
+        try:
+            return lazy.asarray(sparse_eigh(lazy.asarray(x).to_scipy(), UPLO=UPLO))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.linalg.eigh(x, UPLO=UPLO))
+
+
+def eigvalsh(x, /, *, UPLO="L"):
+    x = _warn_compute(x, "eigvalsh")
+    sparse_eigvalsh = getattr(scipy_sparse_linalg, "eigvalsh", None)
+    if sparse_eigvalsh is not None:
+        try:
+            return lazy.asarray(
+                sparse_eigvalsh(lazy.asarray(x).to_scipy(), UPLO=UPLO)
+            )
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.linalg.eigvalsh(x, UPLO=UPLO))
+
+
+def matrix_rank(x, /, *, rtol=None):
+    x = _warn_compute(x, "matrix_rank")
+    sparse_matrix_rank = getattr(scipy_sparse_linalg, "matrix_rank", None)
+    if sparse_matrix_rank is not None:
+        try:
+            return lazy.asarray(
+                np.asarray(sparse_matrix_rank(lazy.asarray(x).to_scipy(), rtol=rtol))
+            )
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    if rtol is None:
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x)))
+    try:
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, rtol=rtol)))
+    except TypeError:
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, tol=rtol)))
+
+
+def pinv(x, /, *, rtol=None):
+    x = _warn_compute(x, "pinv")
+    sparse_pinv = getattr(scipy_sparse_linalg, "pinv", None)
+    if sparse_pinv is not None:
+        try:
+            return lazy.asarray(sparse_pinv(lazy.asarray(x).to_scipy(), rtol=rtol))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    if rtol is None:
+        return lazy.asarray(np.linalg.pinv(x))
+    try:
+        return lazy.asarray(np.linalg.pinv(x, rtol=rtol))
+    except TypeError:
+        return lazy.asarray(np.linalg.pinv(x, rcond=rtol))
+
+
+def qr(x, /, *, mode="reduced"):
+    x = _warn_compute(x, "qr")
+    sparse_qr = getattr(scipy_sparse_linalg, "qr", None)
+    if sparse_qr is not None:
+        try:
+            return lazy.asarray(sparse_qr(lazy.asarray(x).to_scipy(), mode=mode))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.linalg.qr(x, mode=mode))
+
+
+def slogdet(x, /):
+    x = _warn_compute(x, "slogdet")
+    sparse_slogdet = getattr(scipy_sparse_linalg, "slogdet", None)
+    if sparse_slogdet is not None:
+        try:
+            return lazy.asarray(sparse_slogdet(lazy.asarray(x).to_scipy()))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.linalg.slogdet(x))
+
+
+def solve(x1, x2, /):
+    x1 = _warn_compute(x1, "solve")
+    x2 = _warn_compute(x2, "solve")
+    try:
+        x2_np = lazy.asarray(x2)
+        while hasattr(x2_np, "to_numpy"):
+            x2_np = x2_np.to_numpy()
+        return lazy.asarray(
+            scipy_sparse_linalg.spsolve(lazy.asarray(x1).to_scipy(), x2_np)
+        )
+    except Exception:
+        pass
+    x1 = lazy.asarray(x1)
+    while hasattr(x1, "to_numpy"):
+        x1 = x1.to_numpy()
+    x2 = lazy.asarray(x2)
+    while hasattr(x2, "to_numpy"):
+        x2 = x2.to_numpy()
+    return lazy.asarray(np.linalg.solve(x1, x2))
+
+
+def svd(x, /, *, full_matrices=True):
+    x = _warn_compute(x, "svd")
+    sparse_svd = getattr(scipy_sparse_linalg, "svd", None)
+    if sparse_svd is not None:
+        try:
+            return lazy.asarray(
+                sparse_svd(lazy.asarray(x).to_scipy(), full_matrices=full_matrices)
+            )
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    return lazy.asarray(np.linalg.svd(x, full_matrices=full_matrices))
+
+
+def svdvals(x, /):
+    x = _warn_compute(x, "svdvals")
+    sparse_svdvals = getattr(scipy_sparse_linalg, "svdvals", None)
+    if sparse_svdvals is not None:
+        try:
+            return lazy.asarray(sparse_svdvals(lazy.asarray(x).to_scipy()))
+        except Exception:
+            pass
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    svdvals_func = getattr(np.linalg, "svdvals", None)
+    if svdvals_func is None:
+        return lazy.asarray(np.linalg.svd(x, compute_uv=False))
+    return lazy.asarray(svdvals_func(x))
+
+
+def fft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "fft")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.fft(x, n=n, axis=axis, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.fft(x, n=n, axis=axis, norm=norm))
+
+
+def ifft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "ifft")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.ifft(x, n=n, axis=axis, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.ifft(x, n=n, axis=axis, norm=norm))
+
+
+def fftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "fftn")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.fftn(x, s=s, axes=axes, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.fftn(x, s=s, axes=axes, norm=norm))
+
+
+def ifftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "ifftn")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.ifftn(x, s=s, axes=axes, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.ifftn(x, s=s, axes=axes, norm=norm))
+
+
+def rfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "rfft")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.rfft(x, n=n, axis=axis, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.rfft(x, n=n, axis=axis, norm=norm))
+
+
+def irfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "irfft")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.irfft(x, n=n, axis=axis, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.irfft(x, n=n, axis=axis, norm=norm))
+
+
+def rfftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "rfftn")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.rfftn(x, s=s, axes=axes, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.rfftn(x, s=s, axes=axes, norm=norm))
+
+
+def irfftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "irfftn")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.irfftn(x, s=s, axes=axes, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.irfftn(x, s=s, axes=axes, norm=norm))
+
+
+def hfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "hfft")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.hfft(x, n=n, axis=axis, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.hfft(x, n=n, axis=axis, norm=norm))
+
+
+def ihfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "ihfft")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.ihfft(x, n=n, axis=axis, norm=norm))
+    except Exception:
+        return lazy.asarray(np.fft.ihfft(x, n=n, axis=axis, norm=norm))
+
+
+def fftshift(x, /, *, axes=None):
+    x = _warn_compute(x, "fftshift")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.fftshift(x, axes=axes))
+    except Exception:
+        return lazy.asarray(np.fft.fftshift(x, axes=axes))
+
+
+def ifftshift(x, /, *, axes=None):
+    x = _warn_compute(x, "ifftshift")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    try:
+        return lazy.asarray(scipy_fft.ifftshift(x, axes=axes))
+    except Exception:
+        return lazy.asarray(np.fft.ifftshift(x, axes=axes))
+
+
+def fftfreq(n, /, *, d=1.0, device=None):
+    try:
+        result = scipy_fft.fftfreq(n, d=d)
+    except Exception:
+        result = np.fft.fftfreq(n, d=d)
+    return lazy.asarray(result, device=device)
+
+
+def rfftfreq(n, /, *, d=1.0, device=None):
+    try:
+        result = scipy_fft.rfftfreq(n, d=d)
+    except Exception:
+        result = np.fft.rfftfreq(n, d=d)
+    return lazy.asarray(result, device=device)
+
+
 def matrix_power(x, n, /):
     """
     Computes the power of a matrix.
@@ -423,7 +776,10 @@ def matrix_norm(x, /, *, keepdims=False, ord="fro"):
             return lazy.matrix_norm(x, keepdims=keepdims, ord=ord)
         except NotImplementedError:
             pass
-    x = _to_numpy(x, "matrix_norm")
+    x = _warn_compute(x, "matrix_norm")
+    x = lazy.asarray(x)
+    while hasattr(x, "to_numpy"):
+        x = x.to_numpy()
     matrix_norm_fn = getattr(np.linalg, "matrix_norm", None)
     if matrix_norm_fn is None:
         result = np.linalg.norm(x, ord=ord, axis=(-2, -1), keepdims=keepdims)
