@@ -84,7 +84,7 @@ def get_conjunctive_and_disjunctive_inputs(
             return [], []
 
 
-def prefix_lookups(
+def get_loop_lookups(
     prefix: tuple[Field, ...],
     conjunct_stats: list[TensorStats],
     disjunct_stats: list[TensorStats],
@@ -155,7 +155,7 @@ def loop_order_cost(
     )
     cost = 0.0
     for j in range(1, len(loop_order) + 1):
-        cost += prefix_lookups(
+        cost += get_loop_lookups(
             loop_order[:j], conjunct_stats, disjunct_stats, stats_factory
         )
     cost += transpose_penalty(expr, loop_order, stats_bindings)
