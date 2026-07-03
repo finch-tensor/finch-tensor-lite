@@ -155,12 +155,14 @@ def numba_function_call(op, ctx, *args: Any) -> str:
                 raise TypeError(f"Expected tuple type, got: {a.result_type}")
             a_code, b_code = ctx(a), ctx(b)
             comparator = "<" if op is ffuncs.minby else ">"
+            tie_comparator = "<=" if op is ffuncs.minby else ">="
             last_index = len(a.result_type.struct_fieldtypes) - 1
             return (
                 f"({a_code} if "
                 f"(({a_code}[0] {comparator} {b_code}[0]) or "
                 f"(({a_code}[0] == {b_code}[0]) and "
-                f"({a_code}[{last_index}] <= {b_code}[{last_index}]))) "
+                f"({a_code}[{last_index}] {tie_comparator} "
+                f"{b_code}[{last_index}]))) "
                 f"else {b_code})"
             )
         case NumbaOperator():

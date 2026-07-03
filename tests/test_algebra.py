@@ -4,6 +4,7 @@ import numpy as np
 
 import finchlite
 from finchlite.algebra import (
+    TupleFType,
     cansplitpush,
     ffuncs,
     init_value,
@@ -15,6 +16,7 @@ from finchlite.algebra import (
     promote_type,
     repeat_operator,
 )
+from finchlite.algebra.ftypes import FDType
 
 
 def test_algebra_selected():
@@ -89,7 +91,7 @@ def test_algebra_selected():
     assert ffuncs.minby((1, 10), (1, 20)) == (1, 10)
     assert ffuncs.maxby((2, 10), (1, 20)) == (2, 10)
     assert ffuncs.maxby((1, 10), (2, 20)) == (2, 20)
-    assert ffuncs.maxby((1, 10), (1, 20)) == (1, 10)
+    assert ffuncs.maxby((1, 10), (1, 20)) == (1, 20)
     assert ffuncs.last((1, 2, 3)) == 3
     assert ffuncs.scaled_power(2.0) is ffuncs.scaled_square
     assert ffuncs.add_scaled_power(2.0) is ffuncs.add_scaled_square
@@ -145,6 +147,28 @@ def test_python_scalar_promotion_uses_weak_bottom():
     assert promote_type(finchlite.float_, finchlite.complex64) == finchlite.complex64
     assert promote_type(finchlite.complex64, finchlite.complex_) == finchlite.complex64
     assert promote_type(finchlite.complex_, finchlite.complex64) == finchlite.complex64
+    tuple_type = TupleFType.from_tuple((finchlite.int32, finchlite.float32))
+    promoted_tuple_type = TupleFType.from_tuple((finchlite.int64, finchlite.float32))
+    assert isinstance(tuple_type, FDType)
+    assert promote_type(
+        tuple_type,
+        TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+    ) == promoted_tuple_type
+    assert (
+        ffuncs.where.return_type(
+            finchlite.bool,
+            tuple_type,
+            TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+        )
+        == promoted_tuple_type
+    )
+    assert (
+        ffuncs.choose((0, 0)).return_type(
+            tuple_type,
+            TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+        )
+        == promoted_tuple_type
+    )
 
 
 def test_same_ffunc():

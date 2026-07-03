@@ -850,6 +850,52 @@ def test_argmin_argmax(wrap, op, np_op, axis, keepdims):
     finch_assert_equal(result, np_op(x, axis=axis, keepdims=keepdims))
 
 
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
+@pytest.mark.parametrize("axis", [0, 1, -1])
+@pytest.mark.parametrize("descending", [False, True])
+def test_sort_argsort(wrap, axis, descending):
+    x = np.array(
+        [
+            [3.0, 1.0, 2.0, 1.0, 5.0],
+            [0.0, 4.0, 4.0, -1.0, 2.0],
+            [2.0, 4.0, 3.0, -1.0, 0.0],
+        ]
+    )
+    key = -x if descending else x
+    expected_indices = np.argsort(key, axis=axis, kind="stable")
+    expected_sorted = np.take_along_axis(x, expected_indices, axis=axis)
+
+    indices = finchlite.argsort(
+        wrap(x),
+        axis=axis,
+        descending=descending,
+        stable=False,
+    )
+    sorted_x = finchlite.sort(
+        wrap(x),
+        axis=axis,
+        descending=descending,
+    )
+    if isinstance(indices, finchlite.LazyTensor):
+        indices = finchlite.compute(indices)
+    if isinstance(sorted_x, finchlite.LazyTensor):
+        sorted_x = finchlite.compute(sorted_x)
+
+    assert indices.dtype in (finchlite.int32, finchlite.int64)
+    finch_assert_equal(indices, expected_indices)
+    finch_assert_equal(sorted_x, expected_sorted)
+
+
+def test_argsort_stable_ties():
+    x = np.array([[2, 1, 2, 1, 2]], dtype=np.int64)
+
+    finch_assert_equal(finchlite.argsort(x), np.array([[1, 3, 0, 2, 4]]))
+    finch_assert_equal(
+        finchlite.argsort(x, descending=True),
+        np.array([[0, 2, 4, 1, 3]]),
+    )
+
+
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
 @pytest.mark.parametrize(
     "op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)]

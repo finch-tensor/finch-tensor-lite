@@ -11,8 +11,6 @@ array_api_tests/test_signatures.py::test_func_signature[unique_inverse]
 array_api_tests/test_signatures.py::test_func_signature[unique_values]
 # creation functions
 # other functions
-array_api_tests/test_signatures.py::test_func_signature[argsort]
-array_api_tests/test_signatures.py::test_func_signature[sort]
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
 array_api_tests/test_signatures.py::test_func_signature[searchsorted]
 # Array object namespace
@@ -41,8 +39,6 @@ array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
 array_api_tests/test_has_names.py::test_has_names[set-unique_values]
 array_api_tests/test_has_names.py::test_has_names[searching-searchsorted]
 array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
-array_api_tests/test_has_names.py::test_has_names[sorting-argsort]
-array_api_tests/test_has_names.py::test_has_names[sorting-sort]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack__]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack_device__]
 
@@ -68,12 +64,6 @@ array_api_tests/test_set_functions.py::test_unique_all
 array_api_tests/test_set_functions.py::test_unique_counts
 array_api_tests/test_set_functions.py::test_unique_inverse
 array_api_tests/test_set_functions.py::test_unique_values
-
-# test_sorting_functions
-
-# not implemented
-array_api_tests/test_sorting_functions.py::test_argsort
-array_api_tests/test_sorting_functions.py::test_sort
 
 # test_special_cases
 

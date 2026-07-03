@@ -76,7 +76,7 @@ class LazyTensorFType(TensorFType):
         if not isinstance(other, LazyTensorFType):
             return False
         return (
-            ffuncs.same(self._fill_value, other._fill_value)
+            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
             and self.device == other.device
@@ -944,7 +944,7 @@ class IndexTensorFType(TensorFType):
         if not isinstance(other, IndexTensorFType):
             return False
         return (
-            ffuncs.same(self.fill_value, other.fill_value)
+            builtins.bool(np.all(ffuncs.same(self.fill_value, other.fill_value)))
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
@@ -1089,16 +1089,110 @@ def argmax(
         sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
         indices = lazy(IndexTensor(x.shape, np.intp))
 
-    return elementwise(
+    indices = negative(indices)
+    return negative(
+        elementwise(
+            ffuncs.last,
+            reduce(
+                ffuncs.maxby,
+                elementwise(ffuncs.make_tuple, x, indices),
+                axis=axis,
+                keepdims=keepdims,
+                init=(ffuncs.max.init_value(x.element_type), -sentinel),
+            ),
+        )
+    )
+
+
+def _sort(
+    x: LazyTensor,
+    axis: int,
+    descending: bool,
+    min_op: FinchOperator,
+    max_op: FinchOperator,
+) -> LazyTensor:
+    axis_size = x.shape[axis]
+    out = x
+
+    p = 1
+    while p < axis_size:
+        k = p
+        while k >= 1:
+            partner = _select_along_axis(
+                out,
+                axis,
+                OddEvenMergeSortPartnerMaskTensor(axis_size, p=p, k=k, dtype=np.bool_),
+            )
+            if descending:
+                lower = elementwise(max_op, out, partner)
+                upper = elementwise(min_op, out, partner)
+            else:
+                lower = elementwise(min_op, out, partner)
+                upper = elementwise(max_op, out, partner)
+            lower_mask = expand_dims(
+                OddEvenMergeSortLowerMaskTensor(axis_size, p=p, k=k, dtype=np.bool_),
+                axis=tuple(i for i in range(x.ndim) if i != axis),
+            )
+            out = where(lower_mask, lower, upper)
+            k //= 2
+        p *= 2
+    return out
+
+
+def sort(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    descending: bool = False,
+    stable: bool = True,
+) -> LazyTensor:
+    x = lazy(x)
+    if not isinstance(descending, bool):
+        raise TypeError("descending must be a boolean")
+    if not isinstance(stable, bool):
+        raise TypeError("stable must be a boolean")
+
+    axis = normalize_axis_index(axis, x.ndim)
+    return _sort(x, axis, descending, ffuncs.min, ffuncs.max)
+
+
+def argsort(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    descending: bool = False,
+    stable: bool = True,
+) -> LazyTensor:
+    x = lazy(x)
+    if not isinstance(descending, bool):
+        raise TypeError("descending must be a boolean")
+    if not isinstance(stable, bool):
+        raise TypeError("stable must be a boolean")
+
+    axis = normalize_axis_index(axis, x.ndim)
+    axis_size = x.shape[axis]
+    indices = arange(axis_size, dtype=np.intp, device=x.device)
+    if x.ndim > 1:
+        indices = expand_dims(
+            indices,
+            axis=tuple(i for i in range(x.ndim) if i != axis),
+        )
+    indices = broadcast_to(indices, x.shape)
+    if descending:
+        indices = negative(indices)
+    indices = elementwise(
         ffuncs.last,
-        reduce(
-            ffuncs.maxby,
+        _sort(
             elementwise(ffuncs.make_tuple, x, indices),
-            axis=axis,
-            keepdims=keepdims,
-            init=(ffuncs.max.init_value(x.element_type), sentinel),
+            axis,
+            descending,
+            ffuncs.minby,
+            ffuncs.maxby,
         ),
     )
+    return negative(indices) if descending else indices
 
 
 def any(
@@ -1846,7 +1940,7 @@ class FillTensorFType(TensorFType):
         if not isinstance(other, FillTensorFType):
             return False
         return (
-            ffuncs.same(self._fill_value, other._fill_value)
+            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
@@ -2083,7 +2177,7 @@ class MatrixPatternTensorFType(TensorFType):
         if not isinstance(other, MatrixPatternTensorFType):
             return False
         return (
-            ffuncs.same(self._fill_value, other._fill_value)
+            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
             and self._tensor_type == other._tensor_type
@@ -2172,6 +2266,7 @@ class MatrixPatternTensor(Tensor):
             self._k,
         )
 
+
 class EyeTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
         return j - i == self._k
@@ -2211,6 +2306,248 @@ class RollTensor(MatrixPatternTensor):
 class RepeatTensor(MatrixPatternTensor):
     def _contains(self, i, j) -> bool:
         return self._k > 0 and j == i // self._k
+
+
+@dataclass(frozen=True, eq=False)
+class OddEvenMergeSortPartnerMaskTensorFType(TensorFType):
+    _element_type: FType
+    _shape_type: tuple
+    _p: int
+    _k: int
+
+    @property
+    def fill_value(self):
+        return self._element_type(False)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, OddEvenMergeSortPartnerMaskTensorFType):
+            return False
+        return (
+            self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+            and self._p == other._p
+            and self._k == other._k
+        )
+
+    def __hash__(self):
+        return hash((self._element_type, self._shape_type, self._p, self._k))
+
+    def construct(self, shape: tuple) -> OddEvenMergeSortPartnerMaskTensor:
+        return OddEvenMergeSortPartnerMaskTensor(
+            shape,
+            p=self._p,
+            k=self._k,
+            dtype=self.element_type,
+        )
+
+    def __call__(self, val: Any) -> OddEvenMergeSortPartnerMaskTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class OddEvenMergeSortPartnerMaskTensor(Tensor):
+    def __init__(self, shape, *, p: int, k: int, dtype=None):
+        if isinstance(shape, int):
+            shape = (shape, shape)
+        self._shape = tuple(shape)
+        if len(self._shape) != 2:
+            raise ValueError(f"Expected a 2D shape, got {self._shape}")
+        self._p = p
+        self._k = k
+        self._element_type = ftype(dtype if dtype is not None else np.bool_)
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != 2:
+            raise ValueError("Odd-even partner masks require two indices.")
+        val = idxs[1] == self._partner_index(idxs[0])
+        return Scalar(self._element_type(val), fill_value=self.fill_value)
+
+    def _is_left(self, i) -> bool:
+        axis_size = self.shape[1]
+        offset = self._k % self._p
+        return (
+            i + self._k < axis_size
+            and i >= offset
+            and (i - offset) % (2 * self._k) < self._k
+            and i // (2 * self._p) == (i + self._k) // (2 * self._p)
+        )
+
+    def _partner_index(self, i):
+        if self._is_left(i):
+            return i + self._k
+        if i >= self._k and self._is_left(i - self._k):
+            return i - self._k
+        return i
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return OddEvenMergeSortPartnerMaskTensorFType(
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            self._p,
+            self._k,
+        )
+
+
+@dataclass(frozen=True, eq=False)
+class OddEvenMergeSortLowerMaskTensorFType(TensorFType):
+    _element_type: FType
+    _shape_type: tuple
+    _p: int
+    _k: int
+
+    @property
+    def fill_value(self):
+        return self._element_type(False)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, OddEvenMergeSortLowerMaskTensorFType):
+            return False
+        return (
+            self._element_type == other._element_type
+            and self._shape_type == other._shape_type
+            and self._p == other._p
+            and self._k == other._k
+        )
+
+    def __hash__(self):
+        return hash((self._element_type, self._shape_type, self._p, self._k))
+
+    def construct(self, shape: tuple) -> OddEvenMergeSortLowerMaskTensor:
+        return OddEvenMergeSortLowerMaskTensor(
+            shape,
+            p=self._p,
+            k=self._k,
+            dtype=self.element_type,
+        )
+
+    def __call__(self, val: Any) -> OddEvenMergeSortLowerMaskTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class OddEvenMergeSortLowerMaskTensor(Tensor):
+    def __init__(self, shape, *, p: int, k: int, dtype=None):
+        if isinstance(shape, int):
+            shape = (shape,)
+        self._shape = tuple(shape)
+        if len(self._shape) != 1:
+            raise ValueError(f"Expected a 1D shape, got {self._shape}")
+        self._p = p
+        self._k = k
+        self._element_type = ftype(dtype if dtype is not None else np.bool_)
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != 1:
+            raise ValueError("Odd-even lower masks require one index.")
+        return Scalar(
+            self._element_type(self._is_left(idxs[0])), fill_value=self.fill_value
+        )
+
+    def _is_left(self, i) -> bool:
+        axis_size = self.shape[0]
+        offset = self._k % self._p
+        return (
+            i + self._k < axis_size
+            and i >= offset
+            and (i - offset) % (2 * self._k) < self._k
+            and i // (2 * self._p) == (i + self._k) // (2 * self._p)
+        )
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return OddEvenMergeSortLowerMaskTensorFType(
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            self._p,
+            self._k,
+        )
 
 
 @dataclass(frozen=True, eq=False)
@@ -2678,14 +3015,18 @@ def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
 def _select_along_axis(x: LazyTensor, axis: int, selector, fill=None) -> LazyTensor:
     if fill is None:
         fill = x.fill_value
+    fill_value = fill
     selector = lazy(selector)
     if selector.ndim == 2:
         selector = expand_dims(
             selector,
             axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
         )
-    masked = where(selector, expand_dims(x, axis=axis), fill)
-    return reduce(ffuncs.choose(fill), masked, axis=axis + 1, init=fill)
+    expanded = expand_dims(x, axis=axis)
+    if isinstance(fill, tuple):
+        fill = lazy(FillTensor(_broadcast_shape(selector.shape, expanded.shape), fill))
+    masked = where(selector, expanded, fill)
+    return reduce(ffuncs.choose(fill_value), masked, axis=axis + 1, init=fill_value)
 
 
 def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:

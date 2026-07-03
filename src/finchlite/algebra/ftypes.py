@@ -787,7 +787,7 @@ class MutableStructFType(StructFType):
         return True
 
 
-class TupleFType(ImmutableStructFType):
+class TupleFType(ImmutableStructFType, FDType):
     """FType for Python tuples, with a struct-compatible interface."""
 
     def __init__(self, struct_types):
@@ -815,6 +815,22 @@ class TupleFType(ImmutableStructFType):
     @property
     def struct_fieldtypes(self) -> list[Any]:
         return [type_ for (_, type_) in self.struct_fields]
+
+    def __promote__(self, other):
+        if not isinstance(other, TupleFType):
+            return
+        if len(self.struct_fieldtypes) != len(other.struct_fieldtypes):
+            raise TypeError("Tuple operands must have the same length.")
+        return TupleFType.from_tuple(
+            tuple(
+                promote_type(type_, other_type)
+                for type_, other_type in zip(
+                    self.struct_fieldtypes,
+                    other.struct_fieldtypes,
+                    strict=True,
+                )
+            )
+        )
 
     def struct_hasattr(self, attr: str) -> builtins.bool:
         return attr in dict(self.struct_fields)

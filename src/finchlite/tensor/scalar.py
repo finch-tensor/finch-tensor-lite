@@ -5,17 +5,13 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra import FType, TensorFType, ffuncs, ftype, normalize_device
-from finchlite.algebra.ftypes import FDType
 
 from .override_tensor import OverrideTensor
 
 
 class ScalarFType(TensorFType):
     def __init__(self, _element_type: FType, _fill_value: Any, _device=None):
-        elt = _element_type
-        if not isinstance(elt, FDType):
-            raise TypeError(f"Scalar element type must be FDType, got {elt}")
-        self._element_type = elt
+        self._element_type = _element_type
         self._fill_value = _fill_value
         self._device = normalize_device(_device)
 
@@ -23,7 +19,7 @@ class ScalarFType(TensorFType):
         if isinstance(other, ScalarFType):
             return (
                 self._element_type == other._element_type
-                and ffuncs.same(self._fill_value, other._fill_value)
+                and bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
                 and self.device == other.device
             )
         return False

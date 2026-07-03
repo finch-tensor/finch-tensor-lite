@@ -332,6 +332,32 @@ def argmax(
     return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
 
 
+def argsort(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    descending: bool = False,
+    stable: bool = True,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argsort(x, axis=axis, descending=descending, stable=stable)
+    return compute(lazy.argsort(x, axis=axis, descending=descending, stable=stable))
+
+
+def sort(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    descending: bool = False,
+    stable: bool = True,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sort(x, axis=axis, descending=descending, stable=stable)
+    return compute(lazy.sort(x, axis=axis, descending=descending, stable=stable))
+
+
 def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)

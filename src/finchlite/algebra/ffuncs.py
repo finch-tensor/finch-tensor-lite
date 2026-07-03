@@ -676,7 +676,7 @@ class _MaxBy(FinchOperator):
             return x
         if y_key > x_key:
             return y
-        return x if x_last <= y_last else y
+        return x if x_last >= y_last else y
 
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
@@ -998,6 +998,8 @@ class _GreaterEqual(ComparisonFinchOperator):
 
 class _Where(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
+        if isinstance(b, tuple) and isinstance(c, tuple):
+            return b if builtins.bool(a) else c
         res = np.where(a, b, c)
         if isinstance(res, np.ndarray) and res.shape == ():
             return res[()]
