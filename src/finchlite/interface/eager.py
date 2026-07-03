@@ -437,49 +437,34 @@ def cross(x1, x2, /, *, axis=-1):
     cross_func = getattr(np.linalg, "cross", np.cross)
     return lazy.asarray(cross_func(x1, x2, axis=axis))
 
-def minimumSwaps(arr): 
+def _min_perm_swaps(arr):
     """
     Minimum number of swaps needed to order a
     permutation array
     """
     # from https://www.thepoorcoder.com/hackerrank-minimum-swaps-2-solution/
     a = dict(enumerate(arr))
-    b = {v:k for k,v in a.items()}
+    b = {v: k for k, v in a.items()}
     count = 0
     for i in a:
         x = a[i]
-        if x!=i:
+        if x != i:
             y = b[i]
             a[y] = x
             b[x] = y
-            count+=1
+            count += 1
     return count
 
+
 def det(x, /):
+    #https://stackoverflow.com/questions/19107617/how-to-compute-scipy-sparse-matrix-determinant-without-turning-it-to-dense
     x = _warn_compute(x, "det")
     try:
         x_sp = to_scipy(lazy.asarray(x))
         lu = scipy_sparse_linalg.splu(x_sp.tocsc())
         diag_u = lu.U.diagonal()
-
-        perm_sign = 1
-        for perm in (lu.perm_r, lu.perm_c):
-            seen = np.zeros(perm.size, dtype=bool)
-            swaps = 0
-            for i in range(perm.size):
-                if seen[i]:
-                    continue
-                j = i
-                cycle_len = 0
-                while not seen[j]:
-                    seen[j] = True
-                    j = perm[j]
-                    cycle_len += 1
-                swaps += builtins.max(cycle_len - 1, 0)
-            if swaps % 2:
-                perm_sign *= -1
-
-        return lazy.asarray(np.asarray(perm_sign * diag_u.prod()))
+        swap_sign = (-1) ** (_min_perm_swaps(lu.perm_r) + _min_perm_swaps(lu.perm_c))
+        return lazy.asarray(np.asarray(swap_sign * diag_u.prod()))
     except Exception:
         pass
     x = to_numpy(lazy.asarray(x))
