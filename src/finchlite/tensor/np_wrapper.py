@@ -105,3 +105,11 @@ class NumPyWrapper(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self._data.item()
+
+    def to_numpy(self):
+        return self._data
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )

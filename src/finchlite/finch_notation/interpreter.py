@@ -142,6 +142,14 @@ class TensorView(Tensor):
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.unwrap()
 
+    def to_numpy(self):
+        return np.asarray(self.tns.to_numpy())[self.idxs]
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
+
     def unwrap(self):
         """
         Unwrap the tensor view to get a scalar.

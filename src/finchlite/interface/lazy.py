@@ -7,7 +7,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from itertools import accumulate, product, zip_longest
+from itertools import accumulate, zip_longest
 from typing import Any, cast, overload
 
 import numpy as np
@@ -282,6 +282,12 @@ class LazyTensor(OverrideTensor):
             "Cannot convert LazyTensor to Python scalar. "
             "Use compute() to evaluate it first."
         )
+
+    def to_numpy(self):
+        return compute(self).to_numpy()
+
+    def to_scipy(self):
+        return compute(self).to_scipy()
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -994,6 +1000,16 @@ class IndexTensor(Tensor):
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.fill_value
 
+    def to_numpy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
+
     @property
     def shape(self):
         return self._shape
@@ -1701,6 +1717,16 @@ class FillTensor(Tensor):
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self._fill_value
 
+    def to_numpy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
+
     @property
     def shape(self):
         return self._shape
@@ -1821,12 +1847,14 @@ class ReshapeMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
-        for idxs in product(*(range(dim) for dim in self.shape)):
-            arr[idxs] = self._element_type(
-                self._contains(idxs[: self._old_ndim], idxs[self._old_ndim :])
-            )
-        return arr
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
 
     @property
     def shape(self):
@@ -1934,13 +1962,14 @@ class MatrixPatternTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
-        for i in range(self.shape[0]):
-            for j in range(self.shape[1]):
-                arr[i, j] = (
-                    self._one_value if self._contains(i, j) else self._fill_value
-                )
-        return arr
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
 
     @property
     def shape(self):
@@ -2059,10 +2088,14 @@ class ParityMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        arr = np.empty(self.shape, dtype=_np_dtype(self._element_type))
-        for i in range(self.shape[0]):
-            arr[i] = self._element_type(i % 2 == self._parity)
-        return arr
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
 
     @property
     def shape(self):

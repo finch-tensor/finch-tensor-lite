@@ -4,7 +4,12 @@ import numpy as np
 
 import finchlite
 from finchlite import (
+    DenseLevel,
+    ElementLevel,
+    FiberTensor,
+    NumpyBuffer,
     NumpyBufferFType,
+    SparseListLevel,
     asarray,
     dense,
     element,
@@ -76,6 +81,60 @@ def test_bufferized_ndarray_custom_fill_value():
     assert finchlite.same(x.fill_value, y.fill_value)
     assert x.ftype == y.ftype
     assert hash(x.ftype) == hash(y.ftype)
+
+
+def test_bufferized_ndarray_to_numpy_returns_view():
+    arr = np.arange(6, dtype=np.int64).reshape(2, 3)
+    tensor = BufferizedNDArray.from_numpy(arr)
+
+    result = tensor.to_numpy()
+
+    np.testing.assert_array_equal(result, arr)
+    assert np.shares_memory(result, tensor.val.arr)
+
+
+def test_bufferized_ndarray_accessor_to_numpy_returns_view():
+    arr = np.arange(12, dtype=np.int64).reshape(3, 4)
+    tensor = BufferizedNDArray.from_numpy(arr)
+
+    result = tensor.access((1,), None).to_numpy()
+
+    np.testing.assert_array_equal(result, arr[1])
+    assert np.shares_memory(result, tensor.val.arr)
+
+
+def test_sparse_tensor_to_scipy():
+    arr = np.array([[0, 2, 0], [3, 0, 4]], dtype=np.int32)
+    tensor = FiberTensor(
+        DenseLevel(
+            SparseListLevel(
+                ElementLevel(
+                    element(
+                        np.int32(0),
+                        finchlite.int32,
+                        finchlite.intp,
+                        NumpyBufferFType,
+                    ),
+                    NumpyBuffer(np.array([2, 3, 4], dtype=np.int32)),
+                ),
+                np.intp(3),
+                NumpyBuffer(np.array([0, 1, 3], dtype=np.intp)),
+                NumpyBuffer(np.array([1, 0, 2], dtype=np.intp)),
+            ),
+            np.intp(2),
+        )
+    )
+
+    scipy_tensor = tensor.to_scipy()
+
+    np.testing.assert_array_equal(scipy_tensor.toarray(), arr)
+
+
+def test_dense_tensor_to_scipy_rejects():
+    tensor = BufferizedNDArray.from_numpy(np.arange(3, dtype=np.int32))
+
+    with pytest.raises(NotImplementedError, match="does not support to_scipy"):
+        tensor.to_scipy()
 
 
 def test_empty_like_preserves_fill_value():
@@ -158,10 +217,17 @@ def test_fiber_tensor():
 )
 def test_matrix_pattern_tensors(make_tensor, expected):
     tensor = make_tensor()
+    actual = np.array(
+        [
+            [tensor[i, j].item() for j in range(tensor.shape[1])]
+            for i in range(tensor.shape[0])
+        ],
+        dtype=expected.dtype,
+    )
 
     assert tensor.shape == expected.shape
     assert tensor.fill_value.dtype == expected.dtype
-    np.testing.assert_array_equal(tensor.to_numpy(), expected)
+    np.testing.assert_array_equal(actual, expected)
 
 
 def test_lazy_matrix_pattern_tensor_compute():
@@ -170,21 +236,31 @@ def test_lazy_matrix_pattern_tensor_compute():
 
     assert tensor.shape == (2, 3)
     assert result.fill_value.dtype == np.dtype(np.int32)
-    np.testing.assert_array_equal(result.to_numpy(), np.eye(2, 3, dtype=np.int32))
+    actual = np.array(
+        [
+            [result[i, j].item() for j in range(result.shape[1])]
+            for i in range(result.shape[0])
+        ],
+        dtype=np.int32,
+    )
+    np.testing.assert_array_equal(actual, np.eye(2, 3, dtype=np.int32))
 
 
-def test_reshape_mask_tensor_to_numpy():
-    mask = finchlite.ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_)
-    expected = np.zeros((2, 3, 3, 2), dtype=np.bool_)
-    for i in range(2):
-        for j in range(3):
-            old_flat = np.ravel_multi_index((i, j), (2, 3))
-            for k in range(3):
-                for l in range(2):
-                    new_flat = np.ravel_multi_index((k, l), (3, 2))
-                    expected[i, j, k, l] = old_flat == new_flat
-
-    np.testing.assert_array_equal(mask.to_numpy(), expected)
+@pytest.mark.parametrize(
+    "tensor",
+    [
+        finchlite.ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_),
+        FillTensor((2, 3), 0),
+        IndexTensor((2, 3)),
+        ParityMaskTensor(3),
+        EyeTensor((2, 3)),
+    ],
+)
+def test_symbolic_tensors_reject_materialization(tensor):
+    with pytest.raises(NotImplementedError, match="does not support to_numpy"):
+        tensor.to_numpy()
+    with pytest.raises(NotImplementedError, match="does not support to_scipy"):
+        tensor.to_scipy()
 
 
 @pytest.mark.parametrize("k", [-1, 0, 1])

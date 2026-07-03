@@ -160,3 +160,13 @@ class Tensor(FTyped, ABC):
         `ValueError` when called on a non-scalar tensor.
         """
         ...
+
+    @abstractmethod
+    def to_numpy(self):
+        """Convert the tensor to a NumPy representation."""
+        ...
+
+    @abstractmethod
+    def to_scipy(self):
+        """Convert the tensor to a SciPy sparse representation."""
+        ...

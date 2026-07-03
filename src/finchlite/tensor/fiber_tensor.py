@@ -295,6 +295,12 @@ class FiberTensor(OverrideTensor):
         # TODO: temporary for dense only. TBD in sparse_level PR
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
+    def to_scipy(self):
+        # TODO: temporary for dense only. TBD in sparse_level PR
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy for this layout."
+        )
+
     def item(self):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
