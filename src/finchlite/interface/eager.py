@@ -430,12 +430,10 @@ def cholesky(x, /, *, upper=False):
 
 
 def cross(x1, x2, /, *, axis=-1):
-    x1 = _warn_compute(x1, "cross")
-    x1 = to_numpy(lazy.asarray(x1))
-    x2 = _warn_compute(x2, "cross")
-    x2 = to_numpy(lazy.asarray(x2))
-    cross_func = getattr(np.linalg, "cross", np.cross)
-    return lazy.asarray(cross_func(x1, x2, axis=axis))
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.cross(x1, x2, axis=axis)
+    return compute(lazy.cross(x1, x2, axis=axis))
+
 
 def _min_perm_swaps(arr):
     """

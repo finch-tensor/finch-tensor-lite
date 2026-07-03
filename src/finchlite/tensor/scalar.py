@@ -135,3 +135,6 @@ class Scalar(OverrideTensor):
 
     def to_numpy(self):
         return self.val
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
