@@ -3,7 +3,7 @@ from __future__ import annotations
 import builtins
 from typing import Any
 
-from finchlite.algebra.devices import AbstractDevice, normalize_device, serial
+from finchlite.algebra.devices import AbstractDevice, cpu, normalize_device, serial
 from finchlite.algebra.ftypes import (
     bool,
     complex64,
@@ -59,7 +59,7 @@ class ArrayNamespaceInfo:
         return serial()
 
     def devices(self) -> list[AbstractDevice]:
-        return [serial()]
+        return [serial(), cpu()]
 
     def default_dtypes(self, *, device=None) -> dict[str, Any]:
         _validate_device(device)

@@ -357,7 +357,7 @@ def test_array_namespace_info():
         "max dimensions": 5,
     }
     assert info.default_device() == finchlite.serial()
-    assert info.devices() == [finchlite.serial()]
+    assert info.devices() == [finchlite.serial(), finchlite.cpu()]
     assert info.default_dtypes() == {
         "real floating": finchlite.float64,
         "complex floating": finchlite.complex128,
@@ -415,29 +415,37 @@ def test_device_hierarchy_objects_and_ftypes():
     assert isinstance(ser, finchlite.AbstractDevice)
     assert finchlite.ftype(ser) == finchlite.SerialFType()
     assert ser.num_tasks == 1
-    assert ser.device == finchlite.CPU(1)
-    assert finchlite.SerialFType().device == finchlite.CPUFType()
+    assert ser.pool == finchlite.SerialPool()
+    assert ser.parent_device is None
+    assert finchlite.SerialFType().pool_type == finchlite.SerialPoolFType()
+    assert finchlite.SerialPool().pool == finchlite.CPUPool(1)
 
     cpu_dev = finchlite.cpu("main", n=3)
     assert isinstance(cpu_dev, finchlite.CPU)
-    assert cpu_dev == finchlite.CPU(7, "main")
+    assert cpu_dev == finchlite.CPU(finchlite.serial(), id="main", n=7)
     assert cpu_dev.num_tasks == 3
-    assert cpu_dev.device == cpu_dev
+    assert cpu_dev.pool == finchlite.CPUPool(3, "main")
+    assert cpu_dev.parent_device == finchlite.serial()
     assert finchlite.ftype(cpu_dev) == finchlite.CPUFType("main")
-    assert finchlite.CPUFType("main").device == finchlite.CPUFType("main")
-    assert finchlite.CPUFType("main")(2) == finchlite.CPU(2, "main")
+    assert finchlite.CPUFType("main").pool_type == finchlite.CPUPoolFType("main")
+    assert finchlite.CPUFType("main").parent_device_type == finchlite.SerialFType()
+    assert finchlite.CPUFType("main")(2) == finchlite.CPU(
+        finchlite.serial(), id="main", n=2
+    )
 
     parent = finchlite.SerialTask()
-    thread = finchlite.CPUThread(2, cpu_dev, parent)
-    thread_type = finchlite.CPUThreadFType(finchlite.ftype(parent), cpu_dev.ftype)
-    assert thread.device == cpu_dev
+    cpu_pool = cpu_dev.pool
+    thread = finchlite.CPUThread(2, cpu_pool, parent)
+    thread_type = finchlite.CPUThreadFType(finchlite.ftype(parent), cpu_pool.ftype)
+    assert thread.pool == cpu_pool
     assert finchlite.ftype(thread) == thread_type
-    assert thread_type.device == cpu_dev.ftype
+    assert thread_type.pool == cpu_pool.ftype
     assert thread.parent_task == parent
     assert thread_type.parent_task == finchlite.ftype(parent)
     assert thread.task_num == 2
-    assert thread.is_on_device(cpu_dev)
-    assert finchlite.is_on_device(thread, cpu_dev)
+    assert thread.is_on_pool(cpu_pool)
+    assert finchlite.is_on_pool(thread, cpu_pool)
+    assert finchlite.is_on_device(thread, cpu_pool)
 
 
 def test_finfo_returns_python_scalars():
