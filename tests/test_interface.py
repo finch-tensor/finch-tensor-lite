@@ -164,7 +164,9 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         return self.array
 
     def to_scipy(self):
-        return finchlite.to_scipy(self.array)
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
 
 
 @pytest.mark.parametrize(

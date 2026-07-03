@@ -89,12 +89,12 @@ pytest-regressions = "~=2.8.1"
 pytest-mypy = ">=1,<2"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "pytest -m 'not c_backend'"
+cmd = "python -m pytest -m 'not c_backend'"
 depends-on = ["compile"]
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
-cmd = "pytest -m c_backend"
+cmd = "python -m pytest -m c_backend"
 depends-on = ["compile"]
 default-environment = "test-c"
 
