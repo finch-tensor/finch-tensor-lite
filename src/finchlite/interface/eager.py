@@ -1,4 +1,5 @@
 import builtins
+import warnings
 from collections.abc import Sequence
 from typing import Any
 
@@ -8,6 +9,17 @@ from finchlite.algebra import FinchOperator
 
 from . import lazy
 from .fuse import compute
+
+
+def _warn_compute(x, op_name: str):
+    if isinstance(x, lazy.LazyTensor):
+        warnings.warn(
+            f"{op_name} requires a materialized array; computing lazy operand.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return compute(x)
+    return x
 
 
 def full(
@@ -391,7 +403,8 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
-def _to_numpy(x):
+def _to_numpy(x, op_name: str):
+    x = _warn_compute(x, op_name)
     x = lazy.asarray(x)
     while hasattr(x, "to_numpy"):
         x = x.to_numpy()
@@ -399,9 +412,7 @@ def _to_numpy(x):
 
 
 def inv(x, /):
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.inv(x)
-    x = _to_numpy(x)
+    x = _to_numpy(x, "inv")
     return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
 
 
@@ -409,7 +420,7 @@ def matrix_power(x, n, /):
     """
     Computes the power of a matrix.
     """
-    if isinstance(x, lazy.LazyTensor):
+    if isinstance(x, lazy.LazyTensor) and not (isinstance(n, int) and n < 0):
         return lazy.matrix_power(x, n)
     if isinstance(n, int) and n < 0:
         return matrix_power(inv(x), -n)
@@ -418,8 +429,11 @@ def matrix_power(x, n, /):
 
 def matrix_norm(x, /, *, keepdims=False, ord="fro"):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.matrix_norm(x, keepdims=keepdims, ord=ord)
-    x = _to_numpy(x)
+        try:
+            return lazy.matrix_norm(x, keepdims=keepdims, ord=ord)
+        except NotImplementedError:
+            pass
+    x = _to_numpy(x, "matrix_norm")
     matrix_norm_fn = getattr(np.linalg, "matrix_norm", None)
     if matrix_norm_fn is None:
         result = np.linalg.norm(x, ord=ord, axis=(-2, -1), keepdims=keepdims)

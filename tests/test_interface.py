@@ -1140,9 +1140,12 @@ def test_matrix_power_negative_eager():
 
 def test_matrix_power_negative_lazy_requires_materialization():
     a = finchlite.lazy(np.array([[1.0, 2.0], [3.0, 5.0]]))
+    expected = np.linalg.matrix_power(np.array([[1.0, 2.0], [3.0, 5.0]]), -1)
 
-    with pytest.raises(ValueError, match="materializing first"):
-        finchlite.linalg.matrix_power(a, -1)
+    with pytest.warns(RuntimeWarning, match="matrix_power|inv"):
+        result = finchlite.linalg.matrix_power(a, -1)
+
+    finch_assert_allclose(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -1453,6 +1456,28 @@ def test_linalg_matrix_norm_lazy(kw):
     result = finchlite.compute(result)
 
     assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+def test_linalg_matrix_norm_lazy_eager_only_warns_and_computes():
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
+    expected = np.linalg.matrix_norm(x, ord=2)
+
+    with pytest.warns(RuntimeWarning, match="matrix_norm"):
+        result = finchlite.linalg.matrix_norm(finchlite.lazy(x), ord=2)
+
+    assert not isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(result, expected)
+
+
+def test_linalg_inv_lazy_warns_and_computes():
+    x = np.array([[1.0, 2.0], [3.0, 5.0]])
+    expected = np.linalg.inv(x)
+
+    with pytest.warns(RuntimeWarning, match="inv"):
+        result = finchlite.linalg.inv(finchlite.lazy(x))
+
+    assert not isinstance(result, finchlite.LazyTensor)
     finch_assert_allclose(result, expected)
 
 
