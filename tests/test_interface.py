@@ -2032,7 +2032,7 @@ def test_lazy_reshape_preserves_fill_value():
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
-def test_lazy_reshape_uses_grouped_masks(monkeypatch):
+def test_lazy_reshape_uses_single_mask(monkeypatch):
     lazy_module = importlib.import_module("finchlite.interface.lazy")
     original = lazy_module.ReshapeMaskTensor
     mask_shapes = []
@@ -2046,7 +2046,7 @@ def test_lazy_reshape_uses_grouped_masks(monkeypatch):
 
     result = finchlite.reshape(finchlite.lazy(array), (6, 4))
 
-    assert mask_shapes == [((2, 3), (6,))]
+    assert mask_shapes == [((2, 3, 4), (6, 4))]
     finch_assert_equal(finchlite.compute(result), array.reshape(6, 4))
 
 

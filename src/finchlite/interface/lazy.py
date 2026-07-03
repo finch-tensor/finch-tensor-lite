@@ -2589,7 +2589,8 @@ def cumulative_prod(
     )
 
 
-def _normalize_reshape_shape(old_shape: tuple, shape) -> tuple:
+def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
+    x = lazy(x)
     if isinstance(shape, (int, np.integer)) and not isinstance(
         shape,
         (bool, np.bool_),
@@ -2601,7 +2602,7 @@ def _normalize_reshape_shape(old_shape: tuple, shape) -> tuple:
         except TypeError as exc:
             raise TypeError("shape must be an integer or sequence of integers") from exc
 
-    old_size = _shape_size(old_shape)
+    old_size = _shape_size(x.shape)
     unknown_axis = None
     normalized = []
     for i, dim in enumerate(shape):
@@ -2631,81 +2632,7 @@ def _normalize_reshape_shape(old_shape: tuple, shape) -> tuple:
             f"Cannot reshape array of size {old_size} into shape {tuple(normalized)}"
         )
 
-    return tuple(normalized)
-
-
-def _reshape_groups(old_shape: tuple, new_shape: tuple):
-    old_pos = 0
-    new_pos = 0
-    while old_pos < len(old_shape) or new_pos < len(new_shape):
-        old_start = old_pos
-        new_start = new_pos
-        old_prod = 1
-        new_prod = 1
-        if old_pos < len(old_shape):
-            old_prod *= old_shape[old_pos]
-            old_pos += 1
-        if new_pos < len(new_shape):
-            new_prod *= new_shape[new_pos]
-            new_pos += 1
-
-        while old_prod != new_prod:
-            if (old_prod < new_prod and old_pos < len(old_shape)) or (
-                new_pos == len(new_shape) and old_pos < len(old_shape)
-            ):
-                old_prod *= old_shape[old_pos]
-                old_pos += 1
-            elif new_pos < len(new_shape):
-                new_prod *= new_shape[new_pos]
-                new_pos += 1
-            else:
-                raise ValueError(
-                    f"Cannot reshape array of shape {old_shape} into {new_shape}"
-                )
-
-        yield (
-            old_start,
-            old_shape[old_start:old_pos],
-            new_shape[new_start:new_pos],
-        )
-
-
-def _reshape_group(
-    x: LazyTensor,
-    axis: int,
-    old_group: tuple,
-    new_group: tuple,
-) -> LazyTensor:
-    if old_group == new_group:
-        return x
-
-    suffix_ndim = x.ndim - axis - len(old_group)
-    expanded = expand_dims(
-        x,
-        axis=tuple(range(axis + len(old_group), axis + len(old_group) + len(new_group))),
-    )
-    mask = expand_dims(
-        ReshapeMaskTensor(old_group, new_group, dtype=np.bool_),
-        axis=tuple(range(axis))
-        + tuple(
-            range(
-                axis + len(old_group) + len(new_group),
-                axis + len(old_group) + len(new_group) + suffix_ndim,
-            )
-        ),
-    )
-    masked = where(mask, expanded, x.fill_value)
-    return reduce(
-        ffuncs.choose(x.fill_value),
-        masked,
-        axis=tuple(range(axis, axis + len(old_group))),
-        init=x.fill_value,
-    )
-
-
-def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
-    x = lazy(x)
-    shape = _normalize_reshape_shape(x.shape, shape)
+    shape = tuple(normalized)
     if x.shape == shape:
         return x
     if _shape_size(shape) == 0:
@@ -2713,36 +2640,34 @@ def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
     if x.shape == ():
         return broadcast_to(x, shape)
 
-    axis = 0
-    out = x
-    for _, old_group, new_group in _reshape_groups(x.shape, shape):
-        out = _reshape_group(out, axis, old_group, new_group)
-        axis += len(new_group)
-    return out
+    expanded = expand_dims(
+        x,
+        axis=tuple(range(x.ndim, x.ndim + len(shape))),
+    )
+    masked = where(
+        ReshapeMaskTensor(x.shape, shape, dtype=np.bool_),
+        expanded,
+        x.fill_value,
+    )
+    return reduce(
+        ffuncs.choose(x.fill_value),
+        masked,
+        axis=tuple(range(x.ndim)),
+        init=x.fill_value,
+    )
 
 
-def _axis_select(x: LazyTensor, axis: int, mask, fill=None) -> LazyTensor:
+def _select_along_axis(x: LazyTensor, axis: int, selector, fill=None) -> LazyTensor:
     if fill is None:
         fill = x.fill_value
-    mask = expand_dims(
-        mask,
-        axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
-    )
-    masked = where(mask, expand_dims(x, axis=axis), fill)
+    selector = lazy(selector)
+    if selector.ndim == 2:
+        selector = expand_dims(
+            selector,
+            axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
+        )
+    masked = where(selector, expand_dims(x, axis=axis), fill)
     return reduce(ffuncs.choose(fill), masked, axis=axis + 1, init=fill)
-
-
-def _concat_skew(x: LazyTensor, axis: int, offset: int, axis_size: int, fill):
-    mask = expand_dims(
-        eye(axis_size, x.shape[axis], k=-offset, dtype=np.bool_),
-        axis=tuple(range(axis)) + tuple(range(axis + 2, x.ndim + 1)),
-    )
-    masked = where(mask, expand_dims(x, axis=axis), fill)
-    return reduce(ffuncs.choose(fill), masked, axis=axis + 1, init=fill)
-
-
-def _flatten_for_concat(x: LazyTensor) -> LazyTensor:
-    return reshape(x, (_shape_size(x.shape),))
 
 
 def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
@@ -2750,7 +2675,7 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
     if len(arrays) == 0:
         raise ValueError("concat requires at least one array")
     if axis is None:
-        arrays = tuple(_flatten_for_concat(array) for array in arrays)
+        arrays = tuple(reshape(array, (_shape_size(array.shape),)) for array in arrays)
         axis = 0
 
     ndim = arrays[0].ndim
@@ -2783,7 +2708,14 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
     offset = 0
     skewed = []
     for array in arrays:
-        skewed.append(_concat_skew(array, axis, offset, shape[axis], fill))
+        skewed.append(
+            _select_along_axis(
+                array,
+                axis,
+                eye(shape[axis], array.shape[axis], k=-offset, dtype=np.bool_),
+                fill,
+            )
+        )
         offset += array.shape[axis]
 
     return elementwise(ffuncs.choose(fill), *skewed)
@@ -2796,7 +2728,7 @@ def flip(x, /, *, axis: int | tuple[int, ...] | None = None) -> LazyTensor:
     for ax in axes:
         axis_size = out.shape[ax]
         if axis_size > 1:
-            out = _axis_select(
+            out = _select_along_axis(
                 out,
                 ax,
                 ReverseTensor((axis_size, axis_size), dtype=np.bool_),
@@ -2836,7 +2768,7 @@ def roll(
     for ax, amount in zip(axes, shifts, strict=True):
         axis_size = out.shape[ax]
         if axis_size > 1:
-            out = _axis_select(
+            out = _select_along_axis(
                 out,
                 ax,
                 RollTensor((axis_size, axis_size), k=amount, dtype=np.bool_),
@@ -2874,7 +2806,7 @@ def take(x, indices, /, *, axis: int | None = None) -> LazyTensor:
             raise ValueError("axis is required when x is not one-dimensional")
         axis = 0
     axis = normalize_axis_index(axis, x.ndim)
-    return _axis_select(x, axis, _take_mask(indices, x.shape[axis]))
+    return _select_along_axis(x, axis, _take_mask(indices, x.shape[axis]))
 
 
 def take_along_axis(x, indices, /, *, axis: int = -1) -> LazyTensor:
@@ -2913,8 +2845,7 @@ def take_along_axis(x, indices, /, *, axis: int = -1) -> LazyTensor:
         expand_dims(_normalize_take_indices(indices, axis_size), axis=axis + 1),
         positions,
     )
-    masked = where(mask, expand_dims(x, axis=axis), x.fill_value)
-    return reduce(ffuncs.choose(x.fill_value), masked, axis=axis + 1, init=x.fill_value)
+    return _select_along_axis(x, axis, mask)
 
 
 def _literal_repeat_count(repeats) -> int | None:
@@ -2944,7 +2875,7 @@ def repeat(x, repeats, /, *, axis: int | None = None) -> LazyTensor:
         )
         if axis_size == 0 or repeat_count == 0:
             return empty(out_shape, dtype=x.element_type, device=x.device)
-        return _axis_select(
+        return _select_along_axis(
             x,
             axis,
             RepeatTensor(
