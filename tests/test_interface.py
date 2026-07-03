@@ -163,6 +163,9 @@ class TestOverrideTensor(finchlite.OverrideTensor):
     def to_numpy(self):
         return self.array
 
+    def to_scipy(self):
+        return finchlite.to_scipy(self.array)
+
 
 @pytest.mark.parametrize(
     "a, b",
