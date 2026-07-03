@@ -1684,37 +1684,23 @@ def cross(x1, x2, /, *, axis=-1):
     if x2.shape[axis2] != 3:
         raise ValueError(f"x2 cross product axis must have length 3, got {x2.shape}")
 
-    if axis1 != x1.ndim - 1:
-        x1 = permute_dims(
-            x1,
-            axes=tuple(i for i in range(x1.ndim) if i != axis1) + (axis1,),
-        )
-    if axis2 != x2.ndim - 1:
-        x2 = permute_dims(
-            x2,
-            axes=tuple(i for i in range(x2.ndim) if i != axis2) + (axis2,),
-        )
+    if x1.ndim != x2.ndim:
+        raise ValueError("cross operands must have the same number of dimensions")
+    if axis1 != axis2:
+        raise ValueError("cross operands must use the same normalized axis")
 
+    e_axes = tuple(range(axis1)) + tuple(range(axis1 + 3, x1.ndim + 2))
     terms = multiply(
         multiply(
-            asarray(_cross_E, device=common_device(x1.device, x2.device)),
-            expand_dims(expand_dims(x1, axis=-1), axis=-3),
+            expand_dims(
+                asarray(_cross_E, device=common_device(x1.device, x2.device)),
+                axis=e_axes,
+            ),
+            expand_dims(expand_dims(x1, axis=axis1), axis=axis1 + 2),
         ),
-        expand_dims(expand_dims(x2, axis=-2), axis=-2),
+        expand_dims(expand_dims(x2, axis=axis1), axis=axis1 + 1),
     )
-    result = reduce(ffuncs.add, terms, axis=(-1, -2))
-
-    axis = normalize_axis_index(axis, result.ndim)
-    if axis == result.ndim - 1:
-        return result
-    return permute_dims(
-        result,
-        axes=(
-            tuple(range(axis))
-            + (result.ndim - 1,)
-            + tuple(range(axis, result.ndim - 1))
-        ),
-    )
+    return reduce(ffuncs.add, terms, axis=(axis1 + 1, axis1 + 2))
 
 
 def det(x, /):
