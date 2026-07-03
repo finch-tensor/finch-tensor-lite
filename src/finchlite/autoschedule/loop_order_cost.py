@@ -1,6 +1,7 @@
 from finchlite.algebra import ffuncs
 from finchlite.algebra.utils import is_subsequence
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
+from finchlite.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -131,7 +132,11 @@ def transpose_penalty(
         match node:
             case Table(Alias() as tns, idxs):
                 base = stats_bindings.get(tns)
-                if not is_subsequence(tuple(idxs), loop_prefix):
+                # test requires isinstance(base, NumericStats)
+                if (
+                    isinstance(base, NumericStats)
+                    and not is_subsequence(tuple(idxs), loop_prefix)
+                ):
                     penalty += base.estimate_non_fill_values()
             case _:
                 pass
