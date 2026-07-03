@@ -133,9 +133,8 @@ def transpose_penalty(
             case Table(Alias() as tns, idxs):
                 base = stats_bindings.get(tns)
                 # test requires isinstance(base, NumericStats)
-                if (
-                    isinstance(base, NumericStats)
-                    and not is_subsequence(tuple(idxs), loop_prefix)
+                if isinstance(base, NumericStats) and not is_subsequence(
+                    tuple(idxs), loop_prefix
                 ):
                     penalty += base.estimate_non_fill_values()
             case _:
