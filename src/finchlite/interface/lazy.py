@@ -22,6 +22,7 @@ from finchlite.algebra import (
     fixpoint_type,
     ftype,
     init_value,
+    normalize_device,
     result_type,
     return_type,
 )
@@ -62,10 +63,12 @@ class LazyTensorFType(TensorFType):
         _fill_value: Any,
         _element_type: FType | type,
         _shape_type: tuple[FType | type, ...],
+        _device=None,
     ):
         self._fill_value = _fill_value
         self._element_type = ftype(_element_type)
         self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
+        self._device = normalize_device(_device)
 
     def __eq__(self, other):
         if not isinstance(other, LazyTensorFType):
@@ -74,11 +77,17 @@ class LazyTensorFType(TensorFType):
             ffuncs.same(self._fill_value, other._fill_value)
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
+            and self.device == other.device
         )
 
     def __hash__(self):
         return hash(
-            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
+            (
+                ffuncs.samehash(self._fill_value),
+                self._element_type,
+                self._shape_type,
+                self.device,
+            )
         )
 
     def construct(self, shape: tuple) -> LazyTensor:
@@ -92,6 +101,7 @@ class LazyTensorFType(TensorFType):
             shape=shape,
             fill_value=self._fill_value,
             element_type=self._element_type,
+            device=self.device,
         )
 
     def __call__(self, val: Any) -> LazyTensor:
@@ -118,6 +128,10 @@ class LazyTensorFType(TensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    @property
+    def device(self):
+        return self._device
 
     def from_numpy(self, arr):
         raise NotImplementedError
@@ -198,12 +212,14 @@ class LazyTensor(OverrideTensor):
         shape: tuple,
         fill_value: Any,
         element_type: FType,
+        device=None,
     ):
         self.data: Alias = data
         self.ctx = ctx
         self._shape = shape
         self._fill_value = fill_value
         self._element_type = element_type
+        self._device = normalize_device(device)
 
     def override_module(self):
         return sys.modules[__name__]
@@ -214,6 +230,7 @@ class LazyTensor(OverrideTensor):
             _fill_value=self._fill_value,
             _element_type=self._element_type,
             _shape_type=tuple(ftype(dim) for dim in self._shape),
+            _device=self._device,
         )
 
     @property
@@ -228,6 +245,25 @@ class LazyTensor(OverrideTensor):
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
         return self.ftype.fill_value
+
+    @property
+    def device(self):
+        return self._device
+
+    def to_device(self, device, /, *, stream=None):
+        if stream is not None:
+            raise ValueError(f"stream argument is not supported; got {stream!r}")
+        device = normalize_device(device)
+        if device == self.device:
+            return self
+        return LazyTensor(
+            self.data,
+            self.ctx,
+            self._shape,
+            self._fill_value,
+            self._element_type,
+            device=device,
+        )
 
     @property
     def element_type(self) -> FType:
@@ -298,32 +334,36 @@ def asarray(
     If input argument is already array type, return unchanged.
     https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html
     """
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
+    explicit_device = device is not None
+    device = normalize_device(device)
 
     if format is None:
         if isinstance(obj, Scalar):
-            if copy is True:
-                return Scalar(obj.val, fill_value=obj.fill_value)
+            if copy is True or (explicit_device and obj.device != device):
+                return Scalar(obj.val, fill_value=obj.fill_value, device=device)
             return obj
         if isinstance(obj, BufferizedNDArray):
             if copy is True:
                 return BufferizedNDArray.from_numpy(
-                    obj.to_numpy().copy(), fill_value=obj.fill_value
+                    obj.to_numpy().copy(), fill_value=obj.fill_value, device=device
                 )
+            if explicit_device and obj.device != device:
+                return obj.to_device(device)
             return obj
         if isinstance(obj, Tensor) and copy is not True:
+            if explicit_device and obj.device != device:
+                return obj.to_device(device)
             return obj
         if isinstance(obj, np.ndarray):
             if copy is True:
                 obj = obj.copy()
-            return BufferizedNDArray.from_numpy(obj)
+            return BufferizedNDArray.from_numpy(obj, device=device)
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
             elif isinstance(obj, bool | int | float | complex):
                 obj = np.asarray(obj)[()]
-            return Scalar(obj)
+            return Scalar(obj, device=device)
         try:
             np_arr = np.asarray(obj)
             if np_arr.dtype != object:
@@ -339,7 +379,7 @@ def asarray(
                     np_arr = np_arr.astype(np_dtype)
                 elif copy is True:
                     np_arr = np_arr.copy()
-                return BufferizedNDArray.from_numpy(np_arr)
+                return BufferizedNDArray.from_numpy(np_arr, device=device)
         except (TypeError, ValueError):
             pass
         return obj
@@ -380,7 +420,7 @@ def lazy(arr: Any) -> LazyTensor | tuple[Any, ...]:
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
     ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
-    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type)
+    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type, arr.device)
 
 
 def _np_dtype(dtype):
@@ -396,6 +436,7 @@ def full(
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
+    device=None,
 ):
     """
     Returns a new array having a specified shape and filled with fill_value.
@@ -420,46 +461,58 @@ def full(
     - out (array): an array where every element is equal to fill_value.
     """
     shape = (shape,) if isinstance(shape, int) else tuple(shape)
-    return broadcast_to(asarray(fill_value, dtype=dtype), shape)
+    return broadcast_to(asarray(fill_value, dtype=dtype, device=device), shape)
 
 
-def full_like(x, /, fill_value, *, dtype=None):
+def full_like(x, /, fill_value, *, dtype=None, device=None):
     x = lazy(x)
     return full(
-        x.shape, fill_value, dtype=dtype if dtype is not None else x.element_type
+        x.shape,
+        fill_value,
+        dtype=dtype if dtype is not None else x.element_type,
+        device=device if device is not None else x.device,
     )
 
 
-def linspace(start, stop, /, num, *, dtype=None, endpoint=True):
+def linspace(start, stop, /, num, *, dtype=None, endpoint=True, device=None):
     return broadcast_to(
-        lazy(np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype))),
+        asarray(
+            np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype)),
+            device=device,
+        ),
         (num,),
     )
 
 
-def zeros(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
-    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+def zeros(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTensor:
+    return full(
+        shape, 0, dtype=dtype if dtype is not None else np.float64, device=device
+    )
 
 
-def ones(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
-    return full(shape, 1, dtype=dtype if dtype is not None else np.float64)
+def ones(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTensor:
+    return full(
+        shape, 1, dtype=dtype if dtype is not None else np.float64, device=device
+    )
 
 
-def empty(shape: int | tuple[int, ...], *, dtype=None) -> LazyTensor:
-    return full(shape, 0, dtype=dtype if dtype is not None else np.float64)
+def empty(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTensor:
+    return full(
+        shape, 0, dtype=dtype if dtype is not None else np.float64, device=device
+    )
 
 
-def empty_like(x, /, *, dtype=None) -> LazyTensor:
+def empty_like(x, /, *, dtype=None, device=None) -> LazyTensor:
     x = lazy(x)
-    return full_like(x, x.fill_value, dtype=dtype)
+    return full_like(x, x.fill_value, dtype=dtype, device=device)
 
 
-def zeros_like(x, /, *, dtype=None) -> LazyTensor:
-    return full_like(x, 0, dtype=dtype)
+def zeros_like(x, /, *, dtype=None, device=None) -> LazyTensor:
+    return full_like(x, 0, dtype=dtype, device=device)
 
 
-def ones_like(x, /, *, dtype=None) -> LazyTensor:
-    return full_like(x, 1, dtype=dtype)
+def ones_like(x, /, *, dtype=None, device=None) -> LazyTensor:
+    return full_like(x, 1, dtype=dtype, device=device)
 
 
 def arange(
@@ -469,11 +522,12 @@ def arange(
     step: float = 1,
     *,
     dtype=None,
+    device=None,
 ) -> LazyTensor:
     if stop is None:
         start, stop = 0, start
     arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
-    return lazy(arr)
+    return lazy(asarray(arr, device=device))
 
 
 def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
@@ -505,6 +559,7 @@ def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
         tuple(arg.shape[i] for i in axis),
         arg.fill_value,
         arg.element_type,
+        device=arg.device,
     )
 
 
@@ -569,7 +624,7 @@ def expand_dims(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
     data_2, ctx = x.ctx.eval(expr)
-    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type, x.device)
 
 
 def squeeze(
@@ -616,7 +671,7 @@ def squeeze(
     expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
     data_2, ctx = x.ctx.eval(expr)
-    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type)
+    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type, x.device)
 
 
 def reduce(
@@ -699,7 +754,7 @@ def reduce(
     if dtype is None:
         dtype = fixpoint_type(op, init, x.element_type)
     expr, ctx = x.ctx.eval(data)
-    return LazyTensor(expr, ctx, shape, init, dtype)
+    return LazyTensor(expr, ctx, shape, init, dtype, x.device)
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -738,6 +793,14 @@ def _broadcast_shape(*args: tuple) -> tuple:
         for arg in args[2:]:
             shape = _broadcast_shape(shape, arg)
     return shape
+
+
+def _common_device(*args: LazyTensor):
+    device = args[0].device
+    for arg in args[1:]:
+        if arg.device != device:
+            raise ValueError("Inputs must be on the same device")
+    return device
 
 
 def elementwise(f: FinchOperator, *args) -> LazyTensor:
@@ -785,7 +848,14 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     new_element_type = return_type(f, *[x.element_type for x in args])
     ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
     data, ctx = ctx.eval(expr)
-    return LazyTensor(data, ctx, shape, new_fill_value, new_element_type)
+    return LazyTensor(
+        data,
+        ctx,
+        shape,
+        new_fill_value,
+        new_element_type,
+        _common_device(*args),
+    )
 
 
 def round(x) -> LazyTensor:
@@ -801,9 +871,10 @@ def ceil(x) -> LazyTensor:
 
 
 def astype(x, dtype, /, *, copy=True, device=None) -> LazyTensor:
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    return elementwise(ffuncs.astype(ftype(dtype)), lazy(x))
+    explicit_device = device is not None
+    device = normalize_device(device)
+    out = elementwise(ffuncs.astype(ftype(dtype)), lazy(x))
+    return out.to_device(device) if explicit_device else out
 
 
 def trunc(x) -> LazyTensor:
@@ -1897,9 +1968,9 @@ def eye(
     dtype=None,
     device=None,
 ) -> LazyTensor:
-    if device is not None:
-        raise ValueError(f"device argument is not supported; got {device!r}")
-    return cast(
+    explicit_device = device is not None
+    device = normalize_device(device)
+    out = cast(
         LazyTensor,
         lazy(
             EyeTensor(
@@ -1909,6 +1980,7 @@ def eye(
             )
         ),
     )
+    return out.to_device(device) if explicit_device else out
 
 
 def triu(x, /, *, k: int = 0) -> LazyTensor:
@@ -2536,4 +2608,5 @@ def outer(x1, x2) -> LazyTensor:
         (x1.shape[0], x2.shape[0]),
         ffuncs.mul(x1.fill_value, x2.fill_value),
         return_type(ffuncs.mul, x1.element_type, x2.element_type),
+        _common_device(x1, x2),
     )

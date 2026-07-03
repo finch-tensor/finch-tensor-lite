@@ -356,8 +356,8 @@ def test_array_namespace_info():
         "data-dependent shapes": False,
         "max dimensions": 5,
     }
-    assert info.default_device() is None
-    assert info.devices() == [None]
+    assert info.default_device() == finchlite.serial()
+    assert info.devices() == [finchlite.serial()]
     assert info.default_dtypes() == {
         "real floating": finchlite.float64,
         "complex floating": finchlite.complex128,
@@ -390,17 +390,54 @@ def test_array_namespace_info():
 def test_array_object_metadata():
     x = finchlite.asarray(np.arange(6).reshape(2, 3))
 
-    assert x.device is None
+    assert x.device == finchlite.serial()
     assert x.size == 6
     assert x.to_device(None) is x
+    assert x.to_device(finchlite.serial()) is x
     finch_assert_equal(x.T, x.to_numpy().T)
+
+    cpu_dev = finchlite.cpu("test", n=2)
+    x_cpu = x.to_device(cpu_dev)
+    assert x_cpu.device == cpu_dev
+    assert x_cpu is not x
+    assert finchlite.asarray(np.arange(3), device=cpu_dev).device == cpu_dev
 
     y = finchlite.asarray(np.arange(24).reshape(2, 3, 4))
     finch_assert_equal(y.mT, np.swapaxes(y.to_numpy(), -1, -2))
     with pytest.raises(ValueError):
-        y.T
+        _ = y.T
     with pytest.raises(ValueError):
         x.to_device("gpu")
+
+
+def test_device_hierarchy_objects_and_ftypes():
+    ser = finchlite.serial()
+    assert isinstance(ser, finchlite.AbstractDevice)
+    assert finchlite.ftype(ser) == finchlite.SerialFType()
+    assert ser.num_tasks == 1
+    assert ser.device == finchlite.CPU(1)
+    assert finchlite.SerialFType().device == finchlite.CPUFType()
+
+    cpu_dev = finchlite.cpu("main", n=3)
+    assert isinstance(cpu_dev, finchlite.CPU)
+    assert cpu_dev == finchlite.CPU(7, "main")
+    assert cpu_dev.num_tasks == 3
+    assert cpu_dev.device == cpu_dev
+    assert finchlite.ftype(cpu_dev) == finchlite.CPUFType("main")
+    assert finchlite.CPUFType("main").device == finchlite.CPUFType("main")
+    assert finchlite.CPUFType("main")(2) == finchlite.CPU(2, "main")
+
+    parent = finchlite.SerialTask()
+    thread = finchlite.CPUThread(2, cpu_dev, parent)
+    thread_type = finchlite.CPUThreadFType(finchlite.ftype(parent), cpu_dev.ftype)
+    assert thread.device == cpu_dev
+    assert finchlite.ftype(thread) == thread_type
+    assert thread_type.device == cpu_dev.ftype
+    assert thread.parent_task == parent
+    assert thread_type.parent_task == finchlite.ftype(parent)
+    assert thread.task_num == 2
+    assert thread.is_on_device(cpu_dev)
+    assert finchlite.is_on_device(thread, cpu_dev)
 
 
 def test_finfo_returns_python_scalars():

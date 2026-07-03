@@ -12,6 +12,7 @@ from finchlite.algebra import (
     TupleFType,
     ffuncs,
     ftype,
+    normalize_device,
 )
 from finchlite.codegen import NumpyBuffer, NumpyBufferFType
 from finchlite.codegen.numba_codegen import to_numpy_type
@@ -33,11 +34,13 @@ class BufferizedNDArray(OverrideTensor):
         shape: tuple[np.integer, ...],
         strides: tuple[np.integer, ...],
         fill_value: Any = 0,
+        device=None,
     ):
         self.val = val
         self._shape = shape
         self.strides = strides
         self._fill_value = val.ftype.element_type(fill_value)
+        self._device = normalize_device(device)
 
     def to_numpy(self):
         """
@@ -47,7 +50,9 @@ class BufferizedNDArray(OverrideTensor):
         return self.val.arr.reshape(self._shape, copy=False)
 
     @classmethod
-    def from_numpy(cls, arr: np.ndarray, fill_value: Any = 0) -> "BufferizedNDArray":
+    def from_numpy(
+        cls, arr: np.ndarray, fill_value: Any = 0, device=None
+    ) -> "BufferizedNDArray":
         if not arr.flags["C_CONTIGUOUS"]:
             arr = np.ascontiguousarray(arr)
         itemsize = arr.dtype.itemsize
@@ -55,7 +60,7 @@ class BufferizedNDArray(OverrideTensor):
         shape = tuple(np.intp(s) for s in arr.shape)
         val = NumpyBuffer(arr.reshape(-1, copy=False))
         fill_value = np.asarray(fill_value, dtype=arr.dtype).flat[0]
-        return BufferizedNDArray(val, shape, strides, fill_value)
+        return BufferizedNDArray(val, shape, strides, fill_value, device=device)
 
     def __array__(self):
         return self.to_numpy()
@@ -70,6 +75,7 @@ class BufferizedNDArray(OverrideTensor):
             ndim=self.ndim,
             dimension_type=ftype(self.strides),
             fill_value=self._fill_value,
+            device=self._device,
         )
 
     @property
@@ -84,6 +90,24 @@ class BufferizedNDArray(OverrideTensor):
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
         return self._fill_value
+
+    @property
+    def device(self):
+        return self._device
+
+    def to_device(self, device, /, *, stream=None):
+        if stream is not None:
+            raise ValueError(f"stream argument is not supported; got {stream!r}")
+        device = normalize_device(device)
+        if device == self.device:
+            return self
+        return BufferizedNDArray(
+            self.val,
+            self._shape,
+            self.strides,
+            self._fill_value,
+            device=device,
+        )
 
     @property
     def element_type(self) -> FType:
@@ -129,23 +153,33 @@ class BufferizedNDArray(OverrideTensor):
         ):
             result = self.to_numpy()[index]
             if isinstance(result, np.ndarray):
-                return BufferizedNDArray.from_numpy(result, fill_value=self.fill_value)
-            return Scalar(result, fill_value=self.fill_value)
+                return BufferizedNDArray.from_numpy(
+                    result, fill_value=self.fill_value, device=self.device
+                )
+            return Scalar(result, fill_value=self.fill_value, device=self.device)
         if not isinstance(index, tuple) and self.ndim != 1:
             result = self.to_numpy()[index]
             if isinstance(result, np.ndarray):
-                return BufferizedNDArray.from_numpy(result, fill_value=self.fill_value)
-            return Scalar(result, fill_value=self.fill_value)
+                return BufferizedNDArray.from_numpy(
+                    result, fill_value=self.fill_value, device=self.device
+                )
+            return Scalar(result, fill_value=self.fill_value, device=self.device)
         if isinstance(index, tuple):
             index = tuple(i for i in index if i is not Ellipsis)
             if index == () and self.ndim == 0:
-                return Scalar(self.val.load(0), fill_value=self.fill_value)
+                return Scalar(
+                    self.val.load(0), fill_value=self.fill_value, device=self.device
+                )
             if len(index) < self.ndim:
                 return BufferizedNDArray.from_numpy(
-                    self.to_numpy()[index], fill_value=self.fill_value
+                    self.to_numpy()[index],
+                    fill_value=self.fill_value,
+                    device=self.device,
                 )
             index = 0 if index == () else np.dot(index, self.strides)
-        return Scalar(self.val.load(index), fill_value=self.fill_value)
+        return Scalar(
+            self.val.load(index), fill_value=self.fill_value, device=self.device
+        )
 
     def __setitem__(self, index, value):
         """
@@ -159,7 +193,9 @@ class BufferizedNDArray(OverrideTensor):
 
     def reshape(self, shape, /, *, copy=None):
         return BufferizedNDArray.from_numpy(
-            self.to_numpy().reshape(shape), fill_value=self.fill_value
+            self.to_numpy().reshape(shape),
+            fill_value=self.fill_value,
+            device=self.device,
         )
 
     def __str__(self):
@@ -201,6 +237,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             shape,
             strides,
             self.fill_value,
+            device=self.device,
         )
 
     def from_numpy(self, arr):
@@ -219,6 +256,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
                 )
             ),
             fill_value=self.fill_value,
+            device=self.device,
         )
 
     def __init__(
@@ -228,6 +266,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         ndim: int,
         dimension_type: TupleFType | tuple[FType, ...],
         fill_value: Any = 0,
+        device=None,
     ):
         if not isinstance(dimension_type, TupleFType):
             dimension_type = TupleFType.from_tuple(dimension_type)
@@ -242,6 +281,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self.shape_t = dimension_type
         self.strides_t = dimension_type  # assuming strides is the same type as shape
         self._fill_value = self.buf_t.element_type(fill_value)
+        self._device = normalize_device(device)
 
     def construct(
         self,
@@ -273,10 +313,13 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             self.buf_t == other.buf_t
             and self.ndim == other.ndim
             and ffuncs.same(self.fill_value, other.fill_value)
+            and self.device == other.device
         )
 
     def __hash__(self):
-        return hash((self.buf_t, self.ndim, ffuncs.samehash(self.fill_value)))
+        return hash(
+            (self.buf_t, self.ndim, ffuncs.samehash(self.fill_value), self.device)
+        )
 
     def __str__(self):
         return str(self.struct_name)
@@ -299,6 +342,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     @property
     def fill_value(self) -> Any:
         return self._fill_value
+
+    @property
+    def device(self):
+        return self._device
 
     @property
     def element_type(self):
@@ -356,10 +403,16 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         default_strides = tuple(np.intp(s) for s in _get_default_strides(arr.shape))
         if arr.strides == default_strides:
             return BufferizedNDArray(
-                arr.val, new_shape, new_strides, fill_value=arr.fill_value
+                arr.val,
+                new_shape,
+                new_strides,
+                fill_value=arr.fill_value,
+                device=arr.device,
             )
         return BufferizedNDArray.from_numpy(
-            arr.to_numpy().reshape(new_shape), fill_value=arr.fill_value
+            arr.to_numpy().reshape(new_shape),
+            fill_value=arr.fill_value,
+            device=arr.device,
         )
 
     def lower_unwrap(self, ctx, obj): ...

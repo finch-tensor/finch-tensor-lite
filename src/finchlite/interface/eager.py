@@ -17,19 +17,19 @@ def full(
     dtype: Any | None = None,
     device=None,
 ):
-    return compute(lazy.full(shape, fill_value, dtype=dtype))
+    return compute(lazy.full(shape, fill_value, dtype=dtype, device=device))
 
 
 def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    return compute(lazy.zeros(shape, dtype=dtype))
+    return compute(lazy.zeros(shape, dtype=dtype, device=device))
 
 
 def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    return compute(lazy.ones(shape, dtype=dtype))
+    return compute(lazy.ones(shape, dtype=dtype, device=device))
 
 
 def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    return compute(lazy.empty(shape, dtype=dtype))
+    return compute(lazy.empty(shape, dtype=dtype, device=device))
 
 
 def eye(
@@ -137,26 +137,26 @@ def full_like(
     x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
 ):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.full_like(x, fill_value, dtype=dtype)
-    return compute(lazy.full_like(x, fill_value, dtype=dtype))
+        return lazy.full_like(x, fill_value, dtype=dtype, device=device)
+    return compute(lazy.full_like(x, fill_value, dtype=dtype, device=device))
 
 
 def empty_like(x, /, *, dtype: Any | None = None, device=None):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.empty_like(x, dtype=dtype)
-    return compute(lazy.empty_like(x, dtype=dtype))
+        return lazy.empty_like(x, dtype=dtype, device=device)
+    return compute(lazy.empty_like(x, dtype=dtype, device=device))
 
 
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.zeros_like(x, dtype=dtype)
-    return full_like(x, 0, dtype=dtype)
+        return lazy.zeros_like(x, dtype=dtype, device=device)
+    return full_like(x, 0, dtype=dtype, device=device)
 
 
 def ones_like(x, /, *, dtype: Any | None = None, device=None):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.ones_like(x, dtype=dtype)
-    return full_like(x, 1, dtype=dtype)
+        return lazy.ones_like(x, dtype=dtype, device=device)
+    return full_like(x, 1, dtype=dtype, device=device)
 
 
 def arange(
@@ -168,7 +168,7 @@ def arange(
     dtype: Any | None = None,
     device=None,
 ):
-    return compute(lazy.arange(start, stop, step, dtype=dtype))
+    return compute(lazy.arange(start, stop, step, dtype=dtype, device=device))
 
 
 def linspace(
@@ -181,7 +181,9 @@ def linspace(
     device=None,
     endpoint: bool = True,
 ):
-    return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
+    return compute(
+        lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint, device=device)
+    )
 
 
 def permute_dims(arg, /, axes: tuple[int, ...]):

@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from .devices import normalize_device, serial
 from .ftypes import FType, FTyped
 
 
@@ -36,6 +37,14 @@ class TensorFType(FType, ABC):
     @property
     def dtype(self):
         return self.element_type
+
+    @property
+    def device(self):
+        return serial()
+
+    @property
+    def device_type(self) -> FType:
+        return self.device.ftype
 
     @property
     @abstractmethod
@@ -78,6 +87,13 @@ class Tensor(FTyped, ABC):
         return self.ftype.ndim
 
     @property
+    def size(self):
+        size = 1
+        for dim in self.shape:
+            size *= int(dim)
+        return size
+
+    @property
     @abstractmethod
     def ftype(self) -> TensorFType:
         """FType of the tensor, which may include metadata about the tensor."""
@@ -102,6 +118,22 @@ class Tensor(FTyped, ABC):
     @property
     def dtype(self):
         return self.element_type
+
+    @property
+    def device(self):
+        return self.ftype.device
+
+    @property
+    def device_type(self) -> FType:
+        return self.ftype.device_type
+
+    def to_device(self, device, /, *, stream=None):
+        if stream is not None:
+            raise ValueError(f"stream argument is not supported; got {stream!r}")
+        device = normalize_device(device)
+        if device == self.device:
+            return self
+        raise ValueError(f"device argument is not supported; got {device!r}")
 
     @property
     def shape_type(self) -> tuple[FType, ...]:
