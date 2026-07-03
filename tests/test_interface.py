@@ -1540,6 +1540,26 @@ def test_linalg_new_eager_methods_use_numpy_fallback():
     )
 
 
+def test_linalg_cross_uses_lazy_formula():
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([4.0, 5.0, 6.0])
+
+    result = finchlite.linalg.cross(finchlite.lazy(x), finchlite.lazy(y))
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(finchlite.compute(result), np.cross(x, y))
+
+
+def test_linalg_cross_supports_axis_lazy_formula():
+    x = np.arange(6.0).reshape(3, 2)
+    y = np.array([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]])
+
+    result = finchlite.linalg.cross(finchlite.lazy(x), y, axis=0)
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(finchlite.compute(result), np.cross(x, y, axis=0))
+
+
 def test_linalg_sparse_det_uses_superlu():
     x = scipy_sparse.csc_matrix(
         np.array(

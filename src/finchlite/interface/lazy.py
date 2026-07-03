@@ -1654,8 +1654,67 @@ def cholesky(x, /, *, upper=False):
     _eager_only("cholesky")
 
 
+_cross_E = [
+    [
+        [0, 0, 0],
+        [0, 0, 1],
+        [0, -1, 0],
+    ],
+    [
+        [0, 0, -1],
+        [0, 0, 0],
+        [1, 0, 0],
+    ],
+    [
+        [0, 1, 0],
+        [-1, 0, 0],
+        [0, 0, 0],
+    ],
+]
+
+
 def cross(x1, x2, /, *, axis=-1):
-    _eager_only("cross")
+    x1 = lazy(x1)
+    x2 = lazy(x2)
+    axis1 = normalize_axis_index(axis, x1.ndim)
+    axis2 = normalize_axis_index(axis, x2.ndim)
+
+    if x1.shape[axis1] != 3:
+        raise ValueError(f"x1 cross product axis must have length 3, got {x1.shape}")
+    if x2.shape[axis2] != 3:
+        raise ValueError(f"x2 cross product axis must have length 3, got {x2.shape}")
+
+    if axis1 != x1.ndim - 1:
+        x1 = permute_dims(
+            x1,
+            axes=tuple(i for i in range(x1.ndim) if i != axis1) + (axis1,),
+        )
+    if axis2 != x2.ndim - 1:
+        x2 = permute_dims(
+            x2,
+            axes=tuple(i for i in range(x2.ndim) if i != axis2) + (axis2,),
+        )
+
+    terms = multiply(
+        multiply(
+            asarray(_cross_E, device=common_device(x1.device, x2.device)),
+            expand_dims(expand_dims(x1, axis=-1), axis=-3),
+        ),
+        expand_dims(expand_dims(x2, axis=-2), axis=-2),
+    )
+    result = reduce(ffuncs.add, terms, axis=(-1, -2))
+
+    axis = normalize_axis_index(axis, result.ndim)
+    if axis == result.ndim - 1:
+        return result
+    return permute_dims(
+        result,
+        axes=(
+            tuple(range(axis))
+            + (result.ndim - 1,)
+            + tuple(range(axis, result.ndim - 1))
+        ),
+    )
 
 
 def det(x, /):
