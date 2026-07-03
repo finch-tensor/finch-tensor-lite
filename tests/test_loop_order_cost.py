@@ -9,7 +9,7 @@ import numpy as np
 import finchlite as fl
 from finchlite import ffuncs
 from finchlite.algebra.utils import is_subsequence
-from finchlite.autoschedule.loop_ordering import loop_order_cost
+from finchlite.autoschedule.loop_order_cost import loop_order_cost
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import Alias, Field, Literal, MapJoin, Table
 
@@ -113,32 +113,33 @@ def test_loop_order_cost():
 def test_empty_relation():
     test_start = time.perf_counter()
     sf = ExactStatsFactory()
-    i, j, k, l, m = (Field(name) for name in "ijklm")
+    # l_ is l, precommit throws bad name error otehrwise
+    i, j, k, l_, m = (Field(name) for name in "ijklm")
     a, b, c, d = (Alias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
             Table(a, (i, j)),
             Table(b, (j, k)),
-            Table(c, (k, l)),
-            Table(d, (l, m)),
+            Table(c, (k, l_)),
+            Table(d, (l_, m)),
         ),
     )
     bindings = OrderedDict(
         {
             a: sf(fl.asarray(np.ones((3, 3))), (i, j)),
             b: sf(fl.asarray(np.ones((3, 3))), (j, k)),
-            c: sf(fl.asarray(np.ones((3, 3))), (k, l)),
-            d: sf(fl.asarray(np.zeros((3, 3))), (l, m)),
+            c: sf(fl.asarray(np.ones((3, 3))), (k, l_)),
+            d: sf(fl.asarray(np.zeros((3, 3))), (l_, m)),
         }
     )
 
     t0 = time.perf_counter()
-    forward = loop_order_cost(expr, (i, j, k, l, m), sf, bindings)
+    forward = loop_order_cost(expr, (i, j, k, l_, m), sf, bindings)
     forward_time = time.perf_counter() - t0
 
     t0 = time.perf_counter()
-    reverse = loop_order_cost(expr, (m, l, k, j, i), sf, bindings)
+    reverse = loop_order_cost(expr, (m, l_, k, j, i), sf, bindings)
     reverse_time = time.perf_counter() - t0
 
     assert forward > reverse
