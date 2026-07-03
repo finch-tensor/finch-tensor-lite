@@ -558,6 +558,29 @@ def normalize_device(device: Any) -> AbstractDevice:
             raise ValueError(f"device argument is not supported; got {device!r}")
 
 
+def is_parent_device(parent: Any, child: Any) -> bool:
+    parent = normalize_device(parent)
+    child = normalize_device(child)
+    while child is not None:
+        if child == parent:
+            return True
+        child = child.parent_device
+    return False
+
+
+def common_device(*devices: Any) -> AbstractDevice:
+    if not devices:
+        return serial()
+    device = normalize_device(devices[0])
+    for other in devices[1:]:
+        other = normalize_device(other)
+        if is_parent_device(device, other):
+            device = other
+        elif not is_parent_device(other, device):
+            raise ValueError("Inputs must be on compatible devices")
+    return device
+
+
 def is_on_pool(task: Any, pool: AbstractPool) -> bool:
     return task.is_on_pool(pool)
 

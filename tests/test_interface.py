@@ -432,6 +432,10 @@ def test_device_hierarchy_objects_and_ftypes():
     assert finchlite.CPUFType("main")(2) == finchlite.CPU(
         finchlite.serial(), id="main", n=2
     )
+    assert finchlite.common_device(finchlite.serial(), cpu_dev) == cpu_dev
+    assert finchlite.common_device(cpu_dev, finchlite.serial()) == cpu_dev
+    with pytest.raises(ValueError):
+        finchlite.common_device(cpu_dev, finchlite.cpu("other", n=3))
 
     parent = finchlite.SerialTask()
     cpu_pool = cpu_dev.pool

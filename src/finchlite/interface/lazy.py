@@ -18,6 +18,7 @@ from finchlite.algebra import (
     FType,
     Tensor,
     TensorFType,
+    common_device,
     ffuncs,
     fixpoint_type,
     ftype,
@@ -385,8 +386,10 @@ def asarray(
         return obj
 
     if isinstance(obj, np.ndarray):
-        return format.from_numpy(obj)
-    return format(obj)
+        out = format.from_numpy(obj)
+    else:
+        out = format(obj)
+    return out.to_device(device) if explicit_device else out
 
 
 @overload
@@ -795,14 +798,6 @@ def _broadcast_shape(*args: tuple) -> tuple:
     return shape
 
 
-def _common_device(*args: LazyTensor):
-    device = args[0].device
-    for arg in args[1:]:
-        if arg.device != device:
-            raise ValueError("Inputs must be on the same device")
-    return device
-
-
 def elementwise(f: FinchOperator, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
@@ -854,7 +849,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
         shape,
         new_fill_value,
         new_element_type,
-        _common_device(*args),
+        common_device(*(arg.device for arg in args)),
     )
 
 
@@ -1442,7 +1437,7 @@ def count_nonfill(
     x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
 ) -> LazyTensor:
     x = lazy(x)
-    fill = full(x.shape, x.fill_value, dtype=x.element_type)
+    fill = full(x.shape, x.fill_value, dtype=x.element_type, device=x.device)
     return reduce(
         ffuncs.add,
         elementwise(ffuncs.not_same, x, fill),
@@ -2014,9 +2009,9 @@ def diag(x, /, *, k: int = 0) -> LazyTensor:
     if x.ndim == 1 and k == 0:
         vals = broadcast_to(expand_dims(x, axis=1), (x.shape[0], x.shape[0]))
         return where(
-            eye(x.shape[0], k=k, dtype=np.bool_),
+            eye(x.shape[0], k=k, dtype=np.bool_, device=x.device),
             vals,
-            full((x.shape[0], x.shape[0]), 0, dtype=x.element_type),
+            full((x.shape[0], x.shape[0]), 0, dtype=x.element_type, device=x.device),
         )
     if x.ndim in (1, 2):
         from .fuse import compute
@@ -2080,12 +2075,14 @@ def diff(
         return x
     if x.shape[axis] <= n:
         shape = tuple(0 if i == axis else dim for i, dim in enumerate(x.shape))
-        return empty(shape, dtype=x.element_type)
+        return empty(shape, dtype=x.element_type, device=x.device)
 
     moved = moveaxis(x, axis, -1)
     axis_size = moved.shape[-1]
-    main = eye(axis_size, axis_size - 1, dtype=moved.element_type)
-    lower = eye(axis_size, axis_size - 1, k=-1, dtype=moved.element_type)
+    main = eye(axis_size, axis_size - 1, dtype=moved.element_type, device=x.device)
+    lower = eye(
+        axis_size, axis_size - 1, k=-1, dtype=moved.element_type, device=x.device
+    )
     negative_part = reduce(
         ffuncs.add,
         multiply(expand_dims(moved, axis=-1), main),
@@ -2188,11 +2185,11 @@ def cumulative(
     out_size = axis_size + int(include_initial)
     out_shape = tuple(out_size if i == axis else dim for i, dim in enumerate(x.shape))
     if builtins.any(dim == 0 for i, dim in enumerate(x.shape) if i != axis):
-        return empty(out_shape, dtype=dtype)
+        return empty(out_shape, dtype=dtype, device=x.device)
     if axis_size == 0:
         if include_initial:
-            return full(out_shape, init, dtype=dtype)
-        return empty(out_shape, dtype=dtype)
+            return full(out_shape, init, dtype=dtype, device=x.device)
+        return empty(out_shape, dtype=dtype, device=x.device)
 
     if include_initial:
         x = reduce(
@@ -2269,7 +2266,9 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(ffuncs.first_arg, tensor, FillTensor(shape, np.False_))
+    return elementwise(
+        ffuncs.first_arg, tensor, FillTensor(shape, np.False_)
+    )
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
@@ -2608,5 +2607,5 @@ def outer(x1, x2) -> LazyTensor:
         (x1.shape[0], x2.shape[0]),
         ffuncs.mul(x1.fill_value, x2.fill_value),
         return_type(ffuncs.mul, x1.element_type, x2.element_type),
-        _common_device(x1, x2),
+        common_device(x1.device, x2.device),
     )

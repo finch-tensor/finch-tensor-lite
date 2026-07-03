@@ -10,7 +10,12 @@ from finchlite import (
     element,
     fiber_tensor,
 )
-from finchlite.interface.lazy import EyeTensor
+from finchlite.interface.lazy import (
+    EyeTensor,
+    FillTensor,
+    IndexTensor,
+    ParityMaskTensor,
+)
 from finchlite.tensor import BufferizedNDArray
 
 
@@ -112,6 +117,19 @@ def test_index_tensor_returns_linear_indices():
     assert constructed[1, 2].item() == np.int64(5)
 
 
+def test_masks_are_serial_but_operations_keep_input_device():
+    cpu_dev = finchlite.cpu("mask-test", n=2)
+    x = finchlite.asarray(np.eye(2), device=cpu_dev)
+
+    assert EyeTensor((2, 2)).device == finchlite.serial()
+    assert FillTensor((2, 2), 0).device == finchlite.serial()
+    assert IndexTensor((2, 2)).device == finchlite.serial()
+    assert ParityMaskTensor(2).device == finchlite.serial()
+    assert finchlite.triu(x).device == cpu_dev
+    y = finchlite.asarray(np.arange(3), device=cpu_dev)
+    assert finchlite.diff(y).device == cpu_dev
+
+
 def test_fiber_tensor():
     fmt = fiber_tensor(
         dense(
@@ -122,6 +140,10 @@ def test_fiber_tensor():
     )
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)
+
+    cpu_dev = finchlite.cpu("fiber-test", n=2)
+    tensor = asarray(np.arange(12).reshape((3, 4)), format=fmt, device=cpu_dev)
+    assert tensor.device == cpu_dev
 
 
 @pytest.mark.parametrize(

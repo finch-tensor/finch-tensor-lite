@@ -121,7 +121,7 @@ class Tensor(FTyped, ABC):
 
     @property
     def device(self):
-        return self.ftype.device
+        return getattr(self, "_device", self.ftype.device)
 
     @property
     def device_type(self) -> FType:

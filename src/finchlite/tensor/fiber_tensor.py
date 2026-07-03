@@ -6,7 +6,14 @@ import numpy as np
 
 from finchlite import finch_assembly as asm
 from finchlite import finch_notation as ntn
-from finchlite.algebra import FType, FTyped, ImmutableStructFType, TupleFType, bool_
+from finchlite.algebra import (
+    FType,
+    FTyped,
+    ImmutableStructFType,
+    TupleFType,
+    bool_,
+    normalize_device,
+)
 from finchlite.compile.lower import FinchTensorFType
 
 from .override_tensor import OverrideTensor
@@ -221,6 +228,10 @@ class FiberTensor(OverrideTensor):
     lvl: Level
     pos: np.integer = np.intp(0)
     dirty_bit: bool = False
+    _device: Any = None
+
+    def __post_init__(self):
+        self._device = normalize_device(self._device)
 
     def __repr__(self):
         return f"FiberTensor(lvl={self.lvl})"
@@ -230,7 +241,7 @@ class FiberTensor(OverrideTensor):
         """
         Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
-        return FiberTensorFType(self.lvl.ftype)
+        return FiberTensorFType(self.lvl.ftype, self._device)
 
     @property
     def shape(self):
@@ -259,6 +270,18 @@ class FiberTensor(OverrideTensor):
     @property
     def fill_value(self):
         return self.lvl.fill_value
+
+    @property
+    def device(self):
+        return self._device
+
+    def to_device(self, device, /, *, stream=None):
+        if stream is not None:
+            raise ValueError(f"stream argument is not supported; got {stream!r}")
+        device = normalize_device(device)
+        if device == self.device:
+            return self
+        return FiberTensor(self.lvl, self.pos, self.dirty_bit, device)
 
     @property
     def position_type(self):
@@ -296,6 +319,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     """
 
     lvl_t: LevelFType
+    _device: Any = None
+
+    def __post_init__(self):
+        self._device = normalize_device(self._device)
 
     @property
     def struct_name(self):
@@ -315,7 +342,11 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t.construct(shape=shape), self.position_type(0))
+        return FiberTensor(
+            self.lvl_t.construct(shape=shape),
+            self.position_type(0),
+            _device=self.device,
+        )
 
     def __call__(self, val: Any) -> FiberTensor:
         """
@@ -348,6 +379,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     @property
     def fill_value(self):
         return self.lvl_t.fill_value
+
+    @property
+    def device(self):
+        return self._device
 
     @property
     def position_type(self):
@@ -407,7 +442,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args
-        return FiberTensor(lvl, pos, dirty_bit)
+        return FiberTensor(lvl, pos, dirty_bit, self.device)
 
     # TODO: To be removed - use BufferizedNDArray instead.
     def from_numpy(self, arr: np.ndarray) -> FiberTensor:
@@ -415,6 +450,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             self.lvl_t.from_numpy(arr.shape, arr),
             pos=self.position_type(0),
             dirty_bit=False,
+            _device=self.device,
         )
 
 
