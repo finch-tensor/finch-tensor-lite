@@ -155,8 +155,11 @@ class _FloorDiv(BinaryFinchOperator):
         return "floor_divide"
 
     def __call__(self, a: Any, b: Any):
+        a_type = ftype(a)
+        b_type = ftype(b)
+        assert isinstance(a_type, FDType) and isinstance(b_type, FDType)
         try:
-            if isinstance(promote_type(ftype(a), ftype(b)), FDTypeFloat):
+            if isinstance(promote_type(a_type, b_type), FDTypeFloat):
                 return np.floor(np.true_divide(a, b))
         except (AttributeError, TypeError, ValueError):
             return np.floor_divide(a, b)

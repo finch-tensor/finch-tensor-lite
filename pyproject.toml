@@ -104,7 +104,7 @@ depends-on = ["compile"]
 default-environment = "benchmark"
 
 [tool.pixi.feature.test.tasks.type-check]
-cmd = "mypy ."
+cmd = "python -m mypy ."
 default-environment = "test"
 
 [tool.pixi.feature.mindeps.dependencies]
