@@ -122,9 +122,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
                 FiberTensorFType(self.body),
                 tns.idxs,
             )
-            return self.body.level_unfurl(
-                ctx, body_view, ext, mode, proto, pos
-            )
+            return self.body.level_unfurl(ctx, body_view, ext, mode, proto, pos)
 
         scalar = Scalar(self.fill_value, self.fill_value)
         visited_idxs = tns.idxs

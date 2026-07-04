@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 
-from finchlite import finch_notation as ntn
 from finchlite.algebra import FType, FTyped, ImmutableStructFType, TupleFType, bool_
 from finchlite.compile.lower import FinchTensorFType
 
@@ -342,14 +341,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, tns.pos)
 
     def lower_freeze(self, ctx, tns, op):
-        return self.lvl_t.level_lower_freeze(
-            ctx, ctx.fiber_level(tns), op, tns.pos
-        )
+        return self.lvl_t.level_lower_freeze(ctx, ctx.fiber_level(tns), op, tns.pos)
 
     def lower_thaw(self, ctx, tns, op):
-        return self.lvl_t.level_lower_thaw(
-            ctx, ctx.fiber_level(tns), op, tns.pos
-        )
+        return self.lvl_t.level_lower_thaw(ctx, ctx.fiber_level(tns), op, tns.pos)
 
     def lower_unwrap(self, ctx, tns):
         return self.lvl_t.level_lower_unwrap(ctx, tns, tns.pos)

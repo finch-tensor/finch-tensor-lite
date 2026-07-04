@@ -312,9 +312,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             i_var,
             asm.Literal(init.val),
         )
-        ctx.exec(
-            asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body)
-        )
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
         if isinstance(tns.root, asm.Slot):
             ctx.slots[tns.root.name] = replace(tns, dirty=True)
         return

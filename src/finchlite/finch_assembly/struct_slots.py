@@ -27,9 +27,7 @@ class _LowerPackedStructSlotsContext:
         self.field_replacements = (
             {} if field_replacements is None else field_replacements
         )
-        self.path_replacements = (
-            {} if path_replacements is None else path_replacements
-        )
+        self.path_replacements = {} if path_replacements is None else path_replacements
         self.lowerings = {} if lowerings is None else lowerings
 
     def scope(self):
@@ -223,5 +221,7 @@ class _LowerPackedStructSlotsContext:
 class LowerPackedStructSlots(UnvalidatedForm, AssemblyTransform):
     def lower(self, term: asm.Module) -> asm.Module:
         return asm.Module(
-            tuple(_LowerPackedStructSlotsContext().function(func) for func in term.funcs)
+            tuple(
+                _LowerPackedStructSlotsContext().function(func) for func in term.funcs
+            )
         )

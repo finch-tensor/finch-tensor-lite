@@ -618,7 +618,7 @@ class NumbaContext(Context):
 
     def resolve(self, node):
         match node:
-            case asm.Slot(var_n, var_t):
+            case asm.Slot(var_n, _):
                 if var_n in self.slots:
                     return self.slots[var_n]
                 raise KeyError(f"Slot {var_n} not found in context")
