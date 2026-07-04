@@ -176,9 +176,13 @@ def test_python_scalar_promotion_uses_weak_bottom():
 
 
 def test_ftype_recognizes_numpy_dtype_aliases():
-    int_long = finchlite.int32 if np.dtype(np.long) == np.dtype(np.int32) else finchlite.int64
+    int_long = (
+        finchlite.int32 if np.dtype(np.long) == np.dtype(np.int32) else finchlite.int64
+    )
     uint_long = (
-        finchlite.uint32 if np.dtype(np.ulong) == np.dtype(np.uint32) else finchlite.uint64
+        finchlite.uint32
+        if np.dtype(np.ulong) == np.dtype(np.uint32)
+        else finchlite.uint64
     )
     uintp = finchlite.uint32 if np.uintp == np.uint32 else finchlite.uint64
     cases = [
