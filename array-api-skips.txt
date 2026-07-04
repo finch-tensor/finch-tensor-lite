@@ -1,21 +1,13 @@
 # `test_solve` is not defined in Finch, hangs as xfail
 array_api_tests/test_linalg.py::test_solve
 
-# test_signatures
-
-# not implemented
-# set functions
-array_api_tests/test_signatures.py::test_func_signature[unique_all]
-array_api_tests/test_signatures.py::test_func_signature[unique_counts]
-array_api_tests/test_signatures.py::test_func_signature[unique_inverse]
-array_api_tests/test_signatures.py::test_func_signature[unique_values]
-# creation functions
-# other functions
+# dlpack stuff
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
-# Array object namespace
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack__]
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack_device__]
-
+array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
+array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack__]
+array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack_device__]
 
 # test_array_object
 
@@ -24,43 +16,6 @@ array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_2[None]
 array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_2[1]
 array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_1[None]
 array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_1[1]
-
-# test_operators_and_elementwise_functions
-
-# test_data_type_functions
-
-
-# test_has_names
-array_api_tests/test_has_names.py::test_has_names[set-unique_all]
-array_api_tests/test_has_names.py::test_has_names[set-unique_counts]
-array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
-array_api_tests/test_has_names.py::test_has_names[set-unique_values]
-array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
-array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack__]
-array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack_device__]
-
-# test_indexing_functions
-
-# not implemented
-
-# test_manipulation_functions
-
-# data-dependent repeat-count arrays are not implemented
-array_api_tests/test_manipulation_functions.py::test_repeat
-
-# test_searching_functions
-
-# not implemented
-# 0D issue
-array_api_tests/test_searching_functions.py::test_nonzero
-
-# test_set_functions
-
-# not implemented
-array_api_tests/test_set_functions.py::test_unique_all
-array_api_tests/test_set_functions.py::test_unique_counts
-array_api_tests/test_set_functions.py::test_unique_inverse
-array_api_tests/test_set_functions.py::test_unique_values
 
 # test_special_cases
 
@@ -82,8 +37,21 @@ array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i is +infinity 
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(x1_i is -infinity and isfinite(x2_i) and x2_i > 0) -> -infinity]
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(isfinite(x1_i) and x1_i < 0 and x2_i is +infinity) -> -0]
 array_api_tests/test_special_cases.py::test_iop[__ifloordiv__(isfinite(x1_i) and x1_i > 0 and x2_i is -infinity) -> -0]
-# test_statistical_functions
 
-# issue: nonzero-signature — nonzero signature mismatch
+# Data-Dependent outputs are intentionally not implemented
+array_api_tests/test_signatures.py::test_func_signature[unique_all]
+array_api_tests/test_signatures.py::test_func_signature[unique_counts]
+array_api_tests/test_signatures.py::test_func_signature[unique_inverse]
+array_api_tests/test_signatures.py::test_func_signature[unique_values]
 array_api_tests/test_has_names.py::test_has_names[searching-nonzero]
 array_api_tests/test_signatures.py::test_func_signature[nonzero]
+array_api_tests/test_has_names.py::test_has_names[set-unique_all]
+array_api_tests/test_has_names.py::test_has_names[set-unique_counts]
+array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
+array_api_tests/test_has_names.py::test_has_names[set-unique_values]
+array_api_tests/test_manipulation_functions.py::test_repeat
+array_api_tests/test_searching_functions.py::test_nonzero
+array_api_tests/test_set_functions.py::test_unique_all
+array_api_tests/test_set_functions.py::test_unique_counts
+array_api_tests/test_set_functions.py::test_unique_inverse
+array_api_tests/test_set_functions.py::test_unique_values
