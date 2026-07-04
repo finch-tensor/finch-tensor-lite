@@ -437,6 +437,7 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
         """
         return self.dtype(np.inf)
 
+
 class FDTypeNumpyComplex(FDTypeNumpyFloat, FDTypeComplex):
     def __promote__(self, other):
         if isinstance(other, FDTypeBuiltin) and other in (
@@ -667,10 +668,7 @@ def result_type(*arrays_and_dtypes) -> FDType:
     ):
         raise TypeError("result_type requires at least one array or dtype argument")
 
-    concrete_types = [
-        _result_type_arg(arg)
-        for arg in arrays_and_dtypes
-    ]
+    concrete_types = [_result_type_arg(arg) for arg in arrays_and_dtypes]
     result = concrete_types[0]
     for dtype in concrete_types[1:]:
         result = promote_type(result, dtype)
@@ -686,6 +684,7 @@ def _result_type_arg(arg) -> FDType:
     dtype = ftype(arg)
     assert isinstance(dtype, FDType)
     return dtype
+
 
 class FTyped:
     """
@@ -818,7 +817,7 @@ class TupleFType(ImmutableStructFType, FDType):
 
     def __promote__(self, other):
         if not isinstance(other, TupleFType):
-            return
+            return None
         if len(self.struct_fieldtypes) != len(other.struct_fieldtypes):
             raise TypeError("Tuple operands must have the same length.")
         return TupleFType.from_tuple(

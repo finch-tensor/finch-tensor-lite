@@ -15,79 +15,65 @@ def _default_num_tasks() -> int:
 class DeviceFType(FType, ABC):
     @property
     @abstractmethod
-    def num_tasks(self):
-        ...
+    def num_tasks(self): ...
 
     @property
     @abstractmethod
-    def device(self):
-        ...
+    def device(self): ...
 
     @property
     @abstractmethod
-    def parent_device_type(self):
-        ...
+    def parent_device_type(self): ...
 
 
 class TaskFType(FType, ABC):
     @property
     @abstractmethod
-    def num_tasks(self):
-        ...
+    def num_tasks(self): ...
 
     @property
     @abstractmethod
-    def task_num(self):
-        ...
+    def task_num(self): ...
 
     @property
     @abstractmethod
-    def device(self):
-        ...
+    def device(self): ...
 
     @property
     @abstractmethod
-    def parent_task(self):
-        ...
+    def parent_task(self): ...
 
 
 class AbstractDevice(FTyped, ABC):
     @property
     @abstractmethod
-    def num_tasks(self):
-        ...
+    def num_tasks(self): ...
 
     @property
     @abstractmethod
-    def device(self):
-        ...
+    def device(self): ...
 
     @property
     @abstractmethod
-    def parent_device(self):
-        ...
+    def parent_device(self): ...
 
 
 class AbstractTask(FTyped, ABC):
     @property
     @abstractmethod
-    def num_tasks(self):
-        ...
+    def num_tasks(self): ...
 
     @property
     @abstractmethod
-    def task_num(self):
-        ...
+    def task_num(self): ...
 
     @property
     @abstractmethod
-    def device(self):
-        ...
+    def device(self): ...
 
     @property
     @abstractmethod
-    def parent_task(self):
-        ...
+    def parent_task(self): ...
 
     def is_on_device(self, device: Any) -> bool:
         device = normalize_device(device)
@@ -389,8 +375,7 @@ class CPUThreadFType(TaskFType):
         match other:
             case CPUThreadFType(parent_type=parent_type, device_type=device_type):
                 return (
-                    self.parent_type == parent_type
-                    and self.device_type == device_type
+                    self.parent_type == parent_type and self.device_type == device_type
                 )
             case _:
                 return False

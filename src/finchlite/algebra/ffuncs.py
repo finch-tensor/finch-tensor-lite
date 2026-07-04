@@ -13,9 +13,9 @@ from .algebra import (
 from .ftypes import (
     FDType,
     FDTypeBoolean,
+    FDTypeFloat,
     FDTypeInteger,
     FDTypeOrdered,
-    FDTypeFloat,
     FDTypeUnsignedInteger,
     FType,
     TupleFType,
@@ -1573,12 +1573,7 @@ class _AddScaledPower(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
         y_arg, y_scale = y
-        if (
-            np.isnan(x_arg)
-            or np.isnan(x_scale)
-            or np.isnan(y_arg)
-            or np.isnan(y_scale)
-        ):
+        if np.isnan(x_arg) or np.isnan(x_scale) or np.isnan(y_arg) or np.isnan(y_scale):
             return (np.nan, np.nan)
         if x_scale < y_scale:
             x_arg, y_arg = y_arg, x_arg
@@ -1627,12 +1622,7 @@ class _AddScaledSquare(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
         y_arg, y_scale = y
-        if (
-            np.isnan(x_arg)
-            or np.isnan(x_scale)
-            or np.isnan(y_arg)
-            or np.isnan(y_scale)
-        ):
+        if np.isnan(x_arg) or np.isnan(x_scale) or np.isnan(y_arg) or np.isnan(y_scale):
             return (np.nan, np.nan)
         if x_scale < y_scale:
             x_arg, y_arg = y_arg, x_arg
@@ -1690,8 +1680,7 @@ class _ScaledNegativePower(FinchOperator):
 
     def __eq__(self, other):
         return (
-            isinstance(other, _ScaledNegativePower)
-            and self.exponent == other.exponent
+            isinstance(other, _ScaledNegativePower) and self.exponent == other.exponent
         )
 
     def __hash__(self):
@@ -1715,12 +1704,7 @@ class _AddScaledNegativePower(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
         y_arg, y_scale = y
-        if (
-            np.isnan(x_arg)
-            or np.isnan(x_scale)
-            or np.isnan(y_arg)
-            or np.isnan(y_scale)
-        ):
+        if np.isnan(x_arg) or np.isnan(x_scale) or np.isnan(y_arg) or np.isnan(y_scale):
             return (np.nan, np.nan)
         if x_scale == 0 or y_scale == 0:
             return (np.inf, 0)
@@ -2028,19 +2012,19 @@ __all__ = [
     "reciprocal",
     "remainder",
     "resize_if_smaller",
-    "round",
     "root_scaled_negative_power",
     "root_scaled_power",
     "root_scaled_square",
+    "round",
     "rshift",
     "same",
     "samehash",
-    "scansearch",
-    "sign",
-    "signbit",
     "scaled_negative_power",
     "scaled_power",
     "scaled_square",
+    "scansearch",
+    "sign",
+    "signbit",
     "sin",
     "sinh",
     "sqrt",

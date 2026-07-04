@@ -1001,14 +1001,10 @@ class IndexTensor(Tensor):
         return self.fill_value
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -1790,9 +1786,7 @@ def matrix_norm(x, /, *, keepdims=False, ord="fro") -> LazyTensor:
     if ord == 1:
         if keepdims:
             col_sum = sum(abs_x, axis=-2, keepdims=True)
-            return max(
-                col_sum, axis=-1, keepdims=True, init=col_sum.element_type(0)
-            )
+            return max(col_sum, axis=-1, keepdims=True, init=col_sum.element_type(0))
         col_sum = sum(abs_x, axis=-2)
         return max(col_sum, axis=-1, init=col_sum.element_type(0))
     if ord == -1:
@@ -1802,9 +1796,7 @@ def matrix_norm(x, /, *, keepdims=False, ord="fro") -> LazyTensor:
     if ord == float("inf"):
         if keepdims:
             row_sum = sum(abs_x, axis=-1, keepdims=True)
-            return max(
-                row_sum, axis=-2, keepdims=True, init=row_sum.element_type(0)
-            )
+            return max(row_sum, axis=-2, keepdims=True, init=row_sum.element_type(0))
         row_sum = sum(abs_x, axis=-1)
         return max(row_sum, axis=-1, init=row_sum.element_type(0))
     if ord == -float("inf"):
@@ -2044,14 +2036,10 @@ class FillTensor(Tensor):
         return self._fill_value
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2173,14 +2161,10 @@ class ReshapeMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2288,14 +2272,10 @@ class MatrixPatternTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2454,14 +2434,10 @@ class OddEvenMergeSortPartnerMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2572,14 +2548,10 @@ class OddEvenMergeSortLowerMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2679,14 +2651,10 @@ class OneHotMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2779,14 +2747,10 @@ class ParityMaskTensor(Tensor):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @property
     def shape(self):
@@ -2978,8 +2942,7 @@ def cumulative(
         axis = 0
     if not isinstance(include_initial, bool):
         raise TypeError(
-            "include_initial must be a boolean, "
-            f"got {type(include_initial).__name__}"
+            f"include_initial must be a boolean, got {type(include_initial).__name__}"
         )
 
     axis = normalize_axis_index(axis, x.ndim)
@@ -3280,9 +3243,7 @@ def roll(
         try:
             shifts = tuple(operator.index(s) for s in shift)
         except TypeError as exc:
-            raise TypeError(
-                "shift must be an integer or a tuple of integers"
-            ) from exc
+            raise TypeError("shift must be an integer or a tuple of integers") from exc
         if len(shifts) != len(axes):
             raise ValueError("shift and axis must have the same size")
 
@@ -3474,9 +3435,7 @@ def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
             f"Tensor with shape {tensor.shape} is not broadcastable "
             f"to the shape {shape}"
         )
-    return elementwise(
-        ffuncs.first_arg, tensor, FillTensor(shape, np.False_)
-    )
+    return elementwise(ffuncs.first_arg, tensor, FillTensor(shape, np.False_))
 
 
 def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:

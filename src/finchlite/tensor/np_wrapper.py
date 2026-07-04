@@ -110,6 +110,4 @@ class NumPyWrapper(Tensor):
         return self._data
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")

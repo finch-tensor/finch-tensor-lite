@@ -164,9 +164,7 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         return self.array
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
 
 @pytest.mark.parametrize(
@@ -509,26 +507,25 @@ def test_result_type():
     assert finchlite.result_type(finchlite.int8, finchlite.int16) == finchlite.int16
     assert finchlite.result_type(finchlite.int32, finchlite.uint32) == finchlite.int64
     assert (
-        finchlite.result_type(finchlite.float32, finchlite.float64)
-        == finchlite.float64
+        finchlite.result_type(finchlite.float32, finchlite.float64) == finchlite.float64
     )
     assert (
         finchlite.result_type(finchlite.complex64, finchlite.complex128)
         == finchlite.complex128
     )
-    assert finchlite.result_type(
-        finchlite.asarray([1], dtype=finchlite.int32), finchlite.uint16
-    ) == finchlite.int32
+    assert (
+        finchlite.result_type(
+            finchlite.asarray([1], dtype=finchlite.int32), finchlite.uint16
+        )
+        == finchlite.int32
+    )
 
 
 def test_result_type_python_scalars_are_weak():
     assert finchlite.result_type(finchlite.bool, True) == finchlite.bool
     assert finchlite.result_type(finchlite.int32, 1) == finchlite.int32
     assert finchlite.result_type(finchlite.float32, 1, 1.0) == finchlite.float32
-    assert (
-        finchlite.result_type(finchlite.complex64, 1, 1.0, 1j)
-        == finchlite.complex64
-    )
+    assert finchlite.result_type(finchlite.complex64, 1, 1.0, 1j) == finchlite.complex64
 
     with pytest.raises(TypeError):
         finchlite.result_type(1, 1.0)
@@ -1805,8 +1802,7 @@ def test_fft_eager_methods_use_numpy_fallback():
     finch_assert_allclose(finchlite.fft.rfft(x), np.fft.rfft(x))
     finch_assert_allclose(finchlite.fft.fftfreq(4), np.fft.fftfreq(4))
     assert (
-        finchlite.fft.fftfreq(4, dtype=finchlite.float32).to_numpy().dtype
-        == np.float32
+        finchlite.fft.fftfreq(4, dtype=finchlite.float32).to_numpy().dtype == np.float32
     )
     assert (
         finchlite.fft.rfftfreq(4, dtype=finchlite.float32).to_numpy().dtype
@@ -2131,7 +2127,9 @@ def test_lazy_take_along_axis():
     result = finchlite.take_along_axis(finchlite.lazy(array), indices, axis=1)
 
     assert isinstance(result, finchlite.LazyTensor)
-    finch_assert_equal(finchlite.compute(result), np.take_along_axis(array, indices, axis=1))
+    finch_assert_equal(
+        finchlite.compute(result), np.take_along_axis(array, indices, axis=1)
+    )
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove

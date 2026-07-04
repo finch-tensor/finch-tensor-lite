@@ -5,12 +5,8 @@ import scipy.sparse
 
 import finchlite
 from finchlite import (
-    DenseLevel,
-    ElementLevel,
-    FiberTensor,
     NumpyBuffer,
     NumpyBufferFType,
-    SparseListLevel,
     asarray,
     dense,
     element,
@@ -293,8 +289,9 @@ def test_diff(arr, axis, n):
         expected,
     )
     np.testing.assert_array_equal(
-        finchlite.compute(finchlite.diff(finchlite.lazy(arr), axis=axis, n=n))
-        .to_numpy(),
+        finchlite.compute(
+            finchlite.diff(finchlite.lazy(arr), axis=axis, n=n)
+        ).to_numpy(),
         expected,
     )
 

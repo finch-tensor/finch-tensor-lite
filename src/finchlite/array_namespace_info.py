@@ -74,9 +74,7 @@ class ArrayNamespaceInfo:
         _validate_device(device)
         if kind is None:
             return dict(_DTYPES)
-        return {
-            name: dtype for name, dtype in _DTYPES.items() if isdtype(dtype, kind)
-        }
+        return {name: dtype for name, dtype in _DTYPES.items() if isdtype(dtype, kind)}
 
 
 def __array_namespace_info__() -> ArrayNamespaceInfo:

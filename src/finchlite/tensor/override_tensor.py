@@ -79,8 +79,6 @@ ufunc_map: dict[Any, Any] = {
 
 
 class OverrideTensor(Tensor):
-
-
     @property
     def mT(self):
         return self.mod.matrix_transpose(self)

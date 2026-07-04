@@ -110,9 +110,7 @@ def test_algebra_selected():
     scaled_negative_zero = ffuncs.scaled_negative_power(-2.0)(np.float64(0.0))
     assert math.isinf(scaled_negative_zero[0])
     assert scaled_negative_zero[1] == 0.0
-    scaled_negative_sum = ffuncs.add_scaled_negative_power(-2.0)(
-        (1.0, 2.0), (1.0, 4.0)
-    )
+    scaled_negative_sum = ffuncs.add_scaled_negative_power(-2.0)((1.0, 2.0), (1.0, 4.0))
     assert scaled_negative_sum == (1.25, 2.0)
     assert math.isclose(
         ffuncs.root_scaled_negative_power(-2.0)(scaled_negative_sum),
@@ -123,9 +121,12 @@ def test_algebra_selected():
     )
     assert math.isnan(scaled_negative_nan[0])
     assert math.isnan(scaled_negative_nan[1])
-    assert ffuncs.root_scaled_negative_power(-2.0)(
-        ffuncs.add_scaled_negative_power(-2.0)((1.0, 2.0), (math.inf, 0.0))
-    ) == 0.0
+    assert (
+        ffuncs.root_scaled_negative_power(-2.0)(
+            ffuncs.add_scaled_negative_power(-2.0)((1.0, 2.0), (math.inf, 0.0))
+        )
+        == 0.0
+    )
 
 
 def test_python_scalar_promotion_uses_weak_bottom():
@@ -150,10 +151,13 @@ def test_python_scalar_promotion_uses_weak_bottom():
     tuple_type = TupleFType.from_tuple((finchlite.int32, finchlite.float32))
     promoted_tuple_type = TupleFType.from_tuple((finchlite.int64, finchlite.float32))
     assert isinstance(tuple_type, FDType)
-    assert promote_type(
-        tuple_type,
-        TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
-    ) == promoted_tuple_type
+    assert (
+        promote_type(
+            tuple_type,
+            TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+        )
+        == promoted_tuple_type
+    )
     assert (
         ffuncs.where.return_type(
             finchlite.bool,

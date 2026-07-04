@@ -1,8 +1,8 @@
 from .eager import (
     cholesky,
     cross,
-    diagonal,
     det,
+    diagonal,
     eigh,
     eigvalsh,
     inv,
@@ -28,8 +28,8 @@ from .eager import (
 __all__ = [
     "cholesky",
     "cross",
-    "diagonal",
     "det",
+    "diagonal",
     "eigh",
     "eigvalsh",
     "inv",

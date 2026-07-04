@@ -146,9 +146,7 @@ class TensorView(Tensor):
         return np.asarray(self.tns.to_numpy())[self.idxs]
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     def unwrap(self):
         """

@@ -50,9 +50,7 @@ class BufferizedNDArray(OverrideTensor):
         return self.val.arr.reshape(self._shape, copy=False)
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     @classmethod
     def from_numpy(
@@ -526,14 +524,10 @@ class BufferizedNDArrayAccessor(Tensor):
         return self.unwrap()
 
     def to_numpy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_numpy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
 
     def to_scipy(self):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
     def increment(self, val):
         """

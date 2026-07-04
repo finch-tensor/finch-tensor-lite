@@ -499,7 +499,7 @@ def _min_perm_swaps(arr):
 
 
 def det(x, /):
-    #https://stackoverflow.com/questions/19107617/how-to-compute-scipy-sparse-matrix-determinant-without-turning-it-to-dense
+    # https://stackoverflow.com/questions/19107617/how-to-compute-scipy-sparse-matrix-determinant-without-turning-it-to-dense
     x = _warn_compute(x, "det")
     try:
         x_sp = to_scipy(lazy.asarray(x))
@@ -692,9 +692,7 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
                 tol = atol
             if tol is not None:
                 kwargs["tol"] = tol
-            u, s, vh = scipy_sparse_linalg.svds(
-                to_scipy(lazy.asarray(x)), **kwargs
-            )
+            u, s, vh = scipy_sparse_linalg.svds(to_scipy(lazy.asarray(x)), **kwargs)
             return SVDResult(lazy.asarray(u), lazy.asarray(s), lazy.asarray(vh))
         except Exception:
             pass
