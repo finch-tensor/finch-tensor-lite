@@ -1234,11 +1234,6 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
             partner_values = _select_along_axis(values, x2.ndim, partner_mask)
             partner_marker = _select_along_axis(marker, x2.ndim, partner_mask)
             active = logical_xor(marker, partner_marker)
-            tie_self_lower = marker if side == "left" else logical_not(marker)
-            self_lower = logical_or(
-                less(values, partner_values),
-                logical_and(equal(values, partner_values), tie_self_lower),
-            )
             lower_mask = expand_dims(
                 OddEvenMergeSortLowerMaskTensor(
                     search_size,
@@ -1248,24 +1243,35 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
                 ),
                 axis=tuple(range(x2.ndim)),
             )
+            target_value = reduce(
+                ffuncs.choose(values.fill_value),
+                where(marker, values, values.fill_value),
+                axis=x2.ndim,
+                init=values.fill_value,
+            )
+            partner_value = reduce(
+                ffuncs.choose(values.fill_value),
+                where(partner_marker, values, values.fill_value),
+                axis=x2.ndim,
+                init=values.fill_value,
+            )
+            target_goes_lower = (
+                less_equal(target_value, partner_value)
+                if side == "left"
+                else less(target_value, partner_value)
+            )
+            target_value = expand_dims(target_value, axis=x2.ndim)
+            partner_value = expand_dims(partner_value, axis=x2.ndim)
+            target_destination = equal(
+                lower_mask,
+                expand_dims(target_goes_lower, axis=x2.ndim),
+            )
             values = where(
                 active,
-                where(
-                    lower_mask,
-                    where(self_lower, values, partner_values),
-                    where(self_lower, partner_values, values),
-                ),
+                where(target_destination, target_value, partner_value),
                 values,
             )
-            marker = where(
-                active,
-                where(
-                    lower_mask,
-                    where(self_lower, marker, partner_marker),
-                    where(self_lower, partner_marker, marker),
-                ),
-                marker,
-            )
+            marker = where(active, target_destination, marker)
             k //= 2
         p *= 2
 
