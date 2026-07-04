@@ -1,7 +1,7 @@
 name: Benchmark
 jobs:
   benchmark:
-    runs-on: codspeed-macro
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -14,9 +14,9 @@ jobs:
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
-          mode: walltime,memory
+          mode: simulation,memory
           run: |
-            pixi run -e benchmark pytest benchmarks/ --codspeed -vvv
+            pixi run benchmark -vvv -m "not slow"
 
 on:
   push:

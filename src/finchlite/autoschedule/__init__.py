@@ -19,6 +19,7 @@ from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_NUMBA,
+    COMPILE_NUMBA_GALLEY,
     INTERPRET_ASSEMBLY,
     INTERPRET_LOGIC,
     INTERPRET_NOTATION,
@@ -37,6 +38,7 @@ from .standardize import LogicStandardizer
 
 __all__ = [
     "COMPILE_NUMBA",
+    "COMPILE_NUMBA_GALLEY",
     "INTERPRET_ASSEMBLY",
     "INTERPRET_LOGIC",
     "INTERPRET_NOTATION",
