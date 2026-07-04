@@ -293,7 +293,7 @@ class Load(AssemblyExpression, AssemblyTree):
         index: The index to load at.
     """
 
-    buffer: Slot
+    buffer: AssemblyExpression
     index: AssemblyExpression
 
     @property
@@ -317,7 +317,7 @@ class Store(AssemblyTree, AssemblyStatement):
         value: The value to store.
     """
 
-    buffer: Slot
+    buffer: AssemblyExpression
     index: AssemblyExpression
     value: AssemblyExpression
 
@@ -336,7 +336,7 @@ class Resize(AssemblyTree, AssemblyStatement):
         new_size: The new size for the buffer.
     """
 
-    buffer: Slot
+    buffer: AssemblyExpression
     new_size: AssemblyExpression
 
     @property
@@ -353,7 +353,7 @@ class Length(AssemblyExpression, AssemblyTree):
         buffer: The buffer whose length is queried.
     """
 
-    buffer: Slot
+    buffer: AssemblyExpression
 
     @property
     def children(self):

@@ -22,6 +22,7 @@ from finchlite.finch_assembly import (
     AssemblyLibrary,
     AssemblyLoader,
     AssemblyTransform,
+    LowerPackedStructSlots,
 )
 from finchlite.finch_notation import LoopletSimplify, NotationLoader
 from finchlite.symbolic import (
@@ -170,6 +171,54 @@ class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
         self.node = node
 
 
+@dataclass(eq=False)
+class AssemblyStructView:
+    expr: asm.AssemblyExpression
+    type: FType
+    attrs: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        if self.attrs is None:
+            self.attrs = {}
+        if self.metadata is None:
+            self.metadata = {}
+
+    @property
+    def result_type(self):
+        return self.type
+
+    def get(self, attr: str):
+        assert self.attrs is not None
+        if attr in self.attrs:
+            return self.attrs[attr]
+        return asm.GetAttr(self.expr, asm.Literal(attr))
+
+    def meta(self, attr: str, default=None):
+        assert self.metadata is not None
+        return self.metadata.get(attr, default)
+
+    def with_attrs(
+        self,
+        *,
+        type_: FType | None = None,
+        attrs: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ):
+        next_attrs = dict(self.attrs or {})
+        next_metadata = dict(self.metadata or {})
+        if attrs:
+            next_attrs.update(attrs)
+        if metadata:
+            next_metadata.update(metadata)
+        return AssemblyStructView(
+            self.expr,
+            self.type if type_ is None else type_,
+            next_attrs,
+            next_metadata,
+        )
+
+
 @dataclass(frozen=True)
 class SymbolicExtent(FTyped):
     start_sym: ntn.NotationExpression
@@ -314,7 +363,7 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
-        ctx_transforms: tuple[AssemblyTransform, ...] = (),
+        ctx_transforms: tuple[AssemblyTransform, ...] | None = None,
         ctx_lower: NotationLowerer | None = None,
     ):
         if ctx_load is None:
@@ -322,6 +371,8 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
         if ctx_lower is None:
             ctx_lower = AssemblyGenerator()
         self.ctx_load: AssemblyLoader = ctx_load
+        if ctx_transforms is None:
+            ctx_transforms = (LowerPackedStructSlots(),)
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
 
@@ -416,8 +467,13 @@ class AssemblyContext(Context):
         match node:
             case ntn.Slot(var_n, var_t):
                 if var_n in self.slots:
-                    var_o = self.slots[var_n]
-                    return ntn.Stack(var_o, var_t)
+                    view = self.slots[var_n]
+                    if view.result_type != var_t:
+                        raise TypeError(
+                            f"Slot '{var_n}' is declared as type {view.result_type}, "
+                            f"but used as type {var_t}."
+                        )
+                    return ntn.Stack(view, var_t)
                 raise KeyError(f"Slot {var_n} not found in context")
             case ntn.Stack(_, _):
                 return node
@@ -490,7 +546,7 @@ class AssemblyContext(Context):
                             f"but used as type {var_t}."
                         )
                 if var_n in self.slots:
-                    return self.slots[var_n]
+                    return self.slots[var_n].expr
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
             case ntn.Unpack(ntn.Slot(var_n, var_t), val):
                 val_code = self(val)
@@ -505,22 +561,19 @@ class AssemblyContext(Context):
                         f"Variable '{var_n}' is already defined in the current"
                         f" context, cannot overwrite with slot."
                     )
-                var = asm.Variable(var_n, var_t)
-                self.exec(asm.Assign(var, val_code))
+                slot = asm.Slot(var_n, var_t)
+                self.exec(asm.Unpack(slot, val_code))
                 self.types[var_n] = var_t
                 self._freeze_tensor(var_n, op=None)
-                self.slots[var_n] = var_t.asm_unpack(
-                    self, var_n, asm.Variable(var_n, var_t)
-                )
+                self.slots[var_n] = AssemblyStructView(slot, var_t)
                 return None
             case ntn.Repack(ntn.Slot(var_n, var_t), _):
                 if var_n not in self.slots or var_n not in self.types:
                     raise KeyError(f"Slot {var_n} not found in context, cannot repack")
                 if var_t != self.types[var_n]:
                     raise TypeError(f"Type mismatch: {var_t} != {self.types[var_n]}")
-                obj = self.slots[var_n]
                 self._rm_tensor_from_accesses(var_n)
-                var_t.asm_repack(self, var_n, obj)
+                self.exec(asm.Repack(asm.Slot(var_n, var_t)))
                 return None
             case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
                 assert isinstance(mode, ntn.Read)
@@ -545,7 +598,7 @@ class AssemblyContext(Context):
             case ntn.Dimension(tns, ntn.Literal(r)):
                 assert isinstance(r, int)
                 tns = self.resolve(tns)
-                return tns.result_type.lower_dim(self, tns.obj, r)
+                return tns.result_type.lower_dim(self, tns, r)
             case ntn.Cached(arg, _):
                 return self(arg)
             case ntn.Declare(tns, init, op, shape):

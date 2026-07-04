@@ -7,7 +7,7 @@ from finchlite import finch_notation as ntn
 from finchlite.algebra import ImmutableStructFType, ffuncs
 from finchlite.compile import looplets as lplt
 
-from .fiber_tensor import FiberTensor, FiberTensorFields, Level, LevelFType
+from .fiber_tensor import FiberTensor, Level, LevelFType
 from .scalar import Scalar
 
 
@@ -66,45 +66,56 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def from_numpy(self, shape, arr):
         return LoTriMask(self.lvl_t.from_numpy(shape, arr))
 
+    @staticmethod
+    def _body_lvl(tns):
+        return asm.GetAttr(tns, asm.Literal("body"))
+
     def level_lower_freeze(self, ctx, tns, op, pos):
-        return self.body.level_lower_freeze(self, ctx, tns, op, pos)
+        return self.body.level_lower_freeze(ctx, self._body_lvl(tns), op, pos)
 
     def level_lower_thaw(self, ctx, tns, op, pos):
-        return self.body.level_lower_thaw(self, ctx, tns, op, pos)
+        return self.body.level_lower_thaw(ctx, self._body_lvl(tns), op, pos)
 
     def level_lower_unwrap(self, ctx, obj, pos):
-        return self.body.level_lower_unwrap(self, ctx, obj, pos)
+        return self.body.level_lower_unwrap(
+            ctx, obj.with_attrs(attrs={"lvl": self._body_lvl(obj.get("lvl"))}), pos
+        )
 
-    def level_lower_increment(self, ctx, obj, val, pos):
-        return self.body.level_lower_increment(self, ctx, obj, val, pos)
+    def level_lower_increment(self, ctx, obj, op, val, pos):
+        return self.body.level_lower_increment(
+            ctx,
+            obj.with_attrs(attrs={"lvl": self._body_lvl(obj.get("lvl"))}),
+            op,
+            val,
+            pos,
+        )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
-        return self.body.level_lower_declare(self, ctx, tns, init, op, shape, pos)
+        return self.body.level_lower_declare(
+            ctx, self._body_lvl(tns), init, op, shape, pos
+        )
 
     def level_unfurl(self, ctx, stack: ntn.Stack, ext, mode, proto, pos):
-        tns: FiberTensorFields = stack.obj
+        tns = stack.obj
 
         def child_accessor(ctx, idx):
-            return self.body.level_unfurl(ctx, stack, ext, mode, proto, pos)
+            body_view = tns.with_attrs(attrs={"lvl": self._body_lvl(tns.get("lvl"))})
+            return self.body.level_unfurl(
+                ctx, ntn.Stack(body_view, stack.type), ext, mode, proto, pos
+            )
 
         scalar = Scalar(self.fill_value, self.fill_value)
+        visited_idxs = tns.meta("visited_idxs", ())
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
             split=lambda ctx, ext: ntn.Call(
-                ntn.L(ffuncs.add), (tns.visited_idxs[-1], ext.get_unit())
+                ntn.L(ffuncs.add), (visited_idxs[-1], ext.get_unit())
             ),
             tail=lambda ctx, idx: lplt.Run(scalar),
         )
 
-    def level_asm_unpack(self, ctx, var_n, val):
-        val_body = asm.GetAttr(val, asm.Literal("body"))
-        return self.body.level_asm_unpack(ctx, var_n, val_body)
-
     def level_lower_dim(self, ctx, obj, r):
-        return self.body.level_lower_dim(ctx, obj, r)
-
-    def level_asm_repack(self, ctx, lvl_fields):
-        return self.body.level_asm_repack(ctx, lvl_fields)
+        return self.body.level_lower_dim(ctx, self._body_lvl(obj), r)
 
     def from_fields(self, lvl) -> "LoTriMask":
         return LoTriMask(lvl)

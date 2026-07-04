@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import Any
 
 import numpy as np
 
@@ -9,19 +9,11 @@ from finchlite.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finchlite.compile import looplets as lplt
 from finchlite.finch_assembly import parse_assembly
 from finchlite.tensor.fiber_tensor import (
-    FiberTensorFields,
     FiberTensorFType,
     Level,
     LevelFType,
 )
 from finchlite.tensor.scalar import Scalar
-
-
-class SparseListLevelFields(NamedTuple):
-    lvl_asm: asm.AssemblyExpression  # assembly expression of the current level
-    ptr_s: asm.Slot
-    idx_s: asm.Slot
-    next_lvl: NamedTuple
 
 
 @dataclass(unsafe_hash=True)
@@ -133,54 +125,27 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def from_numpy(self, shape, val):
         raise NotImplementedError("sparse list level doesn't support from_numpy")
 
-    def level_asm_unpack(self, ctx, var_n, val) -> SparseListLevelFields:
-        # Unpack ptr buffer
-        ptr_buf = asm.Variable(f"{var_n}_ptr", self.ptr_type)
-        ptr_buf_e = asm.GetAttr(val, asm.Literal("ptr"))
-        ctx.exec(asm.Assign(ptr_buf, ptr_buf_e))
-        ptr_s = asm.Slot(f"{var_n}_ptr_slot", self.ptr_type)
-        ctx.exec(asm.Unpack(ptr_s, ptr_buf))
-
-        # Unpack idx buffer
-        idx_buf = asm.Variable(f"{var_n}_idx", self.idx_type)
-        idx_buf_e = asm.GetAttr(val, asm.Literal("idx"))
-        ctx.exec(asm.Assign(idx_buf, idx_buf_e))
-        idx_s = asm.Slot(f"{var_n}_idx_slot", self.idx_type)
-        ctx.exec(asm.Unpack(idx_s, idx_buf))
-
-        return SparseListLevelFields(
-            val,
-            ptr_s,
-            idx_s,
-            self.lvl_t.level_asm_unpack(
-                ctx, var_n, asm.GetAttr(val, asm.Literal("lvl"))
-            ),
-        )
-
-    def level_asm_repack(self, ctx, lvl_fields: SparseListLevelFields):
-        ctx.exec(asm.Repack(lvl_fields.ptr_s))
-        ctx.exec(asm.Repack(lvl_fields.idx_s))
-        return self.lvl_t.level_asm_repack(ctx, lvl_fields.next_lvl)
-
-    def level_lower_dim(self, ctx, lvl_fields: SparseListLevelFields, r):
+    def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
-            return asm.GetAttr(lvl_fields.lvl_asm, asm.Literal("dimension"))
-        return self.lvl_t.level_lower_dim(ctx, lvl_fields.next_lvl, r - 1)
-
-    def level_lower_declare(
-        self, ctx, level_fields: SparseListLevelFields, init, op, shape, pos
-    ):
-        return self.lvl_t.level_lower_declare(
-            ctx, level_fields.next_lvl, init, op, shape, pos
+            return asm.GetAttr(lvl, asm.Literal("dimension"))
+        return self.lvl_t.level_lower_dim(
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_thaw(self, ctx, level_fields: SparseListLevelFields, op, pos):
-        return self.lvl_t.level_lower_thaw(ctx, level_fields.next_lvl, op, pos)
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+        return self.lvl_t.level_lower_declare(
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape, pos
+        )
 
-    def level_lower_freeze(self, ctx, tns: SparseListLevelFields, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
+        return self.lvl_t.level_lower_thaw(
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+        )
+
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         p_t = self.position_type
-        lvl_ptr = tns.ptr_s
-        lvl_idx = tns.idx_s
+        lvl_ptr = asm.GetAttr(lvl, asm.Literal("ptr"))
+        lvl_idx = asm.GetAttr(lvl, asm.Literal("idx"))
         pos_stop = asm.Variable("pos_stop", p_t)
         qos_stop = asm.Variable("qos_stop", p_t)
         p = asm.Variable("p", p_t)
@@ -195,9 +160,11 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         """
 
         ctx.exec(parse_assembly(expr, locals()))
-        return self.lvl_t.level_lower_freeze(ctx, tns.next_lvl, op, pos)
+        return self.lvl_t.level_lower_freeze(
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+        )
 
-    def level_lower_increment(self, ctx, obj, val, pos):
+    def level_lower_increment(self, ctx, obj, op, val, pos):
         raise NotImplementedError(
             "SparseListLevelFType does not support level_lower_increment."
         )
@@ -207,41 +174,23 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             "SparseListLevelFType does not support level_lower_unwrap."
         )
 
-    def level_lower_assemble(self, ctx, level_fields: SparseListLevelFields, pos_stop):
-        return asm.Block(
-            (
-                asm.Assign(
-                    level_fields.ptr_s,  # type: ignore[arg-type]
-                    asm.Call(
-                        asm.Literal(ffuncs.resize_if_smaller),
-                        (
-                            level_fields.ptr_s,
-                            pos_stop,
-                            asm.Literal(self.fill_value),
-                        ),
-                    ),
-                ),
-            )
-        )
-
     def level_unfurl(
         self, ctx, stack: ntn.Stack, ext, mode: ntn.AccessMode, proto, pos
     ):
-        tns: FiberTensorFields = stack.obj
+        tns = stack.obj
         if not isinstance(stack.type, FiberTensorFType):
             raise TypeError(f"Expected FiberTensorFType, got: {stack.type}")
         ft_ftype: FiberTensorFType = stack.type
-        assert isinstance(tns.lvl_fields, SparseListLevelFields)
-        ptr_s = tns.lvl_fields.ptr_s
-        idx_s = tns.lvl_fields.idx_s
-        lvl_asm = tns.lvl_fields.lvl_asm
-        next_lvl = tns.lvl_fields.next_lvl
+        lvl_asm = tns.get("lvl")
+        ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
+        idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
+        next_lvl = asm.GetAttr(lvl_asm, asm.Literal("lvl"))
 
         q = asm.Variable(ctx.freshen("q"), self.position_type)
         q_stop = asm.Variable(ctx.freshen("q_stop"), self.position_type)
         i_stop = asm.Variable(ctx.freshen("i_stop"), self.position_type)
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
-        pos = tns.pos
+        pos = tns.get("pos")
         scalar = Scalar(self.fill_value, self.fill_value)
 
         tmp_locals = locals()
@@ -276,12 +225,15 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(asm.Assign(pos_2, q))
+            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
             return lplt.Leaf(
                 lambda ctx: ntn.Stack(
-                    FiberTensorFields(
-                        next_lvl, pos_2, tns.dirty_bit, tns.visited_idxs + (idx,)
+                    tns.with_attrs(
+                        type_=child_type,
+                        attrs={"lvl": next_lvl, "pos": pos_2},
+                        metadata={"visited_idxs": (*tns.meta("visited_idxs", ()), idx)},
                     ),
-                    FiberTensorFType(ft_ftype.lvl_t.lvl_t),  # type: ignore[abstract]
+                    child_type,
                 )
             )
 
