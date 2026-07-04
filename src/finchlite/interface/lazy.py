@@ -1104,6 +1104,7 @@ def argmax(
     )
 
 
+# https://en.wikipedia.org/wiki/Batcher_odd%E2%80%93even_mergesort
 def _sort(
     x: LazyTensor,
     axis: int,
@@ -1208,72 +1209,42 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
     axis_size = x1.shape[0]
     search_size = axis_size + 1
     device = common_device(x1.device, x2.device)
-    values = broadcast_to(
-        expand_dims(x1, axis=tuple(range(x2.ndim))),
-        x2.shape + (axis_size,),
-    )
-    values = concat((values, expand_dims(x2, axis=x2.ndim)), axis=-1)
-    marker = concat(
-        (
-            full(x2.shape + (axis_size,), False, dtype=np.bool_, device=device),
-            full(x2.shape + (1,), True, dtype=np.bool_, device=device),
+    values = _select_along_axis(
+        broadcast_to(
+            expand_dims(x1, axis=tuple(range(x2.ndim))),
+            x2.shape + (axis_size,),
         ),
-        axis=-1,
+        x2.ndim,
+        EyeTensor((search_size, axis_size), k=-1, dtype=np.bool_),
     )
+    marker = cast(
+        LazyTensor,
+        lazy(OneHotMaskTensor(search_size, index=0, dtype=np.bool_)),
+    )
+    marker = marker.to_device(device)
+    if x2.ndim > 0:
+        marker = expand_dims(marker, axis=tuple(range(x2.ndim)))
+    marker = broadcast_to(marker, x2.shape + (search_size,))
 
-    p = 1
-    while p < search_size:
-        k = p
-        while k >= 1:
-            partner_mask = OddEvenMergeSortPartnerMaskTensor(
-                search_size,
-                p=p,
-                k=k,
-                dtype=np.bool_,
-            )
-            partner_values = _select_along_axis(values, x2.ndim, partner_mask)
-            partner_marker = _select_along_axis(marker, x2.ndim, partner_mask)
-            active = logical_xor(marker, partner_marker)
-            lower_mask = expand_dims(
-                OddEvenMergeSortLowerMaskTensor(
-                    search_size,
-                    p=p,
-                    k=k,
-                    dtype=np.bool_,
-                ),
-                axis=tuple(range(x2.ndim)),
-            )
-            target_value = reduce(
-                ffuncs.choose(values.fill_value),
-                where(marker, values, values.fill_value),
-                axis=x2.ndim,
-                init=values.fill_value,
-            )
-            partner_value = reduce(
-                ffuncs.choose(values.fill_value),
-                where(partner_marker, values, values.fill_value),
-                axis=x2.ndim,
-                init=values.fill_value,
-            )
-            target_goes_lower = (
-                less_equal(target_value, partner_value)
-                if side == "left"
-                else less(target_value, partner_value)
-            )
-            target_value = expand_dims(target_value, axis=x2.ndim)
-            partner_value = expand_dims(partner_value, axis=x2.ndim)
-            target_destination = equal(
-                lower_mask,
-                expand_dims(target_goes_lower, axis=x2.ndim),
-            )
-            values = where(
-                active,
-                where(target_destination, target_value, partner_value),
-                values,
-            )
-            marker = where(active, target_destination, marker)
-            k //= 2
-        p *= 2
+    stride = 1 << (axis_size.bit_length() - 1) if axis_size > 0 else 0
+    while stride > 0:
+        candidate = _select_along_axis(
+            marker,
+            x2.ndim,
+            EyeTensor((search_size, search_size), k=-stride, dtype=np.bool_),
+        )
+        probe = reduce(
+            ffuncs.choose(values.fill_value),
+            where(candidate, values, values.fill_value),
+            axis=x2.ndim,
+            init=values.fill_value,
+        )
+        advance = logical_and(
+            any(candidate, axis=x2.ndim),
+            less(probe, x2) if side == "left" else less_equal(probe, x2),
+        )
+        marker = where(expand_dims(advance, axis=x2.ndim), candidate, marker)
+        stride //= 2
 
     positions = _axis_indices(search_size, dtype=np.intp).to_device(device)
     if x2.ndim > 0:
@@ -2633,6 +2604,112 @@ class OddEvenMergeSortLowerMaskTensor(Tensor):
             tuple(ftype(dim) for dim in self.shape),
             self._p,
             self._k,
+        )
+
+
+@dataclass(frozen=True, eq=False)
+class OneHotMaskTensorFType(TensorFType):
+    _element_type: FType
+    _shape_type: tuple
+    _index: int
+
+    @property
+    def fill_value(self):
+        return self._element_type(False)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        match other:
+            case OneHotMaskTensorFType(
+                _element_type=element_type,
+                _shape_type=shape_type,
+                _index=index,
+            ):
+                return (
+                    self._element_type == element_type
+                    and self._shape_type == shape_type
+                    and self._index == index
+                )
+            case _:
+                return False
+
+    def __hash__(self):
+        return hash((self._element_type, self._shape_type, self._index))
+
+    def construct(self, shape: tuple) -> OneHotMaskTensor:
+        return OneHotMaskTensor(shape, index=self._index, dtype=self.element_type)
+
+    def __call__(self, val: Any) -> OneHotMaskTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class OneHotMaskTensor(Tensor):
+    def __init__(self, shape, *, index: int, dtype=None):
+        if isinstance(shape, int):
+            shape = (shape,)
+        self._shape = tuple(shape)
+        if len(self._shape) != 1:
+            raise ValueError(f"Expected a 1D shape, got {self._shape}")
+        self._index = operator.index(index)
+        self._element_type = ftype(dtype if dtype is not None else np.bool_)
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != 1:
+            raise ValueError("One-hot mask tensors require one index.")
+        return Scalar(
+            self._element_type(idxs[0] == self._index),
+            fill_value=self.fill_value,
+        )
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_numpy."
+        )
+
+    def to_scipy(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support to_scipy."
+        )
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return OneHotMaskTensorFType(
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            self._index,
         )
 
 
