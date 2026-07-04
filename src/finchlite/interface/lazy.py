@@ -1195,6 +1195,86 @@ def argsort(
     return negative(indices) if descending else indices
 
 
+def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
+    x1 = lazy(x1)
+    x2 = lazy(x2)
+    if x1.ndim != 1:
+        raise ValueError("x1 must be a one-dimensional array")
+    if side not in ("left", "right"):
+        raise ValueError("side must be either 'left' or 'right'")
+    if sorter is not None:
+        x1 = take(x1, sorter)
+
+    axis_size = x1.shape[0]
+    search_size = axis_size + 1
+    device = common_device(x1.device, x2.device)
+    values = broadcast_to(
+        expand_dims(x1, axis=tuple(range(x2.ndim))),
+        x2.shape + (axis_size,),
+    )
+    values = concat((values, expand_dims(x2, axis=x2.ndim)), axis=-1)
+    marker = concat(
+        (
+            full(x2.shape + (axis_size,), False, dtype=np.bool_, device=device),
+            full(x2.shape + (1,), True, dtype=np.bool_, device=device),
+        ),
+        axis=-1,
+    )
+
+    p = 1
+    while p < search_size:
+        k = p
+        while k >= 1:
+            partner_mask = OddEvenMergeSortPartnerMaskTensor(
+                search_size,
+                p=p,
+                k=k,
+                dtype=np.bool_,
+            )
+            partner_values = _select_along_axis(values, x2.ndim, partner_mask)
+            partner_marker = _select_along_axis(marker, x2.ndim, partner_mask)
+            active = logical_xor(marker, partner_marker)
+            tie_self_lower = marker if side == "left" else logical_not(marker)
+            self_lower = logical_or(
+                less(values, partner_values),
+                logical_and(equal(values, partner_values), tie_self_lower),
+            )
+            lower_mask = expand_dims(
+                OddEvenMergeSortLowerMaskTensor(
+                    search_size,
+                    p=p,
+                    k=k,
+                    dtype=np.bool_,
+                ),
+                axis=tuple(range(x2.ndim)),
+            )
+            values = where(
+                active,
+                where(
+                    lower_mask,
+                    where(self_lower, values, partner_values),
+                    where(self_lower, partner_values, values),
+                ),
+                values,
+            )
+            marker = where(
+                active,
+                where(
+                    lower_mask,
+                    where(self_lower, marker, partner_marker),
+                    where(self_lower, partner_marker, marker),
+                ),
+                marker,
+            )
+            k //= 2
+        p *= 2
+
+    positions = _axis_indices(search_size, dtype=np.intp).to_device(device)
+    if x2.ndim > 0:
+        positions = expand_dims(positions, axis=tuple(range(x2.ndim)))
+    return sum(multiply(marker, positions), axis=x2.ndim, dtype=np.intp)
+
+
 def any(
     x,
     /,

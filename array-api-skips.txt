@@ -12,7 +12,6 @@ array_api_tests/test_signatures.py::test_func_signature[unique_values]
 # creation functions
 # other functions
 array_api_tests/test_signatures.py::test_func_signature[from_dlpack]
-array_api_tests/test_signatures.py::test_func_signature[searchsorted]
 # Array object namespace
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack__]
 array_api_tests/test_signatures.py::test_array_method_signature[__dlpack_device__]
@@ -30,14 +29,12 @@ array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_1[1]
 
 # test_data_type_functions
 
-array_api_tests/test_searching_functions.py::test_searchsorted
 
 # test_has_names
 array_api_tests/test_has_names.py::test_has_names[set-unique_all]
 array_api_tests/test_has_names.py::test_has_names[set-unique_counts]
 array_api_tests/test_has_names.py::test_has_names[set-unique_inverse]
 array_api_tests/test_has_names.py::test_has_names[set-unique_values]
-array_api_tests/test_has_names.py::test_has_names[searching-searchsorted]
 array_api_tests/test_has_names.py::test_has_names[creation-from_dlpack]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack__]
 array_api_tests/test_has_names.py::test_has_names[array_method-__dlpack_device__]

@@ -358,6 +358,16 @@ def sort(
     return compute(lazy.sort(x, axis=axis, descending=descending, stable=stable))
 
 
+def searchsorted(x1, x2, /, *, side: str = "left", sorter=None):
+    if (
+        isinstance(x1, lazy.LazyTensor)
+        or isinstance(x2, lazy.LazyTensor)
+        or isinstance(sorter, lazy.LazyTensor)
+    ):
+        return lazy.searchsorted(x1, x2, side=side, sorter=sorter)
+    return compute(lazy.searchsorted(x1, x2, side=side, sorter=sorter))
+
+
 def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)

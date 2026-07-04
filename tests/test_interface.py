@@ -896,6 +896,33 @@ def test_argsort_stable_ties():
     )
 
 
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
+@pytest.mark.parametrize("side", ["left", "right"])
+@pytest.mark.parametrize("use_sorter", [False, True])
+def test_searchsorted(wrap, side, use_sorter):
+    sorted_x1 = np.array([1.0, 2.0, 2.0, 4.0, 7.0])
+    x2 = np.array([[0.0, 2.0, 3.0], [7.0, 8.0, 1.0]])
+    if use_sorter:
+        x1 = np.array([4.0, 1.0, 7.0, 2.0, 2.0])
+        sorter = np.argsort(x1, kind="stable")
+        expected = np.searchsorted(x1, x2, side=side, sorter=sorter)
+        result = finchlite.searchsorted(
+            wrap(x1),
+            wrap(x2),
+            side=side,
+            sorter=wrap(sorter),
+        )
+    else:
+        expected = np.searchsorted(sorted_x1, x2, side=side)
+        result = finchlite.searchsorted(wrap(sorted_x1), wrap(x2), side=side)
+
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+
+    assert result.dtype in (finchlite.int32, finchlite.int64)
+    finch_assert_equal(result, expected)
+
+
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
 @pytest.mark.parametrize(
     "op, np_op", [(finchlite.min, np.min), (finchlite.max, np.max)]
