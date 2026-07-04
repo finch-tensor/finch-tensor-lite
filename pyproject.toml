@@ -98,6 +98,11 @@ cmd = "python -m pytest -m c_backend"
 depends-on = ["compile"]
 default-environment = "test-c"
 
+[tool.pixi.feature.benchmark.tasks.benchmark]
+cmd = "pytest --codspeed benchmarks/"
+depends-on = ["compile"]
+default-environment = "benchmark"
+
 [tool.pixi.feature.test.tasks.type-check]
 cmd = "mypy ."
 default-environment = "test"
