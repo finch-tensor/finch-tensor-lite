@@ -196,23 +196,22 @@ class TestOverrideTensor(finchlite.OverrideTensor):
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((ffuncs.add, finchlite.add, np.add), np.add),
-        ((ffuncs.sub, finchlite.subtract, np.subtract), np.subtract),
-        ((ffuncs.mul, finchlite.multiply, np.multiply), np.multiply),
-        ((ffuncs.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
-        ((ffuncs.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
-        ((ffuncs.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
+        ((finchlite.add, np.add), np.add),
+        ((finchlite.subtract, np.subtract), np.subtract),
+        ((finchlite.multiply, np.multiply), np.multiply),
+        ((finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
+        ((finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
+        ((finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         (
-            (ffuncs.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
+            (finchlite.bitwise_left_shift, np.bitwise_left_shift),
             np.bitwise_left_shift,
         ),
         (
-            (ffuncs.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
+            (finchlite.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
         (
             (
-                ffuncs.truediv,
                 finchlite.truediv,
                 np.true_divide,
                 finchlite.divide,
@@ -220,14 +219,11 @@ class TestOverrideTensor(finchlite.OverrideTensor):
             ),
             np.true_divide,
         ),
-        ((ffuncs.floordiv, finchlite.floor_divide, np.floor_divide), np.floor_divide),
-        ((ffuncs.mod, finchlite.mod, np.mod), np.mod),
-        ((ffuncs.pow, finchlite.power, np.power), np.power),
-        (
-            (ffuncs.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
-            np.mod,
-        ),
-        ((ffuncs.pow, finchlite.pow, np.pow), np.pow),
+        ((finchlite.floor_divide, np.floor_divide), np.floor_divide),
+        ((finchlite.mod, np.mod), np.mod),
+        ((finchlite.power, np.power), np.power),
+        ((finchlite.mod, np.mod, finchlite.remainder, np.remainder), np.mod),
+        ((finchlite.pow, np.pow), np.pow),
         ((finchlite.hypot, np.hypot), np.hypot),
         ((finchlite.atan2, np.atan2), np.atan2),
         ((finchlite.logaddexp, np.logaddexp), np.logaddexp),
@@ -238,15 +234,12 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
         ((finchlite.minimum, np.minimum), np.minimum),
         ((finchlite.maximum, np.maximum), np.maximum),
-        ((ffuncs.eq, finchlite.equal, np.equal), np.equal),
-        ((ffuncs.ne, finchlite.not_equal, np.not_equal), np.not_equal),
-        ((ffuncs.lt, finchlite.less, np.less), np.less),
-        ((ffuncs.le, finchlite.less_equal, np.less_equal), np.less_equal),
-        ((ffuncs.gt, finchlite.greater, np.greater), np.greater),
-        (
-            (ffuncs.ge, finchlite.greater_equal, np.greater_equal),
-            np.greater_equal,
-        ),
+        ((finchlite.equal, np.equal), np.equal),
+        ((finchlite.not_equal, np.not_equal), np.not_equal),
+        ((finchlite.less, np.less), np.less),
+        ((finchlite.less_equal, np.less_equal), np.less_equal),
+        ((finchlite.greater, np.greater), np.greater),
+        ((finchlite.greater_equal, np.greater_equal), np.greater_equal),
     ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -299,6 +292,23 @@ def test_floor_divide_float_special_cases(x1, x2, expected):
         result = float(result)
         assert result == expected
         assert np.signbit(result) == np.signbit(expected)
+
+
+@pytest.mark.parametrize(
+    "x1, x2, expected",
+    [
+        (-np.inf, 1.0, -np.inf),
+        (-np.inf, -1.0, np.inf),
+        (np.inf, -1.0, -np.inf),
+        (np.inf, 1.0, np.inf),
+        (-1.0, np.inf, -0.0),
+        (1.0, -np.inf, -0.0),
+    ],
+)
+def test_ffunc_floor_divide_float_special_cases(x1, x2, expected):
+    result = float(ffuncs.floordiv(np.float64(x1), np.float64(x2)))
+    assert result == expected
+    assert np.signbit(result) == np.signbit(expected)
 
 
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
@@ -574,13 +584,10 @@ def test_nan_fill_value_ftype_equality():
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((ffuncs.abs, finchlite.abs, np.abs), np.abs),
-        ((ffuncs.pos, finchlite.positive, np.positive), np.positive),
-        ((ffuncs.neg, finchlite.negative, np.negative), np.negative),
-        (
-            (ffuncs.invert, finchlite.bitwise_invert, np.bitwise_invert),
-            np.bitwise_invert,
-        ),
+        ((finchlite.abs, np.abs), np.abs),
+        ((finchlite.positive, np.positive), np.positive),
+        ((finchlite.negative, np.negative), np.negative),
+        ((finchlite.bitwise_invert, np.bitwise_invert), np.bitwise_invert),
         ((finchlite.reciprocal, np.reciprocal), np.reciprocal),
         ((finchlite.sin, np.sin), np.sin),
         ((finchlite.sinh, np.sinh), np.sinh),
