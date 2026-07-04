@@ -282,6 +282,27 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
             finch_assert_equal(result, expected)
 
 
+@pytest.mark.parametrize(
+    "x1, x2, expected",
+    [
+        (-np.inf, 1.0, -np.inf),
+        (-np.inf, -1.0, np.inf),
+        (np.inf, -1.0, -np.inf),
+        (np.inf, 1.0, np.inf),
+        (-1.0, np.inf, -0.0),
+        (1.0, -np.inf, -0.0),
+    ],
+)
+def test_floor_divide_float_special_cases(x1, x2, expected):
+    x1 = finchlite.asarray(x1, dtype=finchlite.float64)
+    x2 = finchlite.asarray(x2, dtype=finchlite.float64)
+
+    for result in (finchlite.floor_divide(x1, x2), x1 // x2):
+        result = float(result)
+        assert result == expected
+        assert np.signbit(result) == np.signbit(expected)
+
+
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
 def test_same_elementwise_nan(wrap):
     a = np.array([1.0, np.nan, np.nan, 2.0])

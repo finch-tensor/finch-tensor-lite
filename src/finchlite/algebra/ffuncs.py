@@ -15,6 +15,7 @@ from .ftypes import (
     FDTypeBoolean,
     FDTypeInteger,
     FDTypeOrdered,
+    FDTypeFloat,
     FDTypeUnsignedInteger,
     FType,
     TupleFType,
@@ -154,6 +155,11 @@ class _FloorDiv(BinaryFinchOperator):
         return "floor_divide"
 
     def __call__(self, a: Any, b: Any):
+        try:
+            if isinstance(promote_type(ftype(a), ftype(b)), FDTypeFloat):
+                return np.floor(np.true_divide(a, b))
+        except (AttributeError, TypeError, ValueError):
+            return np.floor_divide(a, b)
         return np.floor_divide(a, b)
 
 
