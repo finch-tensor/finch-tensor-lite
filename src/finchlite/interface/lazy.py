@@ -55,6 +55,366 @@ from finchlite.tensor.override_tensor import OverrideTensor
 from finchlite.tensor.scalar import Scalar
 
 
+def _shape_size(shape: tuple) -> int:
+    return int(np.prod(shape, dtype=np.intp)) if shape else 1
+
+
+@dataclass(frozen=True, eq=False)
+class PatternTensorFType(TensorFType):
+    _fill_value: Any
+    _pattern_value: Any
+    _element_type: FType
+    _shape_type: tuple
+    _tensor_type: type[PatternTensor]
+    _constructor_kwargs: tuple[tuple[str, Any], ...]
+
+    @property
+    def fill_value(self):
+        return self._fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return self._shape_type
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        match other:
+            case PatternTensorFType(
+                _fill_value=fill_value,
+                _pattern_value=pattern_value,
+                _element_type=element_type,
+                _shape_type=shape_type,
+                _tensor_type=tensor_type,
+                _constructor_kwargs=constructor_kwargs,
+            ):
+                return (
+                    builtins.bool(np.all(ffuncs.same(self._fill_value, fill_value)))
+                    and builtins.bool(
+                        np.all(ffuncs.same(self._pattern_value, pattern_value))
+                    )
+                    and self._element_type == element_type
+                    and self._shape_type == shape_type
+                    and self._tensor_type == tensor_type
+                    and self._constructor_kwargs == constructor_kwargs
+                )
+            case _:
+                return False
+
+    def __hash__(self):
+        return hash(
+            (
+                ffuncs.samehash(self._fill_value),
+                ffuncs.samehash(self._pattern_value),
+                self._element_type,
+                self._shape_type,
+                self._tensor_type,
+                self._constructor_kwargs,
+            )
+        )
+
+    def construct(self, shape: tuple) -> PatternTensor:
+        return self._tensor_type(
+            shape,
+            dtype=self.element_type,
+            **dict(self._constructor_kwargs),
+        )
+
+    def __call__(self, val: Any) -> PatternTensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class PatternTensor(Tensor):
+    def __init__(
+        self,
+        shape,
+        *,
+        ndim: int = 2,
+        dtype=None,
+        default_dtype=np.float64,
+        fill_value=0,
+        pattern_value=1,
+        **constructor_kwargs,
+    ):
+        if isinstance(shape, int):
+            shape = (shape,) if ndim == 1 else (shape, shape)
+        self._shape = tuple(shape)
+        if len(self._shape) != ndim:
+            raise ValueError(f"Expected a {ndim}D shape, got {self._shape}")
+        self._element_type = ftype(dtype if dtype is not None else default_dtype)
+        self._fill_value = self._element_type(fill_value)
+        self._pattern_value = self._element_type(pattern_value)
+        self._constructor_kwargs = tuple(constructor_kwargs.items())
+
+    def __getitem__(self, idxs):
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+        if len(idxs) != self.ndim:
+            raise ValueError(f"{type(self).__name__} requires one index per dimension.")
+        val = self._pattern_value if self.contains(*idxs) else self._fill_value
+        return Scalar(val, fill_value=self._fill_value)
+
+    def contains(self, *idxs) -> bool:
+        raise NotImplementedError
+
+    def item(self):
+        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+
+    def to_numpy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype.fill_value
+
+    @property
+    def element_type(self) -> FType:
+        return self.ftype.element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return self.ftype.shape_type
+
+    @property
+    def ftype(self):
+        return PatternTensorFType(
+            self._fill_value,
+            self._pattern_value,
+            self._element_type,
+            tuple(ftype(dim) for dim in self.shape),
+            type(self),
+            self._constructor_kwargs,
+        )
+
+
+class ReshapeMaskTensor(PatternTensor):
+    def __init__(self, shape, new_shape=None, *, old_shape=None, dtype=None):
+        if old_shape is None:
+            if new_shape is None:
+                raise TypeError("new_shape is required")
+            old_shape = shape
+            shape = (*tuple(old_shape), *tuple(new_shape))
+        elif new_shape is None:
+            raise TypeError("new_shape is required")
+
+        self._old_shape = tuple(old_shape)
+        self._new_shape = tuple(new_shape)
+        if _shape_size(self._old_shape) != _shape_size(self._new_shape):
+            raise ValueError(
+                f"Cannot reshape array of size {_shape_size(self._old_shape)} "
+                f"into shape {self._new_shape}"
+            )
+        self._old_ndim = len(self._old_shape)
+        super().__init__(
+            shape,
+            ndim=self._old_ndim + len(self._new_shape),
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            old_shape=self._old_shape,
+            new_shape=self._new_shape,
+        )
+
+    @staticmethod
+    def _flat_index(idxs, shape) -> int:
+        flat_index = 0
+        for idx, dim in zip(idxs, shape, strict=True):
+            flat_index = flat_index * dim + idx
+        return flat_index
+
+    def contains(self, *idxs) -> bool:
+        old_idxs = idxs[: self._old_ndim]
+        new_idxs = idxs[self._old_ndim :]
+        return self._flat_index(old_idxs, self._old_shape) == self._flat_index(
+            new_idxs,
+            self._new_shape,
+        )
+
+
+class EyeTensor(PatternTensor):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
+        self._k = k
+        super().__init__(shape, dtype=dtype, k=self._k)
+
+    def contains(self, i, j) -> bool:
+        return j - i == self._k
+
+
+class UpperTriangleTensor(PatternTensor):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
+        self._k = k
+        super().__init__(shape, dtype=dtype, k=self._k)
+
+    def contains(self, i, j) -> bool:
+        return j - i >= self._k
+
+
+class LowerTriangleTensor(PatternTensor):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
+        self._k = k
+        super().__init__(shape, dtype=dtype, k=self._k)
+
+    def contains(self, i, j) -> bool:
+        return j - i <= self._k
+
+
+class PairSumTensor(PatternTensor):
+    def __init__(self, shape, *, dtype=None):
+        super().__init__(shape, dtype=dtype)
+
+    def contains(self, i, j) -> bool:
+        return j == i * 2 or j == i * 2 + 1
+
+
+class PairCarryTensor(PatternTensor):
+    def __init__(self, shape, *, dtype=None):
+        super().__init__(shape, dtype=dtype)
+
+    def contains(self, i, j) -> bool:
+        return i > 0 and j == (i - 1) // 2
+
+
+class ReverseTensor(PatternTensor):
+    def __init__(self, shape, *, dtype=None):
+        super().__init__(shape, dtype=dtype)
+
+    def contains(self, i, j) -> bool:
+        return j == self.shape[1] - i - 1
+
+
+class RollTensor(PatternTensor):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
+        self._k = k
+        super().__init__(shape, dtype=dtype, k=self._k)
+
+    def contains(self, i, j) -> bool:
+        axis_size = self.shape[1]
+        return axis_size > 0 and j == (i - self._k) % axis_size
+
+
+class RepeatTensor(PatternTensor):
+    def __init__(self, shape, *, k: int = 0, dtype=None):
+        self._k = k
+        super().__init__(shape, dtype=dtype, k=self._k)
+
+    def contains(self, i, j) -> bool:
+        return self._k > 0 and j == i // self._k
+
+
+class OddEvenMergeSortPartnerMaskTensor(PatternTensor):
+    def __init__(self, shape, *, p: int, k: int, dtype=None):
+        self._p = p
+        self._k = k
+        super().__init__(
+            shape,
+            ndim=2,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            p=self._p,
+            k=self._k,
+        )
+
+    def _is_left(self, i) -> bool:
+        axis_size = self.shape[1]
+        offset = self._k % self._p
+        return (
+            i + self._k < axis_size
+            and i >= offset
+            and (i - offset) % (2 * self._k) < self._k
+            and i // (2 * self._p) == (i + self._k) // (2 * self._p)
+        )
+
+    def _partner_index(self, i):
+        if self._is_left(i):
+            return i + self._k
+        if i >= self._k and self._is_left(i - self._k):
+            return i - self._k
+        return i
+
+    def contains(self, i, j) -> bool:
+        return j == self._partner_index(i)
+
+
+class OddEvenMergeSortLowerMaskTensor(PatternTensor):
+    def __init__(self, shape, *, p: int, k: int, dtype=None):
+        self._p = p
+        self._k = k
+        super().__init__(
+            shape,
+            ndim=1,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            p=self._p,
+            k=self._k,
+        )
+
+    def _is_left(self, i) -> bool:
+        axis_size = self.shape[0]
+        offset = self._k % self._p
+        return (
+            i + self._k < axis_size
+            and i >= offset
+            and (i - offset) % (2 * self._k) < self._k
+            and i // (2 * self._p) == (i + self._k) // (2 * self._p)
+        )
+
+    def contains(self, i) -> bool:
+        return self._is_left(i)
+
+
+class OneHotMaskTensor(PatternTensor):
+    def __init__(self, shape, *, index: int, dtype=None):
+        self._index = operator.index(index)
+        super().__init__(
+            shape,
+            ndim=1,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            index=self._index,
+        )
+
+    def contains(self, i) -> bool:
+        return i == self._index
+
+
+class ParityMaskTensor(PatternTensor):
+    def __init__(self, shape, *, parity: int = 0, dtype=None):
+        self._parity = parity
+        super().__init__(
+            shape,
+            ndim=1,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            parity=self._parity,
+        )
+
+    def contains(self, i) -> bool:
+        return i % 2 == self._parity
+
+
 class LazyTensorFType(TensorFType):
     _fill_value: Any
     _element_type: FType
@@ -2069,714 +2429,6 @@ class FillTensor(Tensor):
             self._fill_value,
             ftype(self._fill_value),
             tuple(ftype(dim) for dim in self.shape),
-        )
-
-
-def _shape_size(shape: tuple) -> int:
-    return int(np.prod(shape, dtype=np.intp)) if shape else 1
-
-
-@dataclass(frozen=True, eq=False)
-class ReshapeMaskTensorFType(TensorFType):
-    _old_shape: tuple
-    _new_shape: tuple
-    _element_type: FType
-
-    @property
-    def fill_value(self):
-        return self._element_type(False)
-
-    @property
-    def element_type(self) -> FType:
-        return self._element_type
-
-    @property
-    def shape_type(self):
-        return tuple(ftype(dim) for dim in (*self._old_shape, *self._new_shape))
-
-    def from_numpy(self, arr):
-        raise NotImplementedError
-
-    def __eq__(self, other):
-        if not isinstance(other, ReshapeMaskTensorFType):
-            return False
-        return (
-            self._old_shape == other._old_shape
-            and self._new_shape == other._new_shape
-            and self._element_type == other._element_type
-        )
-
-    def __hash__(self):
-        return hash((self._old_shape, self._new_shape, self._element_type))
-
-    def construct(self, shape: tuple) -> ReshapeMaskTensor:
-        return ReshapeMaskTensor(
-            self._old_shape,
-            self._new_shape,
-            dtype=self.element_type,
-        )
-
-    def __call__(self, val: Any) -> ReshapeMaskTensor:
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-
-class ReshapeMaskTensor(Tensor):
-    def __init__(self, old_shape, new_shape, *, dtype=None):
-        self._old_shape = tuple(old_shape)
-        self._new_shape = tuple(new_shape)
-        if _shape_size(self._old_shape) != _shape_size(self._new_shape):
-            raise ValueError(
-                f"Cannot reshape array of size {_shape_size(self._old_shape)} "
-                f"into shape {self._new_shape}"
-            )
-        self._shape = (*self._old_shape, *self._new_shape)
-        self._old_ndim = len(self._old_shape)
-        self._element_type = ftype(dtype if dtype is not None else np.bool_)
-
-    @staticmethod
-    def _flat_index(idxs, shape) -> int:
-        flat_index = 0
-        for idx, dim in zip(idxs, shape, strict=True):
-            flat_index = flat_index * dim + idx
-        return flat_index
-
-    def _contains(self, old_idxs, new_idxs) -> bool:
-        return self._flat_index(old_idxs, self._old_shape) == self._flat_index(
-            new_idxs,
-            self._new_shape,
-        )
-
-    def __getitem__(self, idxs):
-        if not isinstance(idxs, tuple):
-            idxs = (idxs,)
-        if len(idxs) != self.ndim:
-            raise ValueError("Reshape mask tensors require one index per dimension.")
-        old_idxs = idxs[: self._old_ndim]
-        new_idxs = idxs[self._old_ndim :]
-        return Scalar(
-            self._element_type(self._contains(old_idxs, new_idxs)),
-            fill_value=self.fill_value,
-        )
-
-    def item(self):
-        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-
-    def to_numpy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
-
-    def to_scipy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def fill_value(self) -> Any:
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple[FType, ...]:
-        return self.ftype.shape_type
-
-    @property
-    def ftype(self):
-        return ReshapeMaskTensorFType(
-            self._old_shape,
-            self._new_shape,
-            self._element_type,
-        )
-
-
-@dataclass(frozen=True, eq=False)
-class MatrixPatternTensorFType(TensorFType):
-    _fill_value: Any
-    _element_type: FType
-    _shape_type: tuple
-    _tensor_type: type[MatrixPatternTensor]
-    _k: int
-
-    @property
-    def fill_value(self):
-        return self._fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self._element_type
-
-    @property
-    def shape_type(self):
-        return self._shape_type
-
-    def from_numpy(self, arr):
-        raise NotImplementedError
-
-    def __eq__(self, other):
-        if not isinstance(other, MatrixPatternTensorFType):
-            return False
-        return (
-            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
-            and self._element_type == other._element_type
-            and self._shape_type == other._shape_type
-            and self._tensor_type == other._tensor_type
-            and self._k == other._k
-        )
-
-    def __hash__(self):
-        return hash(
-            (
-                ffuncs.samehash(self._fill_value),
-                self._element_type,
-                self._shape_type,
-                self._tensor_type,
-                self._k,
-            )
-        )
-
-    def construct(self, shape: tuple) -> MatrixPatternTensor:
-        return self._tensor_type(shape, k=self._k, dtype=self.element_type)
-
-    def __call__(self, val: Any) -> MatrixPatternTensor:
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-
-class MatrixPatternTensor(Tensor):
-    def __init__(self, shape, *, k: int = 0, dtype=None):
-        if isinstance(shape, int):
-            shape = (shape, shape)
-        self._shape = tuple(shape)
-        if len(self._shape) != 2:
-            raise ValueError(f"Expected a 2D shape, got {self._shape}")
-        self._k = k
-        self._element_type = ftype(dtype if dtype is not None else np.float64)
-        self._fill_value = self._element_type(0)
-        self._one_value = self._element_type(1)
-
-    def __getitem__(self, idxs):
-        if not isinstance(idxs, tuple):
-            idxs = (idxs,)
-        if len(idxs) != 2:
-            raise ValueError("Matrix pattern tensors require two indices.")
-        val = self._one_value if self._contains(*idxs) else self._fill_value
-        return Scalar(val, fill_value=self._fill_value)
-
-    def _contains(self, i, j) -> bool:
-        raise NotImplementedError
-
-    def item(self):
-        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-
-    def to_numpy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
-
-    def to_scipy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def fill_value(self) -> Any:
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple[FType, ...]:
-        return self.ftype.shape_type
-
-    @property
-    def ftype(self):
-        return MatrixPatternTensorFType(
-            self._fill_value,
-            self._element_type,
-            tuple(ftype(dim) for dim in self.shape),
-            type(self),
-            self._k,
-        )
-
-
-class EyeTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return j - i == self._k
-
-
-class UpperTriangleTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return j - i >= self._k
-
-
-class LowerTriangleTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return j - i <= self._k
-
-
-class PairSumTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return j == i * 2 or j == i * 2 + 1
-
-
-class PairCarryTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return i > 0 and j == (i - 1) // 2
-
-
-class ReverseTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return j == self.shape[1] - i - 1
-
-
-class RollTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        axis_size = self.shape[1]
-        return axis_size > 0 and j == (i - self._k) % axis_size
-
-
-class RepeatTensor(MatrixPatternTensor):
-    def _contains(self, i, j) -> bool:
-        return self._k > 0 and j == i // self._k
-
-
-@dataclass(frozen=True, eq=False)
-class OddEvenMergeSortPartnerMaskTensorFType(TensorFType):
-    _element_type: FType
-    _shape_type: tuple
-    _p: int
-    _k: int
-
-    @property
-    def fill_value(self):
-        return self._element_type(False)
-
-    @property
-    def element_type(self) -> FType:
-        return self._element_type
-
-    @property
-    def shape_type(self):
-        return self._shape_type
-
-    def from_numpy(self, arr):
-        raise NotImplementedError
-
-    def __eq__(self, other):
-        if not isinstance(other, OddEvenMergeSortPartnerMaskTensorFType):
-            return False
-        return (
-            self._element_type == other._element_type
-            and self._shape_type == other._shape_type
-            and self._p == other._p
-            and self._k == other._k
-        )
-
-    def __hash__(self):
-        return hash((self._element_type, self._shape_type, self._p, self._k))
-
-    def construct(self, shape: tuple) -> OddEvenMergeSortPartnerMaskTensor:
-        return OddEvenMergeSortPartnerMaskTensor(
-            shape,
-            p=self._p,
-            k=self._k,
-            dtype=self.element_type,
-        )
-
-    def __call__(self, val: Any) -> OddEvenMergeSortPartnerMaskTensor:
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-
-class OddEvenMergeSortPartnerMaskTensor(Tensor):
-    def __init__(self, shape, *, p: int, k: int, dtype=None):
-        if isinstance(shape, int):
-            shape = (shape, shape)
-        self._shape = tuple(shape)
-        if len(self._shape) != 2:
-            raise ValueError(f"Expected a 2D shape, got {self._shape}")
-        self._p = p
-        self._k = k
-        self._element_type = ftype(dtype if dtype is not None else np.bool_)
-
-    def __getitem__(self, idxs):
-        if not isinstance(idxs, tuple):
-            idxs = (idxs,)
-        if len(idxs) != 2:
-            raise ValueError("Odd-even partner masks require two indices.")
-        val = idxs[1] == self._partner_index(idxs[0])
-        return Scalar(self._element_type(val), fill_value=self.fill_value)
-
-    def _is_left(self, i) -> bool:
-        axis_size = self.shape[1]
-        offset = self._k % self._p
-        return (
-            i + self._k < axis_size
-            and i >= offset
-            and (i - offset) % (2 * self._k) < self._k
-            and i // (2 * self._p) == (i + self._k) // (2 * self._p)
-        )
-
-    def _partner_index(self, i):
-        if self._is_left(i):
-            return i + self._k
-        if i >= self._k and self._is_left(i - self._k):
-            return i - self._k
-        return i
-
-    def item(self):
-        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-
-    def to_numpy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
-
-    def to_scipy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def fill_value(self) -> Any:
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple[FType, ...]:
-        return self.ftype.shape_type
-
-    @property
-    def ftype(self):
-        return OddEvenMergeSortPartnerMaskTensorFType(
-            self._element_type,
-            tuple(ftype(dim) for dim in self.shape),
-            self._p,
-            self._k,
-        )
-
-
-@dataclass(frozen=True, eq=False)
-class OddEvenMergeSortLowerMaskTensorFType(TensorFType):
-    _element_type: FType
-    _shape_type: tuple
-    _p: int
-    _k: int
-
-    @property
-    def fill_value(self):
-        return self._element_type(False)
-
-    @property
-    def element_type(self) -> FType:
-        return self._element_type
-
-    @property
-    def shape_type(self):
-        return self._shape_type
-
-    def from_numpy(self, arr):
-        raise NotImplementedError
-
-    def __eq__(self, other):
-        if not isinstance(other, OddEvenMergeSortLowerMaskTensorFType):
-            return False
-        return (
-            self._element_type == other._element_type
-            and self._shape_type == other._shape_type
-            and self._p == other._p
-            and self._k == other._k
-        )
-
-    def __hash__(self):
-        return hash((self._element_type, self._shape_type, self._p, self._k))
-
-    def construct(self, shape: tuple) -> OddEvenMergeSortLowerMaskTensor:
-        return OddEvenMergeSortLowerMaskTensor(
-            shape,
-            p=self._p,
-            k=self._k,
-            dtype=self.element_type,
-        )
-
-    def __call__(self, val: Any) -> OddEvenMergeSortLowerMaskTensor:
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-
-class OddEvenMergeSortLowerMaskTensor(Tensor):
-    def __init__(self, shape, *, p: int, k: int, dtype=None):
-        if isinstance(shape, int):
-            shape = (shape,)
-        self._shape = tuple(shape)
-        if len(self._shape) != 1:
-            raise ValueError(f"Expected a 1D shape, got {self._shape}")
-        self._p = p
-        self._k = k
-        self._element_type = ftype(dtype if dtype is not None else np.bool_)
-
-    def __getitem__(self, idxs):
-        if not isinstance(idxs, tuple):
-            idxs = (idxs,)
-        if len(idxs) != 1:
-            raise ValueError("Odd-even lower masks require one index.")
-        return Scalar(
-            self._element_type(self._is_left(idxs[0])), fill_value=self.fill_value
-        )
-
-    def _is_left(self, i) -> bool:
-        axis_size = self.shape[0]
-        offset = self._k % self._p
-        return (
-            i + self._k < axis_size
-            and i >= offset
-            and (i - offset) % (2 * self._k) < self._k
-            and i // (2 * self._p) == (i + self._k) // (2 * self._p)
-        )
-
-    def item(self):
-        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-
-    def to_numpy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
-
-    def to_scipy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def fill_value(self) -> Any:
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple[FType, ...]:
-        return self.ftype.shape_type
-
-    @property
-    def ftype(self):
-        return OddEvenMergeSortLowerMaskTensorFType(
-            self._element_type,
-            tuple(ftype(dim) for dim in self.shape),
-            self._p,
-            self._k,
-        )
-
-
-@dataclass(frozen=True, eq=False)
-class OneHotMaskTensorFType(TensorFType):
-    _element_type: FType
-    _shape_type: tuple
-    _index: int
-
-    @property
-    def fill_value(self):
-        return self._element_type(False)
-
-    @property
-    def element_type(self) -> FType:
-        return self._element_type
-
-    @property
-    def shape_type(self):
-        return self._shape_type
-
-    def from_numpy(self, arr):
-        raise NotImplementedError
-
-    def __eq__(self, other):
-        match other:
-            case OneHotMaskTensorFType(
-                _element_type=element_type,
-                _shape_type=shape_type,
-                _index=index,
-            ):
-                return (
-                    self._element_type == element_type
-                    and self._shape_type == shape_type
-                    and self._index == index
-                )
-            case _:
-                return False
-
-    def __hash__(self):
-        return hash((self._element_type, self._shape_type, self._index))
-
-    def construct(self, shape: tuple) -> OneHotMaskTensor:
-        return OneHotMaskTensor(shape, index=self._index, dtype=self.element_type)
-
-    def __call__(self, val: Any) -> OneHotMaskTensor:
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-
-class OneHotMaskTensor(Tensor):
-    def __init__(self, shape, *, index: int, dtype=None):
-        if isinstance(shape, int):
-            shape = (shape,)
-        self._shape = tuple(shape)
-        if len(self._shape) != 1:
-            raise ValueError(f"Expected a 1D shape, got {self._shape}")
-        self._index = operator.index(index)
-        self._element_type = ftype(dtype if dtype is not None else np.bool_)
-
-    def __getitem__(self, idxs):
-        if not isinstance(idxs, tuple):
-            idxs = (idxs,)
-        if len(idxs) != 1:
-            raise ValueError("One-hot mask tensors require one index.")
-        return Scalar(
-            self._element_type(idxs[0] == self._index),
-            fill_value=self.fill_value,
-        )
-
-    def item(self):
-        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-
-    def to_numpy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
-
-    def to_scipy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def fill_value(self) -> Any:
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple[FType, ...]:
-        return self.ftype.shape_type
-
-    @property
-    def ftype(self):
-        return OneHotMaskTensorFType(
-            self._element_type,
-            tuple(ftype(dim) for dim in self.shape),
-            self._index,
-        )
-
-
-@dataclass(frozen=True, eq=False)
-class ParityMaskTensorFType(TensorFType):
-    _element_type: FType
-    _shape_type: tuple
-    _parity: int
-
-    @property
-    def fill_value(self):
-        return self._element_type(False)
-
-    @property
-    def element_type(self) -> FType:
-        return self._element_type
-
-    @property
-    def shape_type(self):
-        return self._shape_type
-
-    def from_numpy(self, arr):
-        raise NotImplementedError
-
-    def __eq__(self, other):
-        if not isinstance(other, ParityMaskTensorFType):
-            return False
-        return (
-            self._element_type == other._element_type
-            and self._shape_type == other._shape_type
-            and self._parity == other._parity
-        )
-
-    def __hash__(self):
-        return hash((self._element_type, self._shape_type, self._parity))
-
-    def construct(self, shape: tuple) -> ParityMaskTensor:
-        return ParityMaskTensor(shape, parity=self._parity, dtype=self.element_type)
-
-    def __call__(self, val: Any) -> ParityMaskTensor:
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-
-class ParityMaskTensor(Tensor):
-    def __init__(self, shape, *, parity: int = 0, dtype=None):
-        if isinstance(shape, int):
-            shape = (shape,)
-        self._shape = tuple(shape)
-        if len(self._shape) != 1:
-            raise ValueError(f"Expected a 1D shape, got {self._shape}")
-        self._parity = parity
-        self._element_type = ftype(dtype if dtype is not None else np.bool_)
-
-    def __getitem__(self, idxs):
-        if not isinstance(idxs, tuple):
-            idxs = (idxs,)
-        if len(idxs) != 1:
-            raise ValueError("Parity mask tensors require one index.")
-        return Scalar(
-            self._element_type(idxs[0] % 2 == self._parity),
-            fill_value=self.fill_value,
-        )
-
-    def item(self):
-        raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-
-    def to_numpy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
-
-    def to_scipy(self):
-        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def fill_value(self) -> Any:
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self) -> FType:
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self) -> tuple[FType, ...]:
-        return self.ftype.shape_type
-
-    @property
-    def ftype(self):
-        return ParityMaskTensorFType(
-            self._element_type,
-            tuple(ftype(dim) for dim in self.shape),
-            self._parity,
         )
 
 
