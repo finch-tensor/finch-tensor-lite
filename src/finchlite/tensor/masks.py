@@ -111,8 +111,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             ctx, asm.GetAttr(tns, asm.Literal("body")), init, op, shape, pos
         )
 
-    def level_unfurl(self, ctx, stack: ntn.Fiber, ext, mode, proto, pos):
-        tns = stack
+    def level_unfurl(self, ctx, fiber: ntn.Fiber, ext, mode, proto, pos):
+        tns = fiber
 
         def child_accessor(ctx, idx):
             body_view = ntn.Fiber(

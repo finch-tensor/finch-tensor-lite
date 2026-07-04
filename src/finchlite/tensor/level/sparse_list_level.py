@@ -175,12 +175,12 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def level_unfurl(
-        self, ctx, stack: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
+        self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
-        if not isinstance(stack.type, FiberTensorFType):
-            raise TypeError(f"Expected FiberTensorFType, got: {stack.type}")
-        tns = stack
-        ft_ftype: FiberTensorFType = stack.type
+        if not isinstance(fiber.type, FiberTensorFType):
+            raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
+        tns = fiber
+        ft_ftype: FiberTensorFType = fiber.type
         lvl_asm = ctx.fiber_level(tns)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
