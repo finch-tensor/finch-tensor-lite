@@ -17,6 +17,8 @@ from finchlite.interface.lazy import (
     FillTensor,
     IndexTensor,
     ParityMaskTensor,
+    PatternTensor,
+    ReshapeMaskTensor,
 )
 from finchlite.tensor import BufferizedNDArray
 
@@ -226,6 +228,20 @@ def test_lazy_matrix_pattern_tensor_compute():
         dtype=np.int32,
     )
     np.testing.assert_array_equal(actual, np.eye(2, 3, dtype=np.int32))
+
+
+@pytest.mark.parametrize(
+    "tensor",
+    [
+        EyeTensor((2, 3)),
+        ParityMaskTensor(3),
+        ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_),
+    ],
+)
+def test_pattern_tensors_share_parent(tensor):
+    assert isinstance(tensor, PatternTensor)
+    assert isinstance(tensor, finchlite.PatternTensor)
+    assert isinstance(tensor.ftype.construct(tensor.shape), type(tensor))
 
 
 @pytest.mark.parametrize(
