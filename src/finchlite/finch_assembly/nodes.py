@@ -399,7 +399,7 @@ class BufferLoop(AssemblyTree, AssemblyStatement):
         body: The body of the loop to execute for each element.
     """
 
-    buffer: Slot
+    buffer: AssemblyExpression
     var: Variable
     body: AssemblyStatement
 

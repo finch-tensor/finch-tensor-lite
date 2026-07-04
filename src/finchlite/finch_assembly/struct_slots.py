@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import cast
 
 from finchlite.algebra import StructFType
 from finchlite.symbolic import UnvalidatedForm
@@ -195,14 +196,14 @@ class _LowerPackedStructSlotsContext:
             case asm.Break():
                 return stmt
             case expr if isinstance(expr, asm.AssemblyExpression):
-                return self.expr(expr)
+                return cast(asm.AssemblyStatement, self.expr(expr))
             case _:
                 raise NotImplementedError(f"Unrecognized assembly statement: {stmt}")
 
     def block(self, block: asm.AssemblyStatement) -> asm.AssemblyStatement:
         match block:
             case asm.Block(bodies):
-                stmts = []
+                stmts: list[asm.AssemblyStatement] = []
                 for body in bodies:
                     body_2 = self.stmt(body)
                     match body_2:

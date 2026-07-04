@@ -121,7 +121,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         pos: ntn.Variable,
     ):
         buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
-        pos_e, op_e, val_e = pos, ctx(op), ctx(val)
+        pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
                 buf,
