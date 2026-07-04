@@ -824,16 +824,16 @@ class NumbaContext(Context):
                 raise NotImplementedError(f"Unrecognized node: {node}")
 
 
-class NumbaSymbolicFType(ABC):
+class NumbaUnpackableFType(ABC):
     """
-    Abstract base class for symbolic formats in Numba. Symbolic formats must also
-    support other functions with symbolic inputs in addition to variable ones.
+    Abstract base class for unpackable formats in Numba. Unpackable formats must also
+    support other functions with unpacked inputs in addition to variable ones.
     """
 
     @abstractmethod
     def numba_unpack(self, ctx, lhs, rhs):
         """
-        Convert a value to a symbolic representation in Numba. Returns a NamedTuple
+        Convert a value to an unpacked representation in Numba. Returns a NamedTuple
         of unpacked variable names, etc. The `lhs` is the variable namespace to
         assign to.
         """
@@ -842,8 +842,8 @@ class NumbaSymbolicFType(ABC):
     @abstractmethod
     def numba_repack(self, ctx, lhs, rhs):
         """
-        Update an object based on a symbolic representation. The `rhs` is the
-        symbolic representation to update from, and `lhs` is a variable name referring
+        Update an object based on an unpacked representation. The `rhs` is the
+        unpacked representation to update from, and `lhs` is a variable name referring
         to the original object to update.
         """
         ...

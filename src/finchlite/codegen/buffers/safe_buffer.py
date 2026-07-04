@@ -1,7 +1,7 @@
 import finchlite.finch_assembly as asm
 from finchlite.algebra import ftypes
-from finchlite.codegen.c_codegen import CBufferFType, CSymbolicFType
-from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaSymbolicFType
+from finchlite.codegen.c_codegen import CBufferFType, CUnpackableFType
+from finchlite.codegen.numba_codegen import NumbaBufferFType, NumbaUnpackableFType
 from finchlite.finch_assembly import Buffer
 
 
@@ -41,7 +41,7 @@ class SafeBuffer(Buffer):
 
 
 class SafeBufferFType(
-    CBufferFType, NumbaBufferFType, CSymbolicFType, NumbaSymbolicFType
+    CBufferFType, NumbaBufferFType, CUnpackableFType, NumbaUnpackableFType
 ):
     def __init__(self, underlying_format):
         self._underlying_format = underlying_format
