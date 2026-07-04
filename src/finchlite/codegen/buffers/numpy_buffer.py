@@ -9,7 +9,7 @@ from finchlite.algebra import FType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
-from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
+from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
 
@@ -131,33 +131,29 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     def c_type(self):
         return ctypes.POINTER(CNumpyBuffer)
 
-    def c_length(self, ctx: "CContext", buf: "Stack"):
-        assert isinstance(buf.obj, CBufferFields)
-        return buf.obj.length
+    def c_length(self, ctx: "CContext", buf: CBufferFields):
+        return buf.length
 
-    def c_data(self, ctx: "CContext", buf: "Stack"):
-        assert isinstance(buf.obj, CBufferFields)
-        return buf.obj.data
+    def c_data(self, ctx: "CContext", buf: CBufferFields):
+        return buf.data
 
-    def c_load(self, ctx: "CContext", buf: "Stack", idx: "AssemblyExpression"):
-        assert isinstance(buf.obj, CBufferFields)
-        return f"({buf.obj.data})[{ctx(idx)}]"
+    def c_load(self, ctx: "CContext", buf: CBufferFields, idx: "AssemblyExpression"):
+        return f"({buf.data})[{ctx(idx)}]"
 
     def c_store(
         self,
         ctx: "CContext",
-        buf: "Stack",
+        buf: CBufferFields,
         idx: "AssemblyExpression",
         value: "AssemblyExpression",
     ):
-        assert isinstance(buf.obj, CBufferFields)
-        ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(value)};")
 
-    def c_resize(self, ctx, buf, new_len):
+    def c_resize(self, ctx, buf: CBufferFields, new_len):
         new_len = ctx(ctx.cache("len", new_len))
-        data = buf.obj.data
-        length = buf.obj.length
-        obj = buf.obj.obj
+        data = buf.data
+        length = buf.length
+        obj = buf.obj
         t = ctx.ctype_name(c_type(self.element_type))
         ctx.exec(
             f"{ctx.feed}{data} = ({t}*){obj}->resize(&{obj}->arr, {new_len});\n"
@@ -221,20 +217,20 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
             numba.types.Array(numba.from_dtype(self._dtype), 1, "C")
         )
 
-    def numba_length(self, ctx, buf):
-        arr = buf.obj.arr
+    def numba_length(self, ctx, buf: NumbaBufferFields):
+        arr = buf.arr
         return f"len({arr})"
 
-    def numba_load(self, ctx, buf, idx):
-        arr = buf.obj.arr
+    def numba_load(self, ctx, buf: NumbaBufferFields, idx):
+        arr = buf.arr
         return f"{arr}[{ctx(idx)}]"
 
-    def numba_store(self, ctx, buf, idx, val):
-        arr = buf.obj.arr
+    def numba_store(self, ctx, buf: NumbaBufferFields, idx, val=None):
+        arr = buf.arr
         ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
 
-    def numba_resize(self, ctx, buf, new_len):
-        arr = buf.obj.arr
+    def numba_resize(self, ctx, buf: NumbaBufferFields, new_len):
+        arr = buf.arr
         ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
 
     def numba_unpack(self, ctx, var_n, val):

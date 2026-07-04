@@ -126,26 +126,6 @@ class Variable(AssemblyExpression, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Stack(AssemblyExpression):
-    """
-    A logical AST expression representing an object using a set `obj` of
-    expressions, variables, and literals in the target language.
-
-    Attributes:
-        obj: The object referencing symbolic variables defined in the target language.
-        type: The type of the symbolic object.
-    """
-
-    obj: Any
-    type: FType
-
-    @property
-    def result_type(self) -> FType:
-        """Returns the type of the expression."""
-        return self.type
-
-
-@dataclass(eq=True, frozen=True)
 class Slot(AssemblyExpression):
     """
     Represents a register to a symbolic object. Using a register in an
@@ -313,7 +293,7 @@ class Load(AssemblyExpression, AssemblyTree):
         index: The index to load at.
     """
 
-    buffer: Slot | Stack
+    buffer: Slot
     index: AssemblyExpression
 
     @property
@@ -337,7 +317,7 @@ class Store(AssemblyTree, AssemblyStatement):
         value: The value to store.
     """
 
-    buffer: Slot | Stack
+    buffer: Slot
     index: AssemblyExpression
     value: AssemblyExpression
 
@@ -356,7 +336,7 @@ class Resize(AssemblyTree, AssemblyStatement):
         new_size: The new size for the buffer.
     """
 
-    buffer: Slot | Stack
+    buffer: Slot
     new_size: AssemblyExpression
 
     @property
@@ -373,7 +353,7 @@ class Length(AssemblyExpression, AssemblyTree):
         buffer: The buffer whose length is queried.
     """
 
-    buffer: Slot | Stack
+    buffer: Slot
 
     @property
     def children(self):
@@ -419,7 +399,7 @@ class BufferLoop(AssemblyTree, AssemblyStatement):
         body: The body of the loop to execute for each element.
     """
 
-    buffer: Slot | Stack
+    buffer: Slot
     var: Variable
     body: AssemblyStatement
 
@@ -769,9 +749,6 @@ class AssemblyPrinterContext(Context):
                             f"Unrecognized function type: {type(func)}"
                         )
                     self(func)
-                return None
-            case Stack(obj, type_):
-                self.exec(f"{feed}stack({self(obj)}, {str(type_)})")
                 return None
             case node:
                 raise NotImplementedError(node, "AssemblyPrinterContext")

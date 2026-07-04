@@ -81,7 +81,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         return self.body.level_lower_declare(self, ctx, tns, init, op, shape, pos)
 
-    def level_unfurl(self, ctx, stack: asm.Stack, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, stack: ntn.Stack, ext, mode, proto, pos):
         tns: FiberTensorFields = stack.obj
 
         def child_accessor(ctx, idx):

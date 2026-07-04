@@ -354,10 +354,6 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterLibrary(self, kernels)
-            case asm.Stack(val):
-                raise NotImplementedError(
-                    "AssemblyInterpreter does not support symbolic, no target language"
-                )
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"

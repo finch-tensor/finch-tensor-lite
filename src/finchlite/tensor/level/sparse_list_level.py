@@ -225,7 +225,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def level_unfurl(
-        self, ctx, stack: asm.Stack, ext, mode: ntn.AccessMode, proto, pos
+        self, ctx, stack: ntn.Stack, ext, mode: ntn.AccessMode, proto, pos
     ):
         tns: FiberTensorFields = stack.obj
         if not isinstance(stack.type, FiberTensorFType):
