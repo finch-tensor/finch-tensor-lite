@@ -175,22 +175,21 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def level_unfurl(
-        self, ctx, stack: ntn.Stack, ext, mode: ntn.AccessMode, proto, pos
+        self, ctx, stack: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
-        tns = stack.obj
         if not isinstance(stack.type, FiberTensorFType):
             raise TypeError(f"Expected FiberTensorFType, got: {stack.type}")
+        tns = stack
         ft_ftype: FiberTensorFType = stack.type
-        lvl_asm = tns.get("lvl")
+        lvl_asm = ctx.fiber_level(tns)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
-        next_lvl = asm.GetAttr(lvl_asm, asm.Literal("lvl"))
 
         q = asm.Variable(ctx.freshen("q"), self.position_type)
         q_stop = asm.Variable(ctx.freshen("q_stop"), self.position_type)
         i_stop = asm.Variable(ctx.freshen("i_stop"), self.position_type)
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
-        pos = tns.get("pos")
+        pos = tns.pos
         scalar = Scalar(self.fill_value, self.fill_value)
 
         tmp_locals = locals()
@@ -227,13 +226,12 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             ctx.exec(asm.Assign(pos_2, q))
             child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
             return lplt.Leaf(
-                lambda ctx: ntn.Stack(
-                    tns.with_attrs(
-                        type_=child_type,
-                        attrs={"lvl": next_lvl, "pos": pos_2},
-                        metadata={"visited_idxs": (*tns.meta("visited_idxs", ()), idx)},
-                    ),
+                lambda ctx: ntn.Fiber(
+                    tns.root,
+                    ntn.Child(tns.lvl),
+                    pos_2,
                     child_type,
+                    (*tns.idxs, idx),
                 )
             )
 

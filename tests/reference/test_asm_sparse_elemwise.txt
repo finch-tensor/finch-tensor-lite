@@ -19,8 +19,8 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
         store(slot(#_A_4#10_val_slot, np_buf_t(float64)), i, 0.0)
     for #i_7#13 in range(0, #A_10_dim_0#8):
         #i_7#13__pos: finchlite.int64 = add(0, mul(#_A_4#10.strides.element_0, #i_7#13))
-        #i_7#13__pos_2: finchlite.int64 = add(#_A_9#4.pos, mul(#_A_9#4.lvl.stride, #i_7#13))
-        #i_7#13__pos_3: finchlite.int64 = add(#_A_10#7.pos, mul(#_A_10#7.lvl.stride, #i_7#13))
+        #i_7#13__pos_2: finchlite.int64 = add(0, mul(#_A_9#4.lvl.stride, #i_7#13))
+        #i_7#13__pos_3: finchlite.int64 = add(0, mul(#_A_10#7.lvl.stride, #i_7#13))
         q: finchlite.int64 = load(slot(#_A_9#4_lvl_lvl_ptr_slot, np_buf_t(int64)), #i_7#13__pos_2)
         q_stop: finchlite.int64 = load(slot(#_A_9#4_lvl_lvl_ptr_slot, np_buf_t(int64)), add(#i_7#13__pos_2, 1))
         if lt(q, q_stop):

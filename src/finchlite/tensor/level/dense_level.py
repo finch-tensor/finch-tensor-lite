@@ -156,16 +156,15 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(
         self,
         ctx: AssemblyContext,
-        stack: ntn.Stack,
+        stack: ntn.Fiber,
         ext: SymbolicExtent,
         mode,
         proto,
         pos: asm.AssemblyExpression,
     ):
-        tns = stack.obj
+        tns = stack
         ft_ftype: FiberTensorFType = stack.type
-        lvl = tns.get("lvl")
-        next_lvl = asm.GetAttr(lvl, asm.Literal("lvl"))
+        lvl = ctx.fiber_level(tns)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             if idx.type_ is None:
@@ -194,13 +193,12 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                 )
             )
             child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
-            return ntn.Stack(
-                tns.with_attrs(
-                    type_=child_type,
-                    attrs={"lvl": next_lvl, "pos": pos_2},
-                    metadata={"visited_idxs": (*tns.meta("visited_idxs", ()), idx)},
-                ),
+            return ntn.Fiber(
+                tns.root,
+                ntn.Child(tns.lvl),
+                pos_2,
                 child_type,
+                (*tns.idxs, idx),
             )
 
         return lplt.Lookup(

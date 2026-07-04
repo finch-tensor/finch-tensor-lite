@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Any, cast
 
 import numpy as np
@@ -299,13 +300,13 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
-            obj.obj.get("shape"),
+            asm.GetAttr(obj.root, asm.Literal("shape")),
             asm.Literal(f"element_{r}"),
         )
 
-    def lower_declare(self, ctx, tns: ntn.Stack, init, op, shape):
+    def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
         i_var = asm.Variable("i", self.buf_t.length_type)
-        buf = tns.obj.get("val")
+        buf = asm.GetAttr(tns.root, asm.Literal("val"))
         body = asm.Store(
             buf,
             i_var,
@@ -314,7 +315,8 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         ctx.exec(
             asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body)
         )
-        tns.obj.metadata["dirty_bit"] = True
+        if isinstance(tns.root, asm.Slot):
+            ctx.slots[tns.root.name] = replace(tns, dirty=True)
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -329,16 +331,15 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             op = mode.op
         tns = ctx.resolve(tns)
         acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf_t.length_type, op)
-        view = tns.obj.with_attrs(
-            type_=acc_t,
-            attrs={
-                "tns": tns.obj,
-                "nind": 0,
-                "pos": asm.Literal(self.buf_t.length_type(0)),
-                "op": op,
-            },
+        view = ntn.Fiber(
+            tns.root,
+            tns.lvl,
+            asm.Literal(self.buf_t.length_type(0)),
+            acc_t,
+            tns.idxs,
+            tns.dirty,
         )
-        return acc_t.unfurl(ctx, ntn.Stack(view, acc_t), ext, mode, proto)
+        return acc_t.unfurl(ctx, view, ext, mode, proto)
 
     def reshape(self, arr, new_shape: tuple):
         new_shape = tuple(np.intp(s) for s in new_shape)
@@ -509,9 +510,8 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return self.tns.element_type
 
     def lower_dim(self, ctx, obj, r):
-        root = obj.obj.get("tns")
         return asm.GetAttr(
-            root.get("shape"),
+            asm.GetAttr(obj.root, asm.Literal("shape")),
             asm.Literal(f"element_{self.nind + r}"),
         )
 
@@ -531,25 +531,25 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         )
 
     def lower_unwrap(self, ctx, tns):
-        root = tns.obj.get("tns")
-        return asm.Load(root.get("val"), tns.obj.get("pos"))
+        return asm.Load(
+            asm.GetAttr(tns.root, asm.Literal("val")),
+            tns.pos,
+        )
 
     def lower_increment(
         self,
         ctx: AssemblyContext,
-        tns: ntn.Stack,
+        tns: ntn.Fiber,
         op: ntn.Literal,
         val: ntn.NotationExpression,
     ):
-        obj = tns.obj
-        root = obj.get("tns")
-        buf = root.get("val")
-        op_e, pos_e, val_e = ctx(op), obj.get("pos"), ctx(val)
+        buf = asm.GetAttr(tns.root, asm.Literal("val"))
+        op_e, pos_e, val_e = ctx(op), tns.pos, ctx(val)
         increment_call = asm.Call(
             op_e,
             (asm.Load(buf, pos_e), val_e),
         )
-        if root.meta("dirty_bit", False) and op.val is ffuncs.overwrite:
+        if tns.dirty and op.val is ffuncs.overwrite:
             increment_call = asm.Call(
                 asm.Literal(ffuncs.init_write(tns.type.fill_value)),
                 (asm.Load(buf, pos_e), increment_call),
@@ -560,19 +560,18 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def unfurl(self, ctx: AssemblyContext, tns, ext, mode, proto):
         def child_accessor(ctx, idx):
             pos_2 = asm.Variable(ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.pos)
-            root = tns.obj.get("tns")
             ctx.exec(
                 asm.Assign(
                     pos_2,
                     asm.Call(
                         asm.Literal(ffuncs.add),
                         (
-                            tns.obj.get("pos"),
+                            tns.pos,
                             asm.Call(
                                 asm.Literal(ffuncs.mul),
                                 (
                                     asm.GetAttr(
-                                        root.get("strides"),
+                                        asm.GetAttr(tns.root, asm.Literal("strides")),
                                         asm.Literal(f"element_{self.nind}"),
                                     ),
                                     asm.Variable(idx.name, idx.type_),
@@ -585,17 +584,13 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             child_type = BufferizedNDArrayAccessorFType(
                 self.tns, self.nind + 1, self.pos, self.op
             )
-            return ntn.Stack(
-                tns.obj.with_attrs(
-                    type_=child_type,
-                    attrs={
-                        "tns": root,
-                        "nind": self.nind + 1,
-                        "pos": pos_2,
-                        "op": self.op,
-                    },
-                ),
+            return ntn.Fiber(
+                tns.root,
+                tns.lvl,
+                pos_2,
                 child_type,
+                tns.idxs,
+                tns.dirty,
             )
 
         return lplt.Lookup(

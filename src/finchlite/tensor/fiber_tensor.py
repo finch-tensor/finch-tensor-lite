@@ -339,36 +339,31 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns)
-        return self.lvl_t.level_unfurl(
-            ctx, tns, ext, mode, proto, tns.obj.get("pos")
-        )
+        return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, tns.pos)
 
     def lower_freeze(self, ctx, tns, op):
         return self.lvl_t.level_lower_freeze(
-            ctx, tns.obj.get("lvl"), op, tns.obj.get("pos")
+            ctx, ctx.fiber_level(tns), op, tns.pos
         )
 
     def lower_thaw(self, ctx, tns, op):
         return self.lvl_t.level_lower_thaw(
-            ctx, tns.obj.get("lvl"), op, tns.obj.get("pos")
+            ctx, ctx.fiber_level(tns), op, tns.pos
         )
 
     def lower_unwrap(self, ctx, tns):
-        return self.lvl_t.level_lower_unwrap(ctx, tns.obj, tns.obj.get("pos"))
+        return self.lvl_t.level_lower_unwrap(ctx, tns, tns.pos)
 
     def lower_increment(self, ctx, tns, op, val):
-        return self.lvl_t.level_lower_increment(
-            ctx, tns.obj, op, val, tns.obj.get("pos")
-        )
+        return self.lvl_t.level_lower_increment(ctx, tns, op, val, tns.pos)
 
     def lower_declare(self, ctx, tns, init, op, shape):
-        tns.obj.metadata["dirty_bit"] = True
         return self.lvl_t.level_lower_declare(
-            ctx, tns.obj.get("lvl"), init, op, shape, tns.obj.get("pos")
+            ctx, ctx.fiber_level(tns), init, op, shape, tns.pos
         )
 
     def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, obj.obj.get("lvl"), r)
+        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), r)
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args

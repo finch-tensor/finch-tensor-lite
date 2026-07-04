@@ -350,7 +350,7 @@ class RunPass(LoopletPass):
                     if j == idx and isinstance(tns, Run):
                         return ntn.Access(
                             Leaf(
-                                lambda ctx: ntn.Stack(
+                                lambda ctx: ntn.Value(
                                     asm.Literal(tns.body), tns.body.ftype
                                 )
                             ),

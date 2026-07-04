@@ -540,10 +540,6 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                                 f"Unrecognized function definition: {func}"
                             )
                 return NotationInterpreterLibrary(self, kernels)
-            case ntn.Stack(val):
-                raise NotImplementedError(
-                    "NotationInterpreter does not support stacks."
-                )
             case _:
                 raise NotImplementedError(
                     f"Unrecognized notation node type: {type(prgm)}"

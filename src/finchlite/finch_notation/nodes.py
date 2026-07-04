@@ -386,23 +386,44 @@ class Assign(NotationTree, NotationStatement):
         return [self.lhs, self.rhs]
 
 
+class Cursor(NotationNode):
+    """
+    A cursor path into a tensor's level tree.
+    """
+
+
 @dataclass(eq=True, frozen=True)
-class Stack(NotationExpression):
+class Root(Cursor):
     """
-    A logical AST expression representing an object using a set `obj` of
-    expressions, variables, and literals in the target language.
-
-    Attributes:
-        obj: The object referencing symbolic variables defined in the target language.
-        type: The type of the symbolic object.
+    The root level of a fiber tensor.
     """
 
-    obj: Any
+
+@dataclass(eq=True, frozen=True)
+class Child(Cursor):
+    """
+    A child level reached from another cursor path.
+    """
+
+    parent: Cursor
+    attr: str = "lvl"
+
+
+@dataclass(eq=True, frozen=True)
+class Fiber(NotationExpression):
+    """
+    A lowering cursor for fiber-tree access.
+    """
+
+    root: Any
+    lvl: Cursor
+    pos: Any
     type: Any
+    idxs: tuple[Any, ...] = ()
+    dirty: bool = False
 
     @property
     def result_type(self):
-        """Returns the type of the expression."""
         return self.type
 
 
@@ -651,8 +672,14 @@ class NotationPrinterContext(Context):
                 return str(name)
             case Slot(name, _):
                 return str(name)
-            case Stack(obj, _):
-                return str(obj)
+            case Root():
+                return "Root"
+            case Child(parent, "lvl"):
+                return f"Child({self(parent)})"
+            case Child(parent, attr):
+                return f"Child({self(parent)}, {attr})"
+            case Fiber(root, lvl, pos, _):
+                return f"fiber({root}, {self(lvl)}, {pos})"
             case Call(f, args):
                 return f"{self(f)}({', '.join(self(arg) for arg in args)})"
             case Unwrap(tns):

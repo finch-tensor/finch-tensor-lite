@@ -850,9 +850,9 @@ class CContext(Context):
                 )
 
 
-class CStackFType(ABC):
+class CSymbolicFType(ABC):
     """
-    Abstract base class for symbolic formats in C. Stack formats must also
+    Abstract base class for symbolic formats in C. Symbolic formats must also
     support other functions with symbolic inputs in addition to variable ones.
     """
 

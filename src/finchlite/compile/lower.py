@@ -153,12 +153,6 @@ class _Dimension(FinchOperator, NumbaNAryOperator):
 dimension = _Dimension()
 
 
-@dataclass(frozen=True)
-class ExtentFields:
-    start: Any
-    end: Any
-
-
 class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
     """
     Exception raised during Finch compilation.
@@ -169,54 +163,6 @@ class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
         super().__init__(f"{message}:\n{node}")
         self.message = message
         self.node = node
-
-
-@dataclass(eq=False)
-class AssemblyStructView:
-    expr: asm.AssemblyExpression
-    type: FType
-    attrs: dict[str, Any] | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self):
-        if self.attrs is None:
-            self.attrs = {}
-        if self.metadata is None:
-            self.metadata = {}
-
-    @property
-    def result_type(self):
-        return self.type
-
-    def get(self, attr: str):
-        assert self.attrs is not None
-        if attr in self.attrs:
-            return self.attrs[attr]
-        return asm.GetAttr(self.expr, asm.Literal(attr))
-
-    def meta(self, attr: str, default=None):
-        assert self.metadata is not None
-        return self.metadata.get(attr, default)
-
-    def with_attrs(
-        self,
-        *,
-        type_: FType | None = None,
-        attrs: dict[str, Any] | None = None,
-        metadata: dict[str, Any] | None = None,
-    ):
-        next_attrs = dict(self.attrs or {})
-        next_metadata = dict(self.metadata or {})
-        if attrs:
-            next_attrs.update(attrs)
-        if metadata:
-            next_metadata.update(metadata)
-        return AssemblyStructView(
-            self.expr,
-            self.type if type_ is None else type_,
-            next_attrs,
-            next_metadata,
-        )
 
 
 @dataclass(frozen=True)
@@ -287,10 +233,6 @@ class ExtentFType(ImmutableStructFType):
 
     def __repr__(self):
         return f"ExtentFType(start={self.start_t}, end={self.end_t})"
-
-    @classmethod
-    def stack(cls, ext: Extent):
-        return ntn.Stack(ExtentFields(ext.start, ext.end), ext.ftype)
 
     @property
     def struct_name(self):
@@ -429,6 +371,37 @@ class AssemblyContext(Context):
         self.types = types
         self.func_state = func_state
 
+    def fiber_level(self, fiber: ntn.Fiber):
+        def descend(root, cursor):
+            match cursor:
+                case ntn.Root():
+                    return asm.GetAttr(root, asm.Literal("lvl"))
+                case ntn.Child(parent, attr):
+                    return asm.GetAttr(descend(root, parent), asm.Literal(attr))
+                case _:
+                    raise TypeError(f"Unrecognized fiber cursor: {cursor}")
+
+        return descend(fiber.root, fiber.lvl)
+
+    @staticmethod
+    def _slot_expr(slot):
+        match slot:
+            case ntn.Fiber(root, _, _, _):
+                return root
+            case _:
+                raise TypeError(f"Unrecognized slot state: {slot}")
+
+    @staticmethod
+    def _slot_cursor(slot, type_):
+        fields = dict(type_.struct_fields)
+        if "pos" in fields:
+            pos_t = fields["pos"]
+        elif "val" in fields:
+            pos_t = fields["val"].length_type
+        else:
+            raise TypeError(f"Cannot create an assembly cursor for {type_}")
+        return ntn.Fiber(slot, ntn.Root(), asm.Literal(pos_t(0)), type_)
+
     def block(self):
         """
         Create a new block. Preambles and epilogues will stay within this block.
@@ -473,12 +446,16 @@ class AssemblyContext(Context):
                             f"Slot '{var_n}' is declared as type {view.result_type}, "
                             f"but used as type {var_t}."
                         )
-                    return ntn.Stack(view, var_t)
+                    if isinstance(view, ntn.Fiber):
+                        return view
+                    raise TypeError(f"Unrecognized slot state: {view}")
                 raise KeyError(f"Slot {var_n} not found in context")
-            case ntn.Stack(_, _):
+            case ntn.Fiber(_, _, _, _):
+                return node
+            case ntn.Value(_, _):
                 return node
             case _:
-                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+                raise ValueError(f"Expected Slot, Fiber, or Value, got: {type(node)}")
 
     def _freeze_tensor(self, tns_var: str, op: ntn.Literal | None) -> None:
         if op is None:
@@ -546,8 +523,10 @@ class AssemblyContext(Context):
                             f"but used as type {var_t}."
                         )
                 if var_n in self.slots:
-                    return self.slots[var_n].expr
+                    return self._slot_expr(self.slots[var_n])
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
+            case ntn.Fiber(root, _, _, _):
+                return root
             case ntn.Unpack(ntn.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:
@@ -565,7 +544,7 @@ class AssemblyContext(Context):
                 self.exec(asm.Unpack(slot, val_code))
                 self.types[var_n] = var_t
                 self._freeze_tensor(var_n, op=None)
-                self.slots[var_n] = AssemblyStructView(slot, var_t)
+                self.slots[var_n] = self._slot_cursor(slot, var_t)
                 return None
             case ntn.Repack(ntn.Slot(var_n, var_t), _):
                 if var_n not in self.slots or var_n not in self.types:

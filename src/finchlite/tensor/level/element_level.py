@@ -102,18 +102,14 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    @staticmethod
-    def _get_buf(lvl):
-        return asm.GetAttr(lvl, asm.Literal("val"))
-
     def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
-        buf = self._get_buf(lvl)
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(buf, i_var, asm.Literal(init.val))
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
     def level_lower_unwrap(self, ctx, obj, pos):
-        buf = self._get_buf(obj.get("lvl"))
+        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
         return asm.Load(buf, pos)
 
     def level_lower_increment(
@@ -124,8 +120,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         val: ntn.NotationExpression,
         pos: ntn.Variable,
     ):
-        buf = self._get_buf(obj.get("lvl"))
-        pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
+        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
+        pos_e, op_e, val_e = pos, ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
                 buf,
@@ -135,10 +131,10 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
-        return self._get_buf(lvl)
+        return asm.GetAttr(lvl, asm.Literal("val"))
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
-        return self._get_buf(lvl)
+        return asm.GetAttr(lvl, asm.Literal("val"))
 
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")

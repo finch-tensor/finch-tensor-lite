@@ -824,9 +824,9 @@ class NumbaContext(Context):
                 raise NotImplementedError(f"Unrecognized node: {node}")
 
 
-class NumbaStackFType(ABC):
+class NumbaSymbolicFType(ABC):
     """
-    Abstract base class for symbolic formats in Numba. Stack formats must also
+    Abstract base class for symbolic formats in Numba. Symbolic formats must also
     support other functions with symbolic inputs in addition to variable ones.
     """
 
