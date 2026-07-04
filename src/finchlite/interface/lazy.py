@@ -284,10 +284,16 @@ class LazyTensor(OverrideTensor):
         )
 
     def to_numpy(self):
-        return compute(self).to_numpy()
+        raise ValueError(
+            "Cannot convert LazyTensor to Python scalar. "
+            "Use compute() to evaluate it first."
+        )
 
     def to_scipy(self):
-        return compute(self).to_scipy()
+        raise ValueError(
+            "Cannot convert LazyTensor to Python scalar. "
+            "Use compute() to evaluate it first."
+        )
 
     # raise ValueError for unsupported operations according to the data-apis spec.
     # NOT tested, since this isn't necessary as it will throw an error anyways.
@@ -395,10 +401,7 @@ def asarray(
             pass
         return obj
 
-    if isinstance(obj, np.ndarray):
-        out = format.from_numpy(obj)
-    else:
-        out = format(obj)
+    out = format.from_numpy(obj) if isinstance(obj, np.ndarray) else format(obj)
     return out.to_device(device) if explicit_device else out
 
 

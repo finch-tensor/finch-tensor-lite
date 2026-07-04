@@ -456,7 +456,7 @@ def inv(x, /):
         return lazy.asarray(
             to_numpy(scipy_sparse_linalg.inv(to_scipy(lazy.asarray(x))))
         )
-    except Exception:
+    except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
@@ -507,7 +507,7 @@ def det(x, /):
         diag_u = lu.U.diagonal()
         swap_sign = (-1) ** (_min_perm_swaps(lu.perm_r) + _min_perm_swaps(lu.perm_c))
         return lazy.asarray(np.asarray(swap_sign * diag_u.prod()))
-    except Exception:
+    except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.asarray(np.linalg.det(x)))
@@ -517,7 +517,7 @@ def lu(x, /, *, permute_l=False, p_indices=False):
     x = _warn_compute(x, "lu")
     try:
         return scipy_sparse_linalg.splu(to_scipy(lazy.asarray(x)).tocsc())
-    except Exception:
+    except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))
     return tuple(
@@ -552,7 +552,7 @@ def eigh(x, /, *, k=None, rtol=None, atol=None):
                 to_scipy(lazy.asarray(x)), **kwargs
             )
             return EighResult(lazy.asarray(eigenvalues), lazy.asarray(eigenvectors))
-        except Exception:
+        except NotImplementedError:
             pass
     if rtol is not None or atol is not None:
         warnings.warn(
@@ -591,7 +591,7 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
             return lazy.asarray(
                 scipy_sparse_linalg.eigsh(to_scipy(lazy.asarray(x)), **kwargs)
             )
-        except Exception:
+        except NotImplementedError:
             pass
     if rtol is not None or atol is not None:
         warnings.warn(
@@ -663,7 +663,7 @@ def solve(x1, x2, /):
         return lazy.asarray(
             scipy_sparse_linalg.spsolve(to_scipy(lazy.asarray(x1)), x2_np)
         )
-    except Exception:
+    except NotImplementedError:
         pass
     x1 = to_numpy(lazy.asarray(x1))
     x2 = to_numpy(lazy.asarray(x2))
@@ -694,7 +694,7 @@ def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
                 kwargs["tol"] = tol
             u, s, vh = scipy_sparse_linalg.svds(to_scipy(lazy.asarray(x)), **kwargs)
             return SVDResult(lazy.asarray(u), lazy.asarray(s), lazy.asarray(vh))
-        except Exception:
+        except NotImplementedError:
             pass
     if rtol is not None or atol is not None:
         warnings.warn(
@@ -733,7 +733,7 @@ def svdvals(x, /, *, k=None, rtol=None, atol=None):
             return lazy.asarray(
                 scipy_sparse_linalg.svds(to_scipy(lazy.asarray(x)), **kwargs)
             )
-        except Exception:
+        except NotImplementedError:
             pass
     if rtol is not None or atol is not None:
         warnings.warn(
@@ -754,7 +754,7 @@ def fft(x, /, *, n=None, axis=-1, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.fft(x, n=n, axis=axis, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.fft(x, n=n, axis=axis, norm=norm))
 
 
@@ -763,7 +763,7 @@ def ifft(x, /, *, n=None, axis=-1, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.ifft(x, n=n, axis=axis, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.ifft(x, n=n, axis=axis, norm=norm))
 
 
@@ -772,7 +772,7 @@ def fftn(x, /, *, s=None, axes=None, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.fftn(x, s=s, axes=axes, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.fftn(x, s=s, axes=axes, norm=norm))
 
 
@@ -781,7 +781,7 @@ def ifftn(x, /, *, s=None, axes=None, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.ifftn(x, s=s, axes=axes, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.ifftn(x, s=s, axes=axes, norm=norm))
 
 
@@ -790,7 +790,7 @@ def rfft(x, /, *, n=None, axis=-1, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.rfft(x, n=n, axis=axis, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.rfft(x, n=n, axis=axis, norm=norm))
 
 
@@ -799,7 +799,7 @@ def irfft(x, /, *, n=None, axis=-1, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.irfft(x, n=n, axis=axis, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.irfft(x, n=n, axis=axis, norm=norm))
 
 
@@ -808,7 +808,7 @@ def rfftn(x, /, *, s=None, axes=None, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.rfftn(x, s=s, axes=axes, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.rfftn(x, s=s, axes=axes, norm=norm))
 
 
@@ -817,7 +817,7 @@ def irfftn(x, /, *, s=None, axes=None, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.irfftn(x, s=s, axes=axes, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.irfftn(x, s=s, axes=axes, norm=norm))
 
 
@@ -826,7 +826,7 @@ def hfft(x, /, *, n=None, axis=-1, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.hfft(x, n=n, axis=axis, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.hfft(x, n=n, axis=axis, norm=norm))
 
 
@@ -835,7 +835,7 @@ def ihfft(x, /, *, n=None, axis=-1, norm=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.ihfft(x, n=n, axis=axis, norm=norm))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.ihfft(x, n=n, axis=axis, norm=norm))
 
 
@@ -844,7 +844,7 @@ def fftshift(x, /, *, axes=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.fftshift(x, axes=axes))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.fftshift(x, axes=axes))
 
 
@@ -853,14 +853,14 @@ def ifftshift(x, /, *, axes=None):
     x = to_numpy(lazy.asarray(x))
     try:
         return lazy.asarray(scipy_fft.ifftshift(x, axes=axes))
-    except Exception:
+    except NotImplementedError:
         return lazy.asarray(np.fft.ifftshift(x, axes=axes))
 
 
 def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
     try:
         result = scipy_fft.fftfreq(n, d=d)
-    except Exception:
+    except NotImplementedError:
         result = np.fft.fftfreq(n, d=d)
     if dtype is not None:
         result = result.astype(lazy._np_dtype(dtype))
@@ -870,7 +870,7 @@ def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
 def rfftfreq(n, /, *, d=1.0, dtype=None, device=None):
     try:
         result = scipy_fft.rfftfreq(n, d=d)
-    except Exception:
+    except NotImplementedError:
         result = np.fft.rfftfreq(n, d=d)
     if dtype is not None:
         result = result.astype(lazy._np_dtype(dtype))
@@ -889,7 +889,7 @@ def matrix_power(x, n, /):
         return lazy.asarray(
             to_numpy(scipy_sparse_linalg.matrix_power(to_scipy(lazy.asarray(x)), n))
         )
-    except Exception:
+    except NotImplementedError:
         pass
     return compute(lazy.matrix_power(x, n))
 
@@ -910,7 +910,7 @@ def matrix_norm(x, /, *, keepdims=False, ord="fro"):
         if keepdims:
             result = np.reshape(result, (1, 1))
         return lazy.asarray(np.asarray(result))
-    except Exception:
+    except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))
     matrix_norm_fn = getattr(np.linalg, "matrix_norm", None)

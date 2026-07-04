@@ -1,5 +1,6 @@
 import builtins
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
