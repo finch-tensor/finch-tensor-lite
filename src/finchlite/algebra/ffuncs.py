@@ -13,6 +13,7 @@ from .algebra import (
 from .ftypes import (
     FDType,
     FDTypeBoolean,
+    FDTypeComplex,
     FDTypeFloat,
     FDTypeInteger,
     FDTypeOrdered,
@@ -158,11 +159,9 @@ class _FloorDiv(BinaryFinchOperator):
         a_type = ftype(a)
         b_type = ftype(b)
         assert isinstance(a_type, FDType) and isinstance(b_type, FDType)
-        try:
-            if isinstance(promote_type(a_type, b_type), FDTypeFloat):
-                return np.floor(np.true_divide(a, b))
-        except (AttributeError, TypeError, ValueError):
-            return np.floor_divide(a, b)
+        dtype = promote_type(a_type, b_type)
+        if isinstance(dtype, FDTypeFloat) and not isinstance(dtype, FDTypeComplex):
+            return np.floor(np.true_divide(a, b))
         return np.floor_divide(a, b)
 
 
