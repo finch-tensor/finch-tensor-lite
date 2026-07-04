@@ -969,18 +969,53 @@ def ftype(x) -> FType:
         return x
     if isinstance(x, FTyped):
         return x.ftype
+    dtype: Any = None
     if isinstance(x, np.dtype):
         if x.fields is not None:
             assert x.names is not None
             return TupleFType.from_tuple(
                 tuple(ftype(x.fields[name][0]) for name in x.names)
             )
-        x = x.type
-    if isinstance(x, np.void) and x.dtype.fields is not None:
+        dtype = x
+    elif isinstance(x, np.void) and x.dtype.fields is not None:
         assert x.dtype.names is not None
         return TupleFType.from_tuple(
             tuple(ftype(x.dtype.fields[name][0]) for name in x.dtype.names)
         )
+    elif isinstance(x, np.generic):
+        dtype = x.dtype
+    elif isinstance(x, type) and issubclass(x, np.generic):
+        dtype = np.dtype(x)
+    if dtype is not None:
+        if dtype == np.dtype(np.bool_):
+            return bool
+        if dtype == np.dtype(np.int8):
+            return int8
+        if dtype == np.dtype(np.int16):
+            return int16
+        if dtype == np.dtype(np.int32):
+            return int32
+        if dtype == np.dtype(np.int64):
+            return int64
+        if dtype == np.dtype(np.uint8):
+            return uint8
+        if dtype == np.dtype(np.uint16):
+            return uint16
+        if dtype == np.dtype(np.uint32):
+            return uint32
+        if dtype == np.dtype(np.uint64):
+            return uint64
+        if dtype == np.dtype(np.float16):
+            return float16
+        if dtype == np.dtype(np.float32):
+            return float32
+        if dtype == np.dtype(np.float64):
+            return float64
+        if dtype == np.dtype(np.complex64):
+            return complex64
+        if dtype == np.dtype(np.complex128):
+            return complex128
+        raise NotImplementedError
     if type(x) is builtins.bool or x is builtins.bool:
         return bool_
     if type(x) is builtins.int or x is builtins.int:
@@ -989,32 +1024,6 @@ def ftype(x) -> FType:
         return float_
     if type(x) is builtins.complex or x is builtins.complex:
         return complex_
-    if type(x) is np.bool_ or x is np.bool_:
-        return bool
-    if type(x) is np.int8 or x is np.int8:
-        return int8
-    if type(x) is np.int16 or x is np.int16:
-        return int16
-    if type(x) is np.int32 or x is np.int32:
-        return int32
-    if type(x) is np.int64 or x is np.int64:
-        return int64
-    if type(x) is np.uint8 or x is np.uint8:
-        return uint8
-    if type(x) is np.uint16 or x is np.uint16:
-        return uint16
-    if type(x) is np.uint32 or x is np.uint32:
-        return uint32
-    if type(x) is np.uint64 or x is np.uint64:
-        return uint64
-    if type(x) is np.float32 or x is np.float32:
-        return float32
-    if type(x) is np.float64 or x is np.float64:
-        return float64
-    if type(x) is np.complex64 or x is np.complex64:
-        return complex64
-    if type(x) is np.complex128 or x is np.complex128:
-        return complex128
     if type(x) is builtins.str or x is builtins.str:
         return str_
     if x is None:

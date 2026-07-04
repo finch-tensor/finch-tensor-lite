@@ -175,6 +175,46 @@ def test_python_scalar_promotion_uses_weak_bottom():
     )
 
 
+def test_ftype_recognizes_numpy_dtype_aliases():
+    int_long = finchlite.int32 if np.dtype(np.long) == np.dtype(np.int32) else finchlite.int64
+    uint_long = (
+        finchlite.uint32 if np.dtype(np.ulong) == np.dtype(np.uint32) else finchlite.uint64
+    )
+    uintp = finchlite.uint32 if np.uintp == np.uint32 else finchlite.uint64
+    cases = [
+        (np.long, int_long),
+        (np.ulong, uint_long),
+        (np.intp, finchlite.intp),
+        (np.uintp, uintp),
+        (np.longlong, finchlite.int64),
+        (np.ulonglong, finchlite.uint64),
+        (np.float16, finchlite.float16),
+    ]
+
+    for np_type, finch_type in cases:
+        assert finchlite.ftype(np_type) == finch_type
+        assert finchlite.ftype(np_type(1)) == finch_type
+        assert finchlite.ftype(np.dtype(np_type)) == finch_type
+
+
+def test_floor_divide_return_type_handles_all_integer_dtypes():
+    dtypes = [
+        finchlite.bool,
+        finchlite.int8,
+        finchlite.int16,
+        finchlite.int32,
+        finchlite.int64,
+        finchlite.uint8,
+        finchlite.uint16,
+        finchlite.uint32,
+        finchlite.uint64,
+    ]
+
+    for x1 in dtypes:
+        for x2 in dtypes:
+            assert isinstance(ffuncs.floordiv.return_type(x1, x2), FDType)
+
+
 def test_same_ffunc():
     assert ffuncs.same(1, 1)
     assert not ffuncs.same(1, 2)
