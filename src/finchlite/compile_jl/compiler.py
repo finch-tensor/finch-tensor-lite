@@ -7,18 +7,8 @@ from finchlite.algebra.ffuncs import make_tuple, overwrite
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
+from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
-from .tensor import FinchJLTensor
-
-
-def _scalar_to_jl(val):
-    # Fallback for finchlite's plain Scalar (raw Python values that never
-    # went through our tensor system). Build a real rank-0 Finch tensor so
-    # the generated @finch code can access it via tns[] syntax.
-    if isinstance(val, np.generic):
-        val = val.item()
-    buf = np.asarray([val])
-    return jl.Tensor(jl.ElementLevel(buf.item(), buf))
 
 
 # Single source of truth for Python ffunc name → Julia operator/function name.
@@ -109,19 +99,16 @@ class FinchJLKernel(AssemblyKernel):
         self.func_name = func_name
         jl.seval(self.jl_code)
 
-    def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
+    def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        raw_args = [
-            arg._obj if isinstance(arg, FinchJLTensor) else _scalar_to_jl(arg.val)
-            for arg in args
-        ]
+        raw_args = [tensor_to_jl(arg) for arg in args]
         result = finch_fn(*raw_args)
 
         # The finch function returns tuples when multiple values are returned
         # or a non-tuple when a single value is returned.
         if jl.isa(result, jl.Finch.Tensor):
-            return (FinchJLTensor(result),)
-        return tuple(FinchJLTensor(res) for res in result)
+            return (jl_tensor_to_python(result),)
+        return tuple(jl_tensor_to_python(res) for res in result)
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -132,8 +119,6 @@ class FinchJLLibrary(AssemblyLibrary):
         return self.kernel_dict[name]
 
 
-# Test with
-# https://github.com/finch-tensor/finch-tensor-lite/blob/main/tests/test_notation_interpreter.py
 class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}

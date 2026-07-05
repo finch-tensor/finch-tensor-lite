@@ -125,9 +125,6 @@ pytest-codspeed = "*"
 [tool.pixi.feature.julia]
 platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
 
-[tool.pixi.feature.julia.dependencies]
-juliaup = ">=1.17.10,<2"
-
 [tool.pixi.feature.julia.pypi-dependencies]
 juliapkg = ">=0.1.16,<0.2.0"
 juliacall = ">=0.9.24,<0.10.0"

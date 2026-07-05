@@ -1,11 +1,17 @@
 from abc import ABC, abstractmethod
+from typing import Any, TypeAlias
 
-import juliacall as jc
 from finchlite.algebra.ftypes import FType
 
-JuliaObj = jc.AnyValue
+JuliaObj: TypeAlias = Any
 DType = FType
 number = int | float | bool | complex
+
+
+def is_julia_obj(obj: Any) -> bool:
+    from .julia import get_jc
+
+    return isinstance(obj, get_jc().AnyValue)
 
 
 class JLFType(FType, ABC):

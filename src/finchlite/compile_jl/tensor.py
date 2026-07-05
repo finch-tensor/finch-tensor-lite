@@ -14,7 +14,7 @@ from .levels import (
     SparseCOOFormat,
     jlobj_to_format,
 )
-from .typing import DType, JLFType, JuliaObj, number
+from .typing import DType, JLFType, JuliaObj, is_julia_obj, number
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
 
@@ -95,7 +95,7 @@ class FinchJLTensor(OverrideTensor):
         return override_func(*args, **kwargs)
 
     def __init__(self, obj: JuliaObj):
-        if isinstance(obj, JuliaObj):
+        if is_julia_obj(obj):
             assert jl.isa(obj, jl.Finch.Tensor)
             self._obj = obj
         else:
@@ -186,7 +186,7 @@ class FinchJLTensor(OverrideTensor):
             # create materialized dense array
             shape = jl.size(obj)
             dense_lvls = jl.Element(
-                jc.convert(jl_dtypes.fl_dtype_to_jl[self.dtype], jl.fill_value(obj))
+                jc.convert(jl_dtypes.to_jl_type(self.dtype), jl.fill_value(obj))
             )
             for _ in range(self.ndim):
                 dense_lvls = jl.Dense(dense_lvls)
