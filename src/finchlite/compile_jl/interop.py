@@ -20,7 +20,10 @@ from finchlite.tensor.np_wrapper import NumPyWrapper
 
 from . import dtypes as jl_dtypes
 from .julia import jc, jl
-from .typing import is_julia_obj
+
+
+def is_julia_obj(obj: Any) -> bool:
+    return isinstance(obj, jc.AnyValue)
 
 
 def _as_julia_scalar(val):

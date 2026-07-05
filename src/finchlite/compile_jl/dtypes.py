@@ -1,4 +1,3 @@
-import builtins
 from functools import lru_cache
 from typing import Any
 
@@ -8,7 +7,6 @@ import finchlite as fl
 from finchlite.algebra.ftypes import FDTypeNumpy, FType
 
 from .julia import get_jl
-from .typing import JLFType
 
 int8: FDTypeNumpy = fl.int8
 int16: FDTypeNumpy = fl.int16
@@ -27,36 +25,8 @@ complex64: FDTypeNumpy = fl.complex64
 complex128: FDTypeNumpy = fl.complex128
 bool: FDTypeNumpy = fl.bool
 
-number = builtins.int | builtins.float | builtins.complex | builtins.bool
-
 finfo = fl.finfo
 iinfo = fl.iinfo
-
-jl_to_np_dtype: dict[FType | None, Any] = {
-    int_: int_.dtype,
-    int8: int8.dtype,
-    int16: int16.dtype,
-    int32: int32.dtype,
-    int64: int64.dtype,
-    uint: uint.dtype,
-    uint8: uint8.dtype,
-    uint16: uint16.dtype,
-    uint32: uint32.dtype,
-    uint64: uint64.dtype,
-    float16: float16.dtype,
-    float32: float32.dtype,
-    float64: float64.dtype,
-    complex64: complex64.dtype,
-    complex128: complex128.dtype,
-    bool: bool.dtype,
-    None: None,
-}
-
-
-def can_cast(from_, to, /) -> builtins.bool:
-    if not isinstance(from_, FType) and hasattr(from_, "dtype"):
-        from_ = from_.dtype
-    return np.can_cast(jl_to_np_dtype[from_], jl_to_np_dtype[to])
 
 
 @lru_cache
@@ -101,8 +71,6 @@ def to_fl_dtype(x) -> FType:
 
 
 def to_jl_type(T):
-    if isinstance(T, JLFType):
-        return T.to_jl_type()
     T = to_fl_dtype(T)
     try:
         return _fl_dtype_to_jl()[T]
