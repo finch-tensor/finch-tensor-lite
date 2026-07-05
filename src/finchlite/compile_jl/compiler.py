@@ -10,7 +10,6 @@ from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
 
-
 # Single source of truth for Python ffunc name → Julia operator/function name.
 # max/min use Finch's <<op>> semiring syntax; they appear only as Aggregate
 # (reduction) nodes, never as plain element-wise Calls, so this is safe.

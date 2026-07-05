@@ -1,7 +1,7 @@
 from finchlite.autoschedule import (
-    DefaultLoopOrderer,
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
+    DefaultLoopOrderer,
     LogicCompiler,
     LogicExecutor,
     LogicNormalizer,
@@ -9,7 +9,6 @@ from finchlite.autoschedule import (
 )
 
 from .compiler import FinchJLCompiler
-
 
 COMPILE_JULIA = LogicNormalizer(
     LogicExecutor(

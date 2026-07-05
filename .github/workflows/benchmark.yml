@@ -2,6 +2,9 @@ name: Benchmark
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4

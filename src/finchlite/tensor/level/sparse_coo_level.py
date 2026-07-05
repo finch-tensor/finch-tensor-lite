@@ -197,8 +197,7 @@ class SparseCOOLevel(Level):
             self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
         if self.tbl is None:
             self.tbl = tuple(
-                self.lvl.buffer_factory(dimension_type)(len=0)
-                for _ in self.coo_shape
+                self.lvl.buffer_factory(dimension_type)(len=0) for _ in self.coo_shape
             )
         elif not isinstance(self.tbl, tuple):
             raise TypeError("SparseCOOLevel tbl must be a tuple")
