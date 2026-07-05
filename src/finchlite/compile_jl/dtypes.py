@@ -32,7 +32,7 @@ number = builtins.int | builtins.float | builtins.complex | builtins.bool
 finfo = fl.finfo
 iinfo = fl.iinfo
 
-jl_to_np_dtype = {
+jl_to_np_dtype: dict[FType | None, Any] = {
     int_: int_.dtype,
     int8: int8.dtype,
     int16: int16.dtype,
