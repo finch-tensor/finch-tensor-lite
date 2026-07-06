@@ -1,3 +1,20 @@
+from __future__ import annotations
+
+import builtins
+import operator
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+
+from finchlite.algebra import FType, Tensor, TensorFType, ffuncs, ftype
+
+from .scalar import Scalar
+
+
+def _shape_size(shape: tuple) -> int:
+    return int(np.prod(shape, dtype=np.intp)) if shape else 1
+
 
 @dataclass(frozen=True, eq=False)
 class IndexTensorFType(TensorFType):
@@ -58,6 +75,7 @@ class IndexTensorFType(TensorFType):
         raise NotImplementedError(
             f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
+
 
 @dataclass(frozen=True, eq=False)
 class FillTensorFType(TensorFType):
@@ -224,7 +242,6 @@ class IndexTensor(Tensor):
             self._element_type,
             tuple(ftype(dim) for dim in self.shape),
         )
-
 
 
 @dataclass(frozen=True, eq=False)
@@ -581,4 +598,3 @@ class ParityMaskTensor(PatternTensor):
 
     def contains(self, i) -> bool:
         return i % 2 == self._parity
-

@@ -6,7 +6,6 @@ import sys
 import threading
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass
 from itertools import accumulate, zip_longest
 from typing import Any, cast, overload
 
@@ -50,14 +49,30 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.symbolic import gensym
-from finchlite.tensor import BufferizedNDArray
+from finchlite.tensor import (
+    BufferizedNDArray,
+    EyeTensor,
+    FillTensor,
+    IndexTensor,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
+    ParityMaskTensor,
+    RepeatTensor,
+    ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    UpperTriangleTensor,
+)
 from finchlite.tensor.override_tensor import OverrideTensor
 from finchlite.tensor.scalar import Scalar
 
 
 def _shape_size(shape: tuple) -> int:
     return int(np.prod(shape, dtype=np.intp)) if shape else 1
-
 
 
 class LazyTensorFType(TensorFType):
@@ -916,8 +931,6 @@ def prod(
 ):
     x = lazy(x)
     return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
-
-
 
 
 def argmin(
@@ -1849,8 +1862,6 @@ def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
 
 def rfftfreq(n, /, *, d=1.0, dtype=None, device=None):
     _eager_only("rfftfreq")
-
-
 
 
 def eye(
