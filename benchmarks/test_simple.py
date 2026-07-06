@@ -2,7 +2,7 @@
 ASV simple benchmarks: time core array ops (matmul, elementwise add/multiply, sum) on
 64x64 inputs, parameterized over different backends.
 
-Run: ``poetry run asv run --bench simple_benchmarks``
+Run: ``pixi run benchmark``
 """
 
 import pytest
@@ -30,6 +30,10 @@ def integer_arrays():
 )
 def test_ops_binary(integer_arrays, scheduler, benchmark, op):
     a, b = integer_arrays
+    # Warmup
+    op(a, b)
+
+    # Benchmark
     benchmark(op, a, b)
 
 
@@ -41,4 +45,8 @@ def test_ops_binary(integer_arrays, scheduler, benchmark, op):
 )
 def test_ops_reduction(integer_arrays, scheduler, benchmark, op):
     a, _ = integer_arrays
+    # Warmup
+    op(a)
+
+    # Benchmark
     benchmark(op, a)

@@ -3,7 +3,7 @@ Galley ASV benchmark: report Galley ``optimize_time`` and ``downstream_time`` fo
 10-matrix matmul chain. One case uses dense matrices while the other
 uses a sparse input for the last matrix.
 
-Run: ``poetry run asv run --bench galley_benchmarks``
+Run: ``pixi run benchmark``
 """
 
 from functools import reduce
@@ -24,8 +24,10 @@ from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
 from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.autoschedule.tensor_stats import UniformStatsFactory
+from finchlite.codegen.numba_codegen.numba import NumbaCompiler
+from finchlite.compile.lower import NotationCompiler
+from finchlite.finch_assembly.simplification import AssemblySimplify
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
-from finchlite.finch_notation.interpreter import NotationInterpreter
 from finchlite.symbolic import gensym
 
 from .utils import patch_benchmark
@@ -72,7 +74,13 @@ def _make_pipeline():
     optimizer = GalleyLogicalOptimizer(
         DefaultLoopOrderer(
             LogicStandardizer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                        )
+                    )
+                )
             )
         )
     )
@@ -85,7 +93,7 @@ def _make_pipeline():
     "empty_last",
     [
         pytest.param(True, id="empty_last"),
-        pytest.param(False, id="dense_last"),
+        pytest.param(False, id="dense_last", marks=pytest.mark.slow),
     ],
 )
 def test_galley_matmul_chain(
@@ -93,11 +101,15 @@ def test_galley_matmul_chain(
 ) -> None:
     import finchlite.autoschedule.galley_optimize as galley
 
+    # Warmup
+    pipeline = _make_pipeline()
+    plan = _plan_from_lazy(_build_expr(empty_last))
+    pipeline(plan)
+
+    # Benchmark
     if metric == "optimize":
         patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
     else:
         patch_benchmark(benchmark, monkeypatch, LogicStandardizer, "lower")
 
-    pipeline = _make_pipeline()
-    plan = _plan_from_lazy(_build_expr(empty_last))
     pipeline(plan)
