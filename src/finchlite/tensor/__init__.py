@@ -5,10 +5,13 @@ from .level import (
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
+    SparseCOOLevel,
+    SparseCOOLevelFType,
     SparseListLevel,
     SparseListLevelFType,
     dense,
     element,
+    sparse_coo,
     sparse_list,
 )
 from .override_tensor import OverrideTensor
@@ -61,11 +64,14 @@ __all__ = [
     "RollTensor",
     "Scalar",
     "ScalarFType",
+    "SparseCOOLevel",
+    "SparseCOOLevelFType",
     "SparseListLevel",
     "SparseListLevelFType",
     "UpperTriangleTensor",
     "dense",
     "element",
     "fiber_tensor",
+    "sparse_coo",
     "sparse_list",
 ]

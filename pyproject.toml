@@ -24,6 +24,10 @@ test = [
 benchmark = [
     "pytest-codspeed>=5",
 ]
+julia = [
+    "juliapkg>=0.1.16,<0.2.0",
+    "juliacall>=0.9.24,<0.10.0",
+]
 
 
 [build-system]
@@ -58,6 +62,8 @@ benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 c = { features = ["c"], solve-group = "default" }
 c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
+julia = { features = ["julia"], solve-group = "julia" }
+test-julia = { features = ["test", "julia"], solve-group = "julia" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 # default feature definition
@@ -104,7 +110,7 @@ depends-on = ["compile"]
 default-environment = "benchmark"
 
 [tool.pixi.feature.test.tasks.type-check]
-cmd = "python -m mypy ."
+cmd = "python -m mypy"
 default-environment = "test"
 
 [tool.pixi.feature.mindeps.dependencies]
@@ -115,6 +121,13 @@ platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
 
 [tool.pixi.feature.benchmark.dependencies]
 pytest-codspeed = "*"
+
+[tool.pixi.feature.julia]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+
+[tool.pixi.feature.julia.pypi-dependencies]
+juliapkg = ">=0.1.16,<0.2.0"
+juliacall = ">=0.9.24,<0.10.0"
 
 [tool.pixi.feature.c.dependencies]
 c-compiler = "*"
@@ -170,4 +183,7 @@ section-order = [
 
 [tool.mypy]
 ignore_missing_imports = true
-exclude = ["array-api-tests", "(^|/)build/", "(^|/)dist/", "tests/reference", "(^|/)benchmarks/"]
+files = [
+    "src",
+    "tests",
+]
