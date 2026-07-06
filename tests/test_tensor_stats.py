@@ -21,6 +21,8 @@ from finchlite.autoschedule.tensor_stats import (
     TensorDef,
     UniformStats,
     UniformStatsFactory,
+    SamplingStats,
+    SamplingStatsFactory,
 )
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
@@ -30,6 +32,69 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+
+# ------------------- SamplingStats tests ---------------------------
+
+
+def test_sampling_hadamard():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 1.0]])
+    B = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    node = MapJoin(
+        Literal(ffuncs.mul),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(B)), (i, j))),
+    )
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=0.9),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    expected = float(np.count_nonzero(A * B))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected, abs=1.0)
+
+
+def test_sampling_spgemm():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 1.0]])
+    B = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    node = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul),
+            (Table(Literal(fl.asarray(A)), (i, k)), Table(Literal(fl.asarray(B)), (k, j))),
+        ),
+        (k,),
+    )
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=0.9),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    expected = float(np.count_nonzero(A @ B))
+    assert stats.estimate_non_fill_values() == pytest.approx(expected, abs=1.0)
+
+
+def test_sampling_zeros():
+    i, j = Field("i"), Field("j")
+    A = np.zeros((3, 3))
+    node = MapJoin(
+        Literal(ffuncs.mul),
+        (Table(Literal(fl.asarray(A)), (i, j)), Table(Literal(fl.asarray(A)), (i, j))),
+    )
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=0.99),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(0.0)
+
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
 

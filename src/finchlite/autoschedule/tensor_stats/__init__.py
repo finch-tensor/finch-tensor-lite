@@ -9,6 +9,7 @@ from .stats_interpreter import StatsInterpreter
 from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStats
 from .uniform_stats import UniformStats, UniformStatsFactory
+from .sampling_stats import SamplingStats, SamplingStatsFactory
 
 __all__ = [
     "DC",
@@ -28,4 +29,6 @@ __all__ = [
     "TensorStats",
     "UniformStats",
     "UniformStatsFactory",
+    "SamplingStats",
+    "SamplingStatsFactory",
 ]
