@@ -144,6 +144,27 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
         case ffuncs.make_tuple:
             return f"({','.join([ctx(arg) for arg in args])},)"
+        case ffuncs.last:
+            (arg,) = args
+            if not isinstance(arg.result_type, TupleFType):
+                raise TypeError(f"Expected tuple type, got: {arg.result_type}")
+            return f"{ctx(arg)}[{len(arg.result_type.struct_fieldtypes) - 1}]"
+        case ffuncs.minby | ffuncs.maxby:
+            a, b = (ctx.cache("by_a", args[0]), ctx.cache("by_b", args[1]))
+            if not isinstance(a.result_type, TupleFType):
+                raise TypeError(f"Expected tuple type, got: {a.result_type}")
+            a_code, b_code = ctx(a), ctx(b)
+            comparator = "<" if op is ffuncs.minby else ">"
+            tie_comparator = "<=" if op is ffuncs.minby else ">="
+            last_index = len(a.result_type.struct_fieldtypes) - 1
+            return (
+                f"({a_code} if "
+                f"(({a_code}[0] {comparator} {b_code}[0]) or "
+                f"(({a_code}[0] == {b_code}[0]) and "
+                f"({a_code}[{last_index}] {tie_comparator} "
+                f"{b_code}[{last_index}]))) "
+                f"else {b_code})"
+            )
         case NumbaOperator():
             return op.numba_function_call(op, ctx, *args)
 
@@ -208,6 +229,10 @@ class NumbaArgumentFType(ABC):
 
 def to_numpy_type(t: FType) -> np.dtype:
     """Return a NumPy dtype for a Finch scalar/data type."""
+    if isinstance(t, TupleFType):
+        return np.dtype(
+            [(name, to_numpy_type(field_t)) for name, field_t in t.struct_fields]
+        )
     if isinstance(t, algebra.ftypes.FDTypeNumpy):
         return np.dtype(t.dtype)
     if isinstance(t, algebra.ftypes.FDTypeBuiltin):

@@ -5,7 +5,7 @@ import numpy as np
 
 import numba
 
-from finchlite.algebra import FType, ftype, ftypes
+from finchlite.algebra import FType, TupleFType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
@@ -59,14 +59,19 @@ class NumpyBuffer(Buffer):
         """
         Returns the ftype of the buffer, which is a NumpyBufferFType.
         """
-        return NumpyBufferFType(ftype(self.arr.dtype.type))
+        return NumpyBufferFType(ftype(self.arr.dtype))
 
     # TODO should be property
     def length(self):
         return self.arr.size
 
     def load(self, index: int):
-        return self.arr[index]
+        value = self.arr[index]
+        if isinstance(self.ftype.element_type, TupleFType):
+            return tuple(
+                value[name] for name in self.ftype.element_type.struct_fieldnames
+            )
+        return value
 
     def store(self, index: int, value):
         self.arr[index] = value
@@ -90,7 +95,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
     """
 
     def __init__(self, element_type: FType):
-        self._element_type = ftype(to_numpy_type(element_type).type)
+        self._element_type = ftype(to_numpy_type(ftype(element_type)))
 
     @property
     def _dtype(self):
@@ -227,10 +232,24 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CStackFType):
 
     def numba_load(self, ctx, buf, idx):
         arr = buf.obj.arr
+        if isinstance(self.element_type, TupleFType):
+            idx = ctx(ctx.cache("idx", idx))
+            fields = ", ".join(
+                f"{arr}[{idx}]['{name}']"
+                for name in self.element_type.struct_fieldnames
+            )
+            return f"({fields},)"
         return f"{arr}[{ctx(idx)}]"
 
     def numba_store(self, ctx, buf, idx, val):
         arr = buf.obj.arr
+        if isinstance(self.element_type, TupleFType):
+            idx = ctx(ctx.cache("idx", idx))
+            val = ctx.cache("val", val)
+            val_code = ctx(val)
+            for i, name in enumerate(self.element_type.struct_fieldnames):
+                ctx.exec(f"{ctx.feed}{arr}[{idx}]['{name}'] = {val_code}[{i}]")
+            return
         ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
 
     def numba_resize(self, ctx, buf, new_len):
