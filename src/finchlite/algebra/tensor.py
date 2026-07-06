@@ -11,7 +11,7 @@ from .ftypes import FType, FTyped
 
 
 def to_numpy(x):
-    while hasattr(x, "to_numpy"):
+    if hasattr(x, "to_numpy"):
         x = x.to_numpy()
     if scipy_sparse.issparse(x):
         return x.toarray()
