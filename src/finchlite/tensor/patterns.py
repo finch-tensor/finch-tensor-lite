@@ -7,8 +7,9 @@ from typing import Any
 
 import numpy as np
 
-from finchlite.algebra import FType, Tensor, TensorFType, ffuncs, ftype
+from finchlite.algebra import FType, TensorFType, ffuncs, ftype
 
+from .override_tensor import OverrideTensor
 from .scalar import Scalar
 
 
@@ -129,7 +130,7 @@ class FillTensorFType(TensorFType):
         )
 
 
-class FillTensor(Tensor):
+class FillTensor(OverrideTensor):
     """
     A tensor that has a specific shape but contains no actual data.
     Used primarily for broadcasting operations where a tensor of a specific
@@ -182,7 +183,7 @@ class FillTensor(Tensor):
         )
 
 
-class IndexTensor(Tensor):
+class IndexTensor(OverrideTensor):
     """
     A tensor that has a specific shape and returns the linear (flattened) index used
     to access it.
@@ -316,7 +317,7 @@ class PatternTensorFType(TensorFType):
         )
 
 
-class PatternTensor(Tensor):
+class PatternTensor(OverrideTensor):
     def __init__(
         self,
         shape,

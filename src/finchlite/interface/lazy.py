@@ -61,6 +61,7 @@ from finchlite.tensor import (
     PairCarryTensor,
     PairSumTensor,
     ParityMaskTensor,
+    PatternTensor,
     RepeatTensor,
     ReshapeMaskTensor,
     ReverseTensor,
