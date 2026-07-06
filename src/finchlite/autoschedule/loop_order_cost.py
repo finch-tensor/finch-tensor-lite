@@ -16,6 +16,16 @@ from finchlite.finch_logic import (
 from finchlite.finch_logic.nodes import MapJoin
 from finchlite.symbolic import PostOrderDFS
 
+# Cost parameters ported from Julia
+# TODO: Julia comments says these need to be adjusted.
+# confirm that these values are OK
+SEQ_READ_COST = 1
+SEQ_WRITE_COST = 5
+RANDOM_READ_COST = 5
+RANDOM_WRITE_COST = 10
+DENSE_ALLOCATE_COST = 0.5
+SPARSE_ALLOCATE_COST = 60
+
 
 def stats_with_false_fill(
     stats_factory: StatsFactory,
@@ -122,6 +132,127 @@ def get_loop_lookups(
     return projected.estimate_non_fill_values()
 
 
+# Transpose penalty funcs more like Julia version
+# TODO: used in bnb
+def cost_of_reformat(stats: TensorStats) -> float:
+    if not isinstance(stats, NumericStats):
+        return 0.0
+    nnz = stats.estimate_non_fill_values()
+    index_formats = getattr(stats, "index_formats", None)
+    if index_formats is not None and all(f == "dense" for f in index_formats):
+        return nnz * DENSE_ALLOCATE_COST * 0.01
+    return nnz * SPARSE_ALLOCATE_COST
+
+
+def get_reformat_set(
+    input_stats: list[TensorStats], prefix: tuple[Field, ...]
+) -> frozenset[int]:
+    return frozenset(
+        i for i, stats in enumerate(input_stats) if needs_reformat(stats, prefix)
+    )
+
+
+# End transpose penalty funcs
+
+
+def needs_reformat(stats: TensorStats, prefix: tuple[Field, ...]) -> bool:
+    prefix_pos = {idx: pos for pos, idx in enumerate(prefix)}
+    current_loop = -1.0
+    reformat = False
+    for idx in reversed(stats.index_order):
+        idx_loop = float(prefix_pos.get(idx, float("inf")))
+        if idx_loop < current_loop:
+            reformat = True
+        current_loop = idx_loop
+    return reformat
+
+
+# NOTE: Julia version had per variable fraction of nnz.
+# Current version here is for prefix + variable.
+# Julia version not possible?
+def _approx_axis_density(stats: TensorStats, rel_vars: set[Field]) -> float:
+    if not isinstance(stats, NumericStats):
+        return 1.0
+    nnz = stats.estimate_non_fill_values()
+    space = stats.get_dim_space_size(tuple(rel_vars))
+    if space == 0 or space == float("inf"):
+        return 0.0
+    return nnz / space
+
+
+def get_prefix_cost(
+    new_prefix: tuple[Field, ...],
+    conjunct_stats: list[TensorStats],
+    disjunct_stats: list[TensorStats],
+    stats_factory: StatsFactory,
+    output_vars: tuple[Field, ...] | None = None,
+) -> float:
+    if not new_prefix:
+        return 0.0
+
+    new_var = new_prefix[-1]
+    prefix_set = set(new_prefix)
+
+    rel_conjuncts = [
+        stat for stat in conjunct_stats if prefix_set.intersection(stat.index_order)
+    ]
+    rel_disjuncts = [
+        stat for stat in disjunct_stats if prefix_set.intersection(stat.index_order)
+    ]
+
+    lookups = get_loop_lookups(new_prefix, rel_conjuncts, rel_disjuncts, stats_factory)
+
+    lookup_factor = 0.0
+    seen: list[TensorStats] = []
+    for stat in rel_conjuncts + rel_disjuncts:
+        if any(stat is s for s in seen):
+            continue
+        seen.append(stat)
+
+        if new_var not in set(stat.index_order):
+            continue
+
+        if needs_reformat(stat, new_prefix):
+            rel_vars = set(stat.index_order) & prefix_set
+            approx_sparsity = _approx_axis_density(stat, rel_vars)
+            is_dense = approx_sparsity > 0.05
+            lookup_factor += SEQ_READ_COST / 5 if is_dense else SEQ_READ_COST
+            continue
+
+        # NOTE: stats format not present in Python
+        # everything below is dead code.
+
+        # index_formats = getattr(stat, "index_formats", None)
+        # fmt = None
+        # if index_formats is not None:
+        #    order = list(stat.index_order)
+        #    if new_var in order:
+        #        fmt = index_formats[order.index(new_var)]
+        # if fmt == "dense":
+        #    lookup_factor += SEQ_READ_COST / 5
+        # elif fmt == "bytemap":
+        #    lookup_factor += SEQ_READ_COST / 2.5
+        # else:
+        #    lookup_factor += SEQ_READ_COST
+        lookup_factor += SEQ_READ_COST
+
+    if output_vars is not None and new_var in output_vars:
+        output_list = list(output_vars)
+        new_var_idx = output_list.index(new_var)
+        prefix_positions = [
+            output_list.index(v) for v in new_prefix if v in output_list
+        ]
+        min_var_idx = min(prefix_positions)
+        is_rand_write = new_var_idx != min_var_idx
+        lookup_factor += RANDOM_WRITE_COST if is_rand_write else SEQ_WRITE_COST
+    else:
+        lookup_factor += SEQ_WRITE_COST
+
+    return lookups * lookup_factor
+
+
+# NOTE: remove for Julia version
+# keeping for test
 def transpose_penalty(
     expr: LogicExpression,
     loop_prefix: tuple[Field, ...],
@@ -142,6 +273,8 @@ def transpose_penalty(
     return penalty
 
 
+# NOTE: remove for Julia version.
+# keeping for test
 def loop_order_cost(
     expr: LogicExpression,
     loop_order: tuple[Field, ...],
