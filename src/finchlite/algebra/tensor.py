@@ -4,15 +4,40 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
+import scipy.sparse as scipy_sparse
 
+from .devices import normalize_device, serial
 from .ftypes import FType, FTyped
+
+
+def to_numpy(x):
+    if hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    if scipy_sparse.issparse(x):
+        return x.toarray()
+    return np.asarray(x)
+
+
+def to_scipy(x):
+    if hasattr(x, "to_scipy"):
+        return x.to_scipy()
+    if scipy_sparse.issparse(x):
+        return x
+    raise NotImplementedError(f"{type(x).__name__} does not support to_scipy.")
 
 
 class TensorFType(FType, ABC):
     @property
-    def ndim(self) -> np.intp:
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        return np.intp(len(self.shape_type))
+        return len(self.shape_type)
+
+    @property
+    def size(self):
+        size = 1
+        for dim in self.shape:
+            size *= int(dim)
+        return size
 
     @property
     @abstractmethod
@@ -29,6 +54,14 @@ class TensorFType(FType, ABC):
     @property
     def dtype(self):
         return self.element_type
+
+    @property
+    def device(self):
+        return serial()
+
+    @property
+    def device_type(self) -> FType:
+        return self.device.ftype
 
     @property
     @abstractmethod
@@ -66,9 +99,16 @@ class Tensor(FTyped, ABC):
     """
 
     @property
-    def ndim(self) -> np.intp:
+    def ndim(self) -> int:
         """Number of dimensions of the tensor."""
-        return self.ftype.ndim
+        return int(self.ftype.ndim)
+
+    @property
+    def size(self):
+        size = 1
+        for dim in self.shape:
+            size *= int(dim)
+        return size
 
     @property
     @abstractmethod
@@ -97,6 +137,22 @@ class Tensor(FTyped, ABC):
         return self.element_type
 
     @property
+    def device(self):
+        return getattr(self, "_device", self.ftype.device)
+
+    @property
+    def device_type(self) -> FType:
+        return self.ftype.device_type
+
+    def to_device(self, device, /, *, stream=None):
+        if stream is not None:
+            raise ValueError(f"stream argument is not supported; got {stream!r}")
+        device = normalize_device(device)
+        if device == self.device:
+            return self
+        raise ValueError(f"device argument is not supported; got {device!r}")
+
+    @property
     def shape_type(self) -> tuple[FType, ...]:
         """Shape type of the tensor. The shape type is a tuple of the index
         types in the tensor. It's the type of each element in tns.shape. It
@@ -120,4 +176,14 @@ class Tensor(FTyped, ABC):
         needs the underlying Python scalar value. Implementations should raise
         `ValueError` when called on a non-scalar tensor.
         """
+        ...
+
+    @abstractmethod
+    def to_numpy(self):
+        """Convert the tensor to a NumPy representation."""
+        ...
+
+    @abstractmethod
+    def to_scipy(self):
+        """Convert the tensor to a SciPy sparse representation."""
         ...

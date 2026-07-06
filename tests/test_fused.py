@@ -338,6 +338,22 @@ def test_jit_straight_line_inserted_code(file_regression):
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
+def test_jit_eager_only_operation_warns_and_computes():
+    def simple_fn(A):
+        return finchlite.linalg.inv(A)
+
+    @jit
+    def opt_fn(A):
+        return finchlite.linalg.inv(A)
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 5.0]]))
+
+    with pytest.warns(RuntimeWarning, match="inv"):
+        result = opt_fn(A)
+
+    finch_assert_allclose(result, simple_fn(A))
+
+
 def test_jit_return_expr():
     """A jit function with no loops should produce the same result as eager."""
 

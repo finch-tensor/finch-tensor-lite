@@ -1,9 +1,12 @@
+import dataclasses
+import importlib
 import math
 import warnings
 
 import pytest
 
 import numpy as np
+import scipy.sparse as scipy_sparse
 
 import finchlite
 from finchlite import ffuncs
@@ -160,6 +163,9 @@ class TestOverrideTensor(finchlite.OverrideTensor):
     def to_numpy(self):
         return self.array
 
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
+
 
 @pytest.mark.parametrize(
     "a, b",
@@ -190,23 +196,22 @@ class TestOverrideTensor(finchlite.OverrideTensor):
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((ffuncs.add, finchlite.add, np.add), np.add),
-        ((ffuncs.sub, finchlite.subtract, np.subtract), np.subtract),
-        ((ffuncs.mul, finchlite.multiply, np.multiply), np.multiply),
-        ((ffuncs.and_, finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
-        ((ffuncs.or_, finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
-        ((ffuncs.xor, finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
+        ((finchlite.add, np.add), np.add),
+        ((finchlite.subtract, np.subtract), np.subtract),
+        ((finchlite.multiply, np.multiply), np.multiply),
+        ((finchlite.bitwise_and, np.bitwise_and), np.bitwise_and),
+        ((finchlite.bitwise_or, np.bitwise_or), np.bitwise_or),
+        ((finchlite.bitwise_xor, np.bitwise_xor), np.bitwise_xor),
         (
-            (ffuncs.lshift, finchlite.bitwise_left_shift, np.bitwise_left_shift),
+            (finchlite.bitwise_left_shift, np.bitwise_left_shift),
             np.bitwise_left_shift,
         ),
         (
-            (ffuncs.rshift, finchlite.bitwise_right_shift, np.bitwise_right_shift),
+            (finchlite.bitwise_right_shift, np.bitwise_right_shift),
             np.bitwise_right_shift,
         ),
         (
             (
-                ffuncs.truediv,
                 finchlite.truediv,
                 np.true_divide,
                 finchlite.divide,
@@ -214,14 +219,11 @@ class TestOverrideTensor(finchlite.OverrideTensor):
             ),
             np.true_divide,
         ),
-        ((ffuncs.floordiv, finchlite.floor_divide, np.floor_divide), np.floor_divide),
-        ((ffuncs.mod, finchlite.mod, np.mod), np.mod),
-        ((ffuncs.pow, finchlite.power, np.power), np.power),
-        (
-            (ffuncs.mod, finchlite.mod, np.mod, finchlite.remainder, np.remainder),
-            np.mod,
-        ),
-        ((ffuncs.pow, finchlite.pow, np.pow), np.pow),
+        ((finchlite.floor_divide, np.floor_divide), np.floor_divide),
+        ((finchlite.mod, np.mod), np.mod),
+        ((finchlite.power, np.power), np.power),
+        ((finchlite.mod, np.mod, finchlite.remainder, np.remainder), np.mod),
+        ((finchlite.pow, np.pow), np.pow),
         ((finchlite.hypot, np.hypot), np.hypot),
         ((finchlite.atan2, np.atan2), np.atan2),
         ((finchlite.logaddexp, np.logaddexp), np.logaddexp),
@@ -232,15 +234,12 @@ class TestOverrideTensor(finchlite.OverrideTensor):
         ((finchlite.logical_xor, np.logical_xor), np.logical_xor),
         ((finchlite.minimum, np.minimum), np.minimum),
         ((finchlite.maximum, np.maximum), np.maximum),
-        ((ffuncs.eq, finchlite.equal, np.equal), np.equal),
-        ((ffuncs.ne, finchlite.not_equal, np.not_equal), np.not_equal),
-        ((ffuncs.lt, finchlite.less, np.less), np.less),
-        ((ffuncs.le, finchlite.less_equal, np.less_equal), np.less_equal),
-        ((ffuncs.gt, finchlite.greater, np.greater), np.greater),
-        (
-            (ffuncs.ge, finchlite.greater_equal, np.greater_equal),
-            np.greater_equal,
-        ),
+        ((finchlite.equal, np.equal), np.equal),
+        ((finchlite.not_equal, np.not_equal), np.not_equal),
+        ((finchlite.less, np.less), np.less),
+        ((finchlite.less_equal, np.less_equal), np.less_equal),
+        ((finchlite.greater, np.greater), np.greater),
+        ((finchlite.greater_equal, np.greater_equal), np.greater_equal),
     ],
 )
 def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
@@ -272,6 +271,44 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
                 result = finchlite.compute(result)
 
             finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "x1, x2, expected",
+    [
+        (-np.inf, 1.0, -np.inf),
+        (-np.inf, -1.0, np.inf),
+        (np.inf, -1.0, -np.inf),
+        (np.inf, 1.0, np.inf),
+        (-1.0, np.inf, -0.0),
+        (1.0, -np.inf, -0.0),
+    ],
+)
+def test_floor_divide_float_special_cases(x1, x2, expected):
+    x1 = finchlite.asarray(x1, dtype=finchlite.float64)
+    x2 = finchlite.asarray(x2, dtype=finchlite.float64)
+
+    for result in (finchlite.floor_divide(x1, x2), x1 // x2):
+        result = float(result)
+        assert result == expected
+        assert np.signbit(result) == np.signbit(expected)
+
+
+@pytest.mark.parametrize(
+    "x1, x2, expected",
+    [
+        (-np.inf, 1.0, -np.inf),
+        (-np.inf, -1.0, np.inf),
+        (np.inf, -1.0, -np.inf),
+        (np.inf, 1.0, np.inf),
+        (-1.0, np.inf, -0.0),
+        (1.0, -np.inf, -0.0),
+    ],
+)
+def test_ffunc_floor_divide_float_special_cases(x1, x2, expected):
+    result = float(ffuncs.floordiv(np.float64(x1), np.float64(x2)))
+    assert result == expected
+    assert np.signbit(result) == np.signbit(expected)
 
 
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
@@ -347,6 +384,163 @@ def test_asarray_existing_finch_tensors_pass_through():
     assert scalar.dtype == finchlite.int64
 
 
+def test_array_namespace_info():
+    info = finchlite.__array_namespace_info__()
+
+    assert info.capabilities() == {
+        "boolean indexing": False,
+        "data-dependent shapes": False,
+        "max dimensions": 5,
+    }
+    assert info.default_device() == finchlite.serial()
+    assert info.devices() == [finchlite.serial(), finchlite.cpu()]
+    assert info.default_dtypes() == {
+        "real floating": finchlite.float64,
+        "complex floating": finchlite.complex128,
+        "integral": finchlite.int64,
+        "indexing": finchlite.intp,
+    }
+    assert info.dtypes(kind="bool") == {"bool": finchlite.bool}
+    assert info.dtypes(kind="integral") == {
+        "int8": finchlite.int8,
+        "int16": finchlite.int16,
+        "int32": finchlite.int32,
+        "int64": finchlite.int64,
+        "uint8": finchlite.uint8,
+        "uint16": finchlite.uint16,
+        "uint32": finchlite.uint32,
+        "uint64": finchlite.uint64,
+    }
+    assert set(info.dtypes(kind=("real floating", "complex floating"))) == {
+        "float16",
+        "float32",
+        "float64",
+        "complex64",
+        "complex128",
+    }
+
+    with pytest.raises(ValueError):
+        info.default_dtypes(device="gpu")
+
+
+def test_array_object_metadata():
+    x = finchlite.asarray(np.arange(6).reshape(2, 3))
+
+    assert x.device == finchlite.serial()
+    assert x.size == 6
+    assert x.to_device(None) is x
+    assert x.to_device(finchlite.serial()) is x
+    finch_assert_equal(x.T, x.to_numpy().T)
+
+    cpu_dev = finchlite.cpu("test", n=2)
+    x_cpu = x.to_device(cpu_dev)
+    assert x_cpu.device == cpu_dev
+    assert x_cpu is not x
+    assert finchlite.asarray(np.arange(3), device=cpu_dev).device == cpu_dev
+
+    y = finchlite.asarray(np.arange(24).reshape(2, 3, 4))
+    finch_assert_equal(y.mT, np.swapaxes(y.to_numpy(), -1, -2))
+    with pytest.raises(ValueError):
+        _ = y.T
+    with pytest.raises(ValueError):
+        x.to_device("gpu")
+
+
+def test_device_hierarchy_objects_and_ftypes():
+    ser = finchlite.serial()
+    assert isinstance(ser, finchlite.AbstractDevice)
+    assert finchlite.ftype(ser) == finchlite.SerialFType()
+    assert ser.num_tasks == 1
+    assert ser.device == ser
+    assert ser.parent_device is None
+    assert finchlite.SerialFType().device == finchlite.SerialFType()
+
+    cpu_dev = finchlite.cpu("main", n=3)
+    assert isinstance(cpu_dev, finchlite.CPU)
+    assert cpu_dev == finchlite.CPU(finchlite.serial(), id="main", n=7)
+    assert cpu_dev.num_tasks == 3
+    assert cpu_dev.device == cpu_dev
+    assert cpu_dev.parent_device == finchlite.serial()
+    assert finchlite.ftype(cpu_dev) == finchlite.CPUFType("main")
+    assert finchlite.CPUFType("main").device == finchlite.CPUFType("main")
+    assert finchlite.CPUFType("main").parent_device_type == finchlite.SerialFType()
+    assert finchlite.CPUFType("main")(2) == finchlite.CPU(
+        finchlite.serial(), id="main", n=2
+    )
+    assert finchlite.common_device(finchlite.serial(), cpu_dev) == cpu_dev
+    assert finchlite.common_device(cpu_dev, finchlite.serial()) == cpu_dev
+    with pytest.raises(ValueError):
+        finchlite.common_device(cpu_dev, finchlite.cpu("other", n=3))
+
+    parent = finchlite.SerialTask()
+    thread = finchlite.CPUThread(2, cpu_dev, parent)
+    thread_type = finchlite.CPUThreadFType(finchlite.ftype(parent), cpu_dev.ftype)
+    assert thread.device == cpu_dev
+    assert finchlite.ftype(thread) == thread_type
+    assert thread_type.device == cpu_dev.ftype
+    assert thread.parent_task == parent
+    assert thread_type.parent_task == finchlite.ftype(parent)
+    assert thread.task_num == 2
+    assert thread.is_on_device(cpu_dev)
+    assert finchlite.is_on_device(thread, cpu_dev)
+
+
+def test_finfo_returns_python_scalars():
+    info = finchlite.finfo(finchlite.float32)
+    property_info = finchlite.float32.finfo
+
+    assert dataclasses.is_dataclass(info)
+    assert isinstance(info, finchlite.FInfo)
+    assert info == property_info
+    assert isinstance(info.bits, int)
+    assert isinstance(info.eps, float)
+    assert isinstance(info.max, float)
+    assert isinstance(info.min, float)
+    assert isinstance(info.smallest_normal, float)
+    assert info.dtype == finchlite.float32
+
+
+def test_iinfo_returns_python_scalars():
+    info = finchlite.iinfo(finchlite.int16)
+    property_info = finchlite.int16.iinfo
+
+    assert dataclasses.is_dataclass(info)
+    assert isinstance(info, finchlite.IInfo)
+    assert info == property_info
+    assert isinstance(info.bits, int)
+    assert isinstance(info.max, int)
+    assert isinstance(info.min, int)
+    assert info.dtype == finchlite.int16
+
+
+def test_result_type():
+    assert finchlite.result_type(finchlite.int8, finchlite.int16) == finchlite.int16
+    assert finchlite.result_type(finchlite.int32, finchlite.uint32) == finchlite.int64
+    assert (
+        finchlite.result_type(finchlite.float32, finchlite.float64) == finchlite.float64
+    )
+    assert (
+        finchlite.result_type(finchlite.complex64, finchlite.complex128)
+        == finchlite.complex128
+    )
+    assert (
+        finchlite.result_type(
+            finchlite.asarray([1], dtype=finchlite.int32), finchlite.uint16
+        )
+        == finchlite.int32
+    )
+
+
+def test_result_type_python_scalars_are_weak():
+    assert finchlite.result_type(finchlite.bool, True) == finchlite.bool
+    assert finchlite.result_type(finchlite.int32, 1) == finchlite.int32
+    assert finchlite.result_type(finchlite.float32, 1, 1.0) == finchlite.float32
+    assert finchlite.result_type(finchlite.complex64, 1, 1.0, 1j) == finchlite.complex64
+
+    with pytest.raises(TypeError):
+        finchlite.result_type(1, 1.0)
+
+
 def test_lazy_python_scalars_keep_builtin_dtypes():
     assert finchlite.lazy(True).dtype == finchlite.bool_
     assert finchlite.lazy(1).dtype == finchlite.int_
@@ -390,13 +584,10 @@ def test_nan_fill_value_ftype_equality():
 @pytest.mark.parametrize(
     "ops, np_op",
     [
-        ((ffuncs.abs, finchlite.abs, np.abs), np.abs),
-        ((ffuncs.pos, finchlite.positive, np.positive), np.positive),
-        ((ffuncs.neg, finchlite.negative, np.negative), np.negative),
-        (
-            (ffuncs.invert, finchlite.bitwise_invert, np.bitwise_invert),
-            np.bitwise_invert,
-        ),
+        ((finchlite.abs, np.abs), np.abs),
+        ((finchlite.positive, np.positive), np.positive),
+        ((finchlite.negative, np.negative), np.negative),
+        ((finchlite.bitwise_invert, np.bitwise_invert), np.bitwise_invert),
         ((finchlite.reciprocal, np.reciprocal), np.reciprocal),
         ((finchlite.sin, np.sin), np.sin),
         ((finchlite.sinh, np.sinh), np.sinh),
@@ -660,6 +851,14 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
         finch_assert_equal(result, expected)
 
 
+@pytest.mark.usefixtures("interpreter_scheduler")
+def test_std_nan_propagation():
+    x = np.array([np.nan], dtype=np.float64)
+    with np.errstate(invalid="ignore"):
+        result = finchlite.compute(finchlite.std(finchlite.lazy(x)))
+    assert np.isnan(result.item())
+
+
 @pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
 @pytest.mark.parametrize(
     "op, np_op", [(finchlite.argmin, np.argmin), (finchlite.argmax, np.argmax)]
@@ -674,6 +873,79 @@ def test_argmin_argmax(wrap, op, np_op, axis, keepdims):
 
     assert result.dtype in (finchlite.int32, finchlite.int64)
     finch_assert_equal(result, np_op(x, axis=axis, keepdims=keepdims))
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
+@pytest.mark.parametrize("axis", [0, 1, -1])
+@pytest.mark.parametrize("descending", [False, True])
+def test_sort_argsort(wrap, axis, descending):
+    x = np.array(
+        [
+            [3.0, 1.0, 2.0, 1.0, 5.0],
+            [0.0, 4.0, 4.0, -1.0, 2.0],
+            [2.0, 4.0, 3.0, -1.0, 0.0],
+        ]
+    )
+    key = -x if descending else x
+    expected_indices = np.argsort(key, axis=axis, kind="stable")
+    expected_sorted = np.take_along_axis(x, expected_indices, axis=axis)
+
+    indices = finchlite.argsort(
+        wrap(x),
+        axis=axis,
+        descending=descending,
+        stable=False,
+    )
+    sorted_x = finchlite.sort(
+        wrap(x),
+        axis=axis,
+        descending=descending,
+    )
+    if isinstance(indices, finchlite.LazyTensor):
+        indices = finchlite.compute(indices)
+    if isinstance(sorted_x, finchlite.LazyTensor):
+        sorted_x = finchlite.compute(sorted_x)
+
+    assert indices.dtype in (finchlite.int32, finchlite.int64)
+    finch_assert_equal(indices, expected_indices)
+    finch_assert_equal(sorted_x, expected_sorted)
+
+
+def test_argsort_stable_ties():
+    x = np.array([[2, 1, 2, 1, 2]], dtype=np.int64)
+
+    finch_assert_equal(finchlite.argsort(x), np.array([[1, 3, 0, 2, 4]]))
+    finch_assert_equal(
+        finchlite.argsort(x, descending=True),
+        np.array([[0, 2, 4, 1, 3]]),
+    )
+
+
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finchlite.lazy])
+@pytest.mark.parametrize("side", ["left", "right"])
+@pytest.mark.parametrize("use_sorter", [False, True])
+def test_searchsorted(wrap, side, use_sorter):
+    sorted_x1 = np.array([1.0, 2.0, 2.0, 4.0, 7.0])
+    x2 = np.array([[0.0, 2.0, 3.0], [7.0, 8.0, 1.0]])
+    if use_sorter:
+        x1 = np.array([4.0, 1.0, 7.0, 2.0, 2.0])
+        sorter = np.argsort(x1, kind="stable")
+        expected = np.searchsorted(x1, x2, side=side, sorter=sorter)
+        result = finchlite.searchsorted(
+            wrap(x1),
+            wrap(x2),
+            side=side,
+            sorter=wrap(sorter),
+        )
+    else:
+        expected = np.searchsorted(sorted_x1, x2, side=side)
+        result = finchlite.searchsorted(wrap(sorted_x1), wrap(x2), side=side)
+
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+
+    assert result.dtype in (finchlite.int32, finchlite.int64)
+    finch_assert_equal(result, expected)
 
 
 @pytest.mark.parametrize("wrap", [lambda x: x, finchlite.lazy])
@@ -981,9 +1253,12 @@ def test_matrix_power_negative_eager():
 
 def test_matrix_power_negative_lazy_requires_materialization():
     a = finchlite.lazy(np.array([[1.0, 2.0], [3.0, 5.0]]))
+    expected = np.linalg.matrix_power(np.array([[1.0, 2.0], [3.0, 5.0]]), -1)
 
-    with pytest.raises(ValueError, match="materializing first"):
-        finchlite.linalg.matrix_power(a, -1)
+    with pytest.warns(RuntimeWarning, match="matrix_power|inv"):
+        result = finchlite.linalg.matrix_power(a, -1)
+
+    finch_assert_allclose(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -1054,6 +1329,7 @@ def test_matrix_transpose(a, a_wrap):
         # axes=0 (outer product)
         (np.arange(3), np.arange(4), 0),
         (np.arange(8 * 7 * 5).reshape(8, 7, 5), np.arange(12).reshape(3, 4, 1), 0),
+        (np.arange(3, dtype=np.uint8), np.arange(4, dtype=np.uint8), ((), ())),
         # complex
         (random_array((2, 3)), random_array((3, 4)), 1),
         (
@@ -1101,6 +1377,17 @@ def test_tensordot(a, b, axes, a_wrap, b_wrap):
         assert isinstance(result, finchlite.LazyTensor)
         result = finchlite.compute(result)
     finch_assert_allclose(result, expected)
+    assert result.to_numpy().dtype == expected.dtype
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_tensordot_default_axes():
+    a = np.arange(24).reshape(2, 3, 4)
+    b = np.arange(24).reshape(3, 4, 2)
+
+    result = finchlite.tensordot(a, b)
+
+    finch_assert_allclose(result, np.tensordot(a, b))
 
 
 @pytest.mark.parametrize(
@@ -1185,6 +1472,371 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
         result = finchlite.compute(result)
 
     finch_assert_allclose(result, expected)
+
+
+def test_vecdot_preserves_promoted_input_dtype():
+    x1 = finchlite.asarray(np.array([1, 2, 3], dtype=np.uint8))
+    x2 = finchlite.asarray(np.array([4, 5, 6], dtype=np.uint8))
+
+    result = finchlite.vecdot(x1, x2)
+
+    assert result.element_type == finchlite.uint8
+    assert result.fill_value == np.uint8(0)
+    assert result.item() == np.uint8(32)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},
+        {"axis": 1},
+        {"axis": 0, "keepdims": True, "ord": 1},
+        {"axis": (0, 1), "ord": 0},
+        {"axis": 1, "ord": float("inf")},
+        {"axis": 1, "ord": -float("inf")},
+        {"axis": None, "ord": -2},
+    ],
+)
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_linalg_vector_norm(kw, wrap):
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
+    wx = wrap(x)
+    expected = np.linalg.vector_norm(x, **kw)
+
+    result = finchlite.linalg.vector_norm(wx, **kw)
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+def test_linalg_vector_norm_large_values():
+    x = np.array([1e308, 1e308], dtype=np.float64)
+    expected = np.float64(math.sqrt(2.0) * 1e308)
+
+    result = finchlite.compute(finchlite.linalg.vector_norm(finchlite.lazy(x)))
+
+    assert np.isfinite(result.item())
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+def test_linalg_vector_norm_negative_ord_stable_values():
+    tiny = np.array([1e-308, 1e308], dtype=np.float64)
+    tiny_result = finchlite.compute(
+        finchlite.linalg.vector_norm(finchlite.lazy(tiny), ord=-2)
+    )
+    finch_assert_allclose(tiny_result, np.float64(1e-308))
+
+    zero = np.array([0.0, 2.0], dtype=np.float64)
+    zero_result = finchlite.compute(
+        finchlite.linalg.vector_norm(finchlite.lazy(zero), ord=-2)
+    )
+    finch_assert_allclose(zero_result, np.float64(0.0))
+
+    nan = np.array([1.0, np.nan], dtype=np.float64)
+    nan_result = finchlite.compute(
+        finchlite.linalg.vector_norm(finchlite.lazy(nan), ord=-2)
+    )
+    assert np.isnan(nan_result.item())
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},
+        {"ord": 1},
+        {"ord": -1},
+        {"ord": float("inf")},
+        {"ord": -float("inf"), "keepdims": True},
+        {"ord": 2},
+        {"ord": -2},
+        {"ord": "nuc"},
+    ],
+)
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+    ],
+)
+def test_linalg_matrix_norm_eager(kw, wrap):
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float32)
+    wx = wrap(x)
+    expected = np.linalg.matrix_norm(x, **kw)
+
+    result = finchlite.linalg.matrix_norm(wx, **kw)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {},
+        {"ord": 1},
+        {"ord": -1},
+        {"ord": float("inf")},
+        {"ord": -float("inf"), "keepdims": True},
+    ],
+)
+def test_linalg_matrix_norm_lazy(kw):
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
+    expected = np.linalg.matrix_norm(x, **kw)
+
+    result = finchlite.linalg.matrix_norm(finchlite.lazy(x), **kw)
+    result = finchlite.compute(result)
+
+    assert finchlite.ftype(expected.dtype.type) == result.element_type
+    finch_assert_allclose(result, expected)
+
+
+def test_linalg_matrix_norm_lazy_eager_only_warns_and_computes():
+    x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
+    expected = np.linalg.matrix_norm(x, ord=2)
+
+    with pytest.warns(RuntimeWarning, match="matrix_norm"):
+        result = finchlite.linalg.matrix_norm(finchlite.lazy(x), ord=2)
+
+    assert not isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(result, expected)
+
+
+def test_linalg_inv_lazy_warns_and_computes():
+    x = np.array([[1.0, 2.0], [3.0, 5.0]])
+    expected = np.linalg.inv(x)
+
+    with pytest.warns(RuntimeWarning, match="inv"):
+        result = finchlite.linalg.inv(finchlite.lazy(x))
+
+    assert not isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(result, expected)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "cholesky",
+        "cross",
+        "det",
+        "eigh",
+        "eigvalsh",
+        "matrix_rank",
+        "lu",
+        "pinv",
+        "qr",
+        "slogdet",
+        "solve",
+        "svd",
+        "svdvals",
+    ],
+)
+def test_linalg_missing_methods_are_exposed(name):
+    assert hasattr(finchlite.linalg, name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "fft",
+        "ifft",
+        "fftn",
+        "ifftn",
+        "rfft",
+        "irfft",
+        "rfftn",
+        "irfftn",
+        "hfft",
+        "ihfft",
+        "fftshift",
+        "ifftshift",
+        "fftfreq",
+        "rfftfreq",
+    ],
+)
+def test_fft_methods_are_exposed(name):
+    assert hasattr(finchlite.fft, name)
+
+
+def test_linalg_new_eager_methods_use_numpy_fallback():
+    x = np.array([[3.0, 1.0], [1.0, 3.0]])
+    b = np.array([1.0, 2.0])
+
+    finch_assert_allclose(finchlite.linalg.det(x), np.linalg.det(x))
+    finch_assert_allclose(finchlite.linalg.solve(x, b), np.linalg.solve(x, b))
+    finch_assert_allclose(
+        finchlite.linalg.svdvals(x),
+        np.linalg.svd(x, compute_uv=False),
+    )
+
+
+def test_linalg_cross_uses_lazy_formula():
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([4.0, 5.0, 6.0])
+
+    result = finchlite.linalg.cross(finchlite.lazy(x), finchlite.lazy(y))
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(finchlite.compute(result), np.cross(x, y))
+
+
+def test_linalg_cross_supports_axis_lazy_formula():
+    x = np.arange(6.0).reshape(3, 2)
+    y = np.array([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]])
+
+    result = finchlite.linalg.cross(finchlite.lazy(x), y, axis=0)
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_allclose(finchlite.compute(result), np.cross(x, y, axis=0))
+
+
+def test_linalg_sparse_det_uses_superlu():
+    x = scipy_sparse.csc_matrix(
+        np.array(
+            [
+                [0.0, 2.0, 0.0],
+                [3.0, 0.0, 4.0],
+                [0.0, 5.0, 6.0],
+            ]
+        )
+    )
+
+    result = finchlite.linalg.det(x)
+
+    finch_assert_allclose(result, np.linalg.det(x.toarray()))
+
+
+def test_linalg_lu_uses_dense_fallback():
+    x = np.array([[2.0, 5.0, 8.0], [5.0, 2.0, 2.0], [7.0, 5.0, 6.0]])
+
+    p, lower, upper = finchlite.linalg.lu(x)
+
+    finch_assert_allclose(p @ lower @ upper, x)
+
+
+def test_linalg_lu_uses_sparse_superlu():
+    x = scipy_sparse.csc_matrix(
+        np.array([[4.0, 0.0, 1.0], [0.0, 3.0, 2.0], [1.0, 0.0, 5.0]])
+    )
+    b = np.array([1.0, 2.0, 3.0])
+
+    result = finchlite.linalg.lu(x)
+
+    finch_assert_allclose(result.solve(b), np.linalg.solve(x.toarray(), b))
+
+
+def test_linalg_partial_sparse_eigen_kwargs():
+    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+
+    vals = finchlite.linalg.eigvalsh(x, k=2, rtol=1e-12)
+    eig_vals, eig_vecs = finchlite.linalg.eigh(x, k=2, atol=1e-12)
+
+    finch_assert_allclose(np.sort(vals.to_numpy()), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(eig_vals.to_numpy()), np.array([3.0, 4.0]))
+    assert eig_vecs.shape == (4, 2)
+
+
+def test_linalg_partial_sparse_svd_kwargs():
+    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+
+    vals = finchlite.linalg.svdvals(x, k=2, rtol=1e-12)
+    u, s, vh = finchlite.linalg.svd(x, k=2, atol=1e-12)
+
+    finch_assert_allclose(np.sort(vals.to_numpy()), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(s.to_numpy()), np.array([3.0, 4.0]))
+    assert u.shape == (4, 2)
+    assert vh.shape == (2, 4)
+
+
+def test_linalg_partial_sparse_kwargs_dense_fallback_returns_full_results():
+    x = np.diag([1.0, 2.0, 3.0, 4.0])
+
+    with pytest.warns(RuntimeWarning, match="eigvalsh dense fallback"):
+        eig_vals = finchlite.linalg.eigvalsh(x, k=2, rtol=1e-12)
+    with pytest.warns(RuntimeWarning, match="svdvals dense fallback"):
+        singular_vals = finchlite.linalg.svdvals(x, k=2, atol=1e-12)
+
+    finch_assert_allclose(eig_vals, np.linalg.eigvalsh(x))
+    finch_assert_allclose(singular_vals, np.linalg.svd(x, compute_uv=False))
+
+
+def test_linalg_partial_sparse_warns_when_combining_tolerances():
+    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+
+    with pytest.warns(RuntimeWarning, match="eigvalsh sparse fallback"):
+        eig_vals = finchlite.linalg.eigvalsh(x, k=2, rtol=1e-12, atol=1e-12)
+    with pytest.warns(RuntimeWarning, match="svdvals sparse fallback"):
+        singular_vals = finchlite.linalg.svdvals(x, k=2, rtol=1e-12, atol=1e-12)
+
+    finch_assert_allclose(np.sort(eig_vals.to_numpy()), np.array([3.0, 4.0]))
+    finch_assert_allclose(np.sort(singular_vals.to_numpy()), np.array([3.0, 4.0]))
+
+
+def test_linalg_matrix_rank_accepts_atol():
+    x = np.diag([1.0, 1e-12])
+
+    result = finchlite.linalg.matrix_rank(x, atol=1e-10)
+
+    finch_assert_equal(result, np.linalg.matrix_rank(x, tol=1e-10))
+
+
+def test_linalg_matrix_rank_warns_when_combining_tolerances():
+    x = np.diag([1.0, 1e-12])
+
+    with pytest.warns(RuntimeWarning, match="matrix_rank cannot apply both"):
+        result = finchlite.linalg.matrix_rank(x, rtol=1e-12, atol=1e-10)
+
+    finch_assert_equal(result, np.linalg.matrix_rank(x, tol=1e-10))
+
+
+def test_fft_eager_methods_use_numpy_fallback():
+    x = np.arange(4, dtype=np.float64)
+
+    finch_assert_allclose(finchlite.fft.fft(x), np.fft.fft(x))
+    finch_assert_allclose(finchlite.fft.rfft(x), np.fft.rfft(x))
+    finch_assert_allclose(finchlite.fft.fftfreq(4), np.fft.fftfreq(4))
+    assert (
+        finchlite.fft.fftfreq(4, dtype=finchlite.float32).to_numpy().dtype == np.float32
+    )
+    assert (
+        finchlite.fft.rfftfreq(4, dtype=finchlite.float32).to_numpy().dtype
+        == np.float32
+    )
+
+
+def test_new_eager_only_methods_warn_compute_lazy_operands():
+    x = np.array([[3.0, 1.0], [1.0, 3.0]])
+
+    with pytest.warns(RuntimeWarning, match="det"):
+        det_result = finchlite.linalg.det(finchlite.lazy(x))
+    with pytest.warns(RuntimeWarning, match="fft"):
+        fft_result = finchlite.fft.fft(finchlite.lazy(x[0]))
+
+    finch_assert_allclose(det_result, np.linalg.det(x))
+    finch_assert_allclose(fft_result, np.fft.fft(x[0]))
+
+
+def test_new_lazy_methods_error_directly():
+    lazy_mod = importlib.import_module("finchlite.interface.lazy")
+    x = finchlite.lazy(np.eye(2))
+
+    with pytest.raises(NotImplementedError, match="det is eager-only"):
+        lazy_mod.det(x)
+    with pytest.raises(NotImplementedError, match="fft is eager-only"):
+        lazy_mod.fft(x)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -1294,6 +1946,256 @@ def test_scalar_coerce(x, func):
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 @pytest.mark.parametrize(
+    "arrays, axis",
+    [
+        (
+            (
+                np.arange(6, dtype=np.int64).reshape(2, 3),
+                np.arange(6, 15, dtype=np.int64).reshape(3, 3),
+            ),
+            0,
+        ),
+        (
+            (
+                np.arange(6, dtype=np.int64).reshape(2, 3),
+                np.arange(6, 10, dtype=np.int64).reshape(2, 2),
+            ),
+            1,
+        ),
+        (
+            (
+                np.arange(24, dtype=np.int64).reshape(2, 3, 4),
+                np.arange(24, 48, dtype=np.int64).reshape(2, 3, 4),
+            ),
+            -1,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "array_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+        finchlite.lazy,
+    ],
+)
+def test_concat(arrays, axis, array_wrap):
+    wrapped = tuple(array_wrap(array) for array in arrays)
+    result = finchlite.concat(wrapped, axis=axis)
+    expected = np.concatenate(arrays, axis=axis)
+
+    if isinstance(result, finchlite.LazyTensor):
+        result = finchlite.compute(result)
+    finch_assert_equal(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+@pytest.mark.parametrize(
+    "array_wrap",
+    [
+        lambda x: x,
+        TestOverrideTensor,
+    ],
+)
+def test_concat_axis_none_eager(array_wrap):
+    arrays = (
+        np.arange(6, dtype=np.int64).reshape(2, 3),
+        np.arange(6, 8, dtype=np.int64).reshape(1, 2),
+    )
+    wrapped = tuple(array_wrap(array) for array in arrays)
+
+    result = finchlite.concat(wrapped, axis=None)
+
+    finch_assert_equal(
+        result,
+        np.concatenate(tuple(array.reshape(-1) for array in arrays), axis=0),
+    )
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_concat_axis_none_lazy():
+    raw_arrays = (
+        np.arange(6, dtype=np.int64).reshape(2, 3),
+        np.arange(6, 8, dtype=np.int64).reshape(1, 2),
+    )
+    arrays = tuple(finchlite.lazy(array) for array in raw_arrays)
+
+    result = finchlite.compute(finchlite.concat(arrays, axis=None))
+
+    finch_assert_equal(
+        result,
+        np.concatenate(tuple(array.reshape(-1) for array in raw_arrays), axis=0),
+    )
+
+
+def test_concat_axis_none_promotes_dtype():
+    arrays = (
+        finchlite.asarray(np.array([1], dtype=np.int8)),
+        finchlite.asarray(np.array([128], dtype=np.int16)),
+    )
+
+    result = finchlite.concat(arrays, axis=None)
+    expected = np.concatenate(tuple(array.to_numpy().reshape(-1) for array in arrays))
+
+    assert result.dtype == ftype(expected.dtype.type)
+    finch_assert_equal(result, expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_concat_uses_first_fill_value():
+    a = finchlite.BufferizedNDArray.from_numpy(
+        np.array([[0, 1], [2, 0]], dtype=np.int64),
+        fill_value=0,
+    )
+    b = finchlite.BufferizedNDArray.from_numpy(
+        np.array([[7, 3]], dtype=np.int64),
+        fill_value=7,
+    )
+
+    result = finchlite.concat((finchlite.lazy(a), finchlite.lazy(b)), axis=0)
+
+    assert result.fill_value == a.fill_value
+    result = finchlite.compute(result)
+    assert result.fill_value == a.fill_value
+    finch_assert_equal(result, np.concatenate((a.to_numpy(), b.to_numpy()), axis=0))
+
+
+def test_concat_rejects_mismatched_shapes():
+    with pytest.raises(ValueError, match="dimensions except"):
+        finchlite.concat((np.ones((2, 3)), np.ones((3, 4))), axis=0)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_shape_ops_use_symbolic_selectors():
+    array = np.arange(24, dtype=np.int64).reshape(2, 3, 4)
+
+    cases = [
+        (
+            finchlite.flip(finchlite.lazy(array), axis=(0, 2)),
+            np.flip(array, axis=(0, 2)),
+        ),
+        (
+            finchlite.roll(finchlite.lazy(array), shift=(1, -2), axis=(0, 2)),
+            np.roll(array, shift=(1, -2), axis=(0, 2)),
+        ),
+        (
+            finchlite.take(finchlite.lazy(array), finchlite.asarray([2, 0]), axis=1),
+            np.take(array, [2, 0], axis=1),
+        ),
+        (
+            finchlite.repeat(finchlite.lazy(array), 2, axis=None),
+            np.repeat(array, 2, axis=None),
+        ),
+        (
+            finchlite.tile(finchlite.lazy(array), (2, 1, 1)),
+            np.tile(array, (2, 1, 1)),
+        ),
+    ]
+
+    for result, expected in cases:
+        assert isinstance(result, finchlite.LazyTensor)
+        finch_assert_equal(finchlite.compute(result), expected)
+
+
+def test_repeat_rejects_data_dependent_repeats():
+    with pytest.raises(NotImplementedError, match="data-dependent output shape"):
+        finchlite.repeat(
+            finchlite.lazy(np.arange(6, dtype=np.int64).reshape(2, 3)),
+            finchlite.asarray([1, 2, 1]),
+            axis=1,
+        )
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_stack_and_unstack():
+    arrays = (
+        np.arange(6, dtype=np.int64).reshape(2, 3),
+        np.arange(6, 12, dtype=np.int64).reshape(2, 3),
+    )
+
+    stacked = finchlite.stack(tuple(finchlite.lazy(array) for array in arrays), axis=1)
+
+    assert isinstance(stacked, finchlite.LazyTensor)
+    finch_assert_equal(finchlite.compute(stacked), np.stack(arrays, axis=1))
+
+    parts = finchlite.unstack(stacked, axis=1)
+    assert isinstance(parts, tuple)
+    assert len(parts) == len(arrays)
+    for part, expected in zip(parts, arrays, strict=True):
+        assert isinstance(part, finchlite.LazyTensor)
+        finch_assert_equal(finchlite.compute(part), expected)
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_take_along_axis():
+    array = np.arange(6, dtype=np.int64).reshape(2, 3)
+    indices = np.array([[2, 0], [1, 1]], dtype=np.intp)
+
+    result = finchlite.take_along_axis(finchlite.lazy(array), indices, axis=1)
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_equal(
+        finchlite.compute(result), np.take_along_axis(array, indices, axis=1)
+    )
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+@pytest.mark.parametrize(
+    "array, shape",
+    [
+        (np.arange(6, dtype=np.int64).reshape(2, 3), (3, 2)),
+        (np.arange(6, dtype=np.int64).reshape(2, 3), (-1,)),
+        (np.arange(6, dtype=np.int64), (2, 3)),
+        (np.array(5, dtype=np.int64), (1,)),
+    ],
+)
+def test_lazy_reshape(array, shape):
+    result = finchlite.reshape(finchlite.lazy(array), shape)
+
+    assert isinstance(result, finchlite.LazyTensor)
+    finch_assert_equal(finchlite.compute(result), np.reshape(array, shape))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_reshape_preserves_fill_value():
+    array = finchlite.BufferizedNDArray.from_numpy(
+        np.array([[9, 1], [2, 9]], dtype=np.int64),
+        fill_value=9,
+    )
+
+    result = finchlite.reshape(finchlite.lazy(array), (4,))
+
+    assert result.fill_value == array.fill_value
+    result = finchlite.compute(result)
+    finch_assert_equal(result, array.to_numpy().reshape((4,)))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+def test_lazy_reshape_uses_single_mask(monkeypatch):
+    lazy_module = importlib.import_module("finchlite.interface.lazy")
+    original = lazy_module.ReshapeMaskTensor
+    mask_shapes = []
+
+    def recording_mask(old_shape, new_shape, *args, **kwargs):
+        mask_shapes.append((tuple(old_shape), tuple(new_shape)))
+        return original(old_shape, new_shape, *args, **kwargs)
+
+    monkeypatch.setattr(lazy_module, "ReshapeMaskTensor", recording_mask)
+    array = np.arange(24, dtype=np.int64).reshape(2, 3, 4)
+
+    result = finchlite.reshape(finchlite.lazy(array), (6, 4))
+
+    assert mask_shapes == [((2, 3, 4), (6, 4))]
+    finch_assert_equal(finchlite.compute(result), array.reshape(6, 4))
+
+
+def test_lazy_reshape_rejects_invalid_shape():
+    with pytest.raises(ValueError, match="Cannot reshape"):
+        finchlite.reshape(finchlite.lazy(np.arange(6)), (4,))
+
+
+@pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
+@pytest.mark.parametrize(
     "x, shape",
     [
         # ——— VALID CASES ———
@@ -1353,6 +2255,27 @@ def test_broadcast_to(x, shape, x_wrap):
         if isinstance(wx, finchlite.LazyTensor):
             out = finchlite.compute(out)
         finch_assert_equal(out, expected, strict=True)
+
+
+@pytest.mark.parametrize("indexing", ["xy", "ij"])
+def test_meshgrid(indexing):
+    arrays = [
+        np.array([1, 2], dtype=np.int32),
+        np.array([3, 4, 5], dtype=np.int32),
+        np.array([6, 7], dtype=np.int32),
+    ]
+    expected = np.meshgrid(*arrays, indexing=indexing)
+    result = finchlite.meshgrid(*arrays, indexing=indexing)
+    lazy_result = finchlite.meshgrid(
+        *(finchlite.lazy(array) for array in arrays),
+        indexing=indexing,
+    )
+
+    for result_arr, lazy_arr, expected_arr in zip(
+        result, lazy_result, expected, strict=True
+    ):
+        finch_assert_equal(result_arr, expected_arr, strict=True)
+        finch_assert_equal(finchlite.compute(lazy_arr), expected_arr, strict=True)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
