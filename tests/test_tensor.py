@@ -12,7 +12,8 @@ from finchlite import (
     element,
     fiber_tensor,
 )
-from finchlite.interface.lazy import (
+from finchlite.tensor import (
+    BufferizedNDArray,
     EyeTensor,
     FillTensor,
     IndexTensor,
@@ -20,7 +21,6 @@ from finchlite.interface.lazy import (
     PatternTensor,
     ReshapeMaskTensor,
 )
-from finchlite.tensor import BufferizedNDArray
 
 
 def test_fiber_tensor_attributes():
