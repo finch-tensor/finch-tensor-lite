@@ -5,10 +5,8 @@ import numpy as np
 
 import numba
 
-from finchlite.algebra import FType, ftype, ftypes
-from finchlite.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type
 from finchlite.algebra import FType, TupleFType, ftype, ftypes
-from finchlite.codegen.c_codegen import CBufferFType, CContext, c_type
+from finchlite.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression
