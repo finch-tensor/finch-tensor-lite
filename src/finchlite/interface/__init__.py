@@ -145,27 +145,17 @@ from .fuse import (
     fused,
 )
 from .lazy import (
-    EyeTensor,
     LazyTensor,
-    LowerTriangleTensor,
-    PatternTensor,
-    ReshapeMaskTensor,
-    UpperTriangleTensor,
     asarray,
     lazy,
 )
 
 __all__ = [
-    "EyeTensor",
     "LazyTensor",
-    "LowerTriangleTensor",
     "NumPyFType",
     "NumPyWrapper",
-    "PatternTensor",
-    "ReshapeMaskTensor",
     "Scalar",
     "ScalarFType",
-    "UpperTriangleTensor",
     "abs",
     "acos",
     "acosh",
