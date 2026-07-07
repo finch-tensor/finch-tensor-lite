@@ -164,4 +164,4 @@ def tril(x, /, *, k: int = 0):
         lvl = lvl.lvl
     low_tri_mask = LoTriMask(lvl.lvl)
     lvl.lvl = low_tri_mask
-    return FiberTensor(root_lvl)
+    return FiberTensor(root_lvl, _device=x.device)

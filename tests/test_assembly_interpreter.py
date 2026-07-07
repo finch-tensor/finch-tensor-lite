@@ -20,7 +20,6 @@ from finchlite.finch_assembly import (  # noqa: F401
     IfElse,
     Literal,
     Module,
-    Print,
     Return,
     Variable,
 )
@@ -228,71 +227,3 @@ def test_simple_struct():
 
     result = mod.simple_struct(p, x)
     assert result == 9.0
-
-
-def test_asm_print(capsys, file_regression):
-    p_var_name = "p"
-    x_var_name = "x"
-    res_var_name = "res"
-
-    Point = namedtuple("Point", ["x", "y"])
-    p = Point(np.float64(1.0), np.float64(2.0))
-    x = (1, 4)
-
-    p_var = asm.Variable(p_var_name, ftype(p))
-    x_var = asm.Variable(x_var_name, ftype(x))
-    res_var = asm.Variable(res_var_name, finchlite.float64)
-    mod = AssemblyInterpreter()(
-        asm.Module(
-            (
-                asm.Function(
-                    asm.Variable("simple_struct", finchlite.float64),
-                    (p_var, x_var),
-                    asm.Block(
-                        (
-                            asm.Print((p_var,)),
-                            asm.Print((x_var,)),
-                            asm.Print((p_var, x_var)),
-                            asm.Assign(
-                                res_var,
-                                asm.Call(
-                                    asm.Literal(ffuncs.mul),
-                                    (
-                                        asm.GetAttr(p_var, asm.Literal("x")),
-                                        asm.GetAttr(x_var, asm.Literal("element_0")),
-                                    ),
-                                ),
-                            ),
-                            asm.Assign(
-                                res_var,
-                                asm.Call(
-                                    asm.Literal(ffuncs.add),
-                                    (
-                                        res_var,
-                                        asm.Call(
-                                            asm.Literal(ffuncs.mul),
-                                            (
-                                                asm.GetAttr(p_var, asm.Literal("y")),
-                                                asm.GetAttr(
-                                                    x_var, asm.Literal("element_1")
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            asm.Print((res_var,)),
-                            asm.Print((p_var, x_var, res_var)),
-                            asm.Return(res_var),
-                        )
-                    ),
-                ),
-            ),
-        )
-    )
-
-    result = mod.simple_struct(p, x)
-    assert result == 9.0
-
-    capture = capsys.readouterr().out
-    file_regression.check(capture, extension=".txt")

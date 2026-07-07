@@ -2,28 +2,29 @@ name: Benchmark
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
         with:
             fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          python-version: '3.12'
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-      - name: Configure Poetry
-        run: |
-            poetry env use python3.12
-      - name: Install package
-        run: |
-          poetry install --extras benchmark
+          pixi-version: v0.71.3
+          environments: benchmark
       - name: Run benchmarks
-        run: |
-          poetry run asv machine --yes
-          poetry run asv continuous origin/main HEAD -f 1.25 --show-stderr
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: simulation,memory
+          run: |
+            pixi run benchmark -vvv -m "not slow"
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main

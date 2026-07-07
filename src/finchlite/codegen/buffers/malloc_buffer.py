@@ -72,13 +72,13 @@ class MallocBufferBackend:
             free=ctx.freshen("mallocbuffer_free"),
             resize=ctx.freshen("mallocbuffer_resize"),
         )
-        ctx.datastructures[ftype] = methods
+        ctx.buffer_methods[ftype] = methods
 
         buffer_type = ctx.ctype_name(CMallocBufferStruct)
         elt_type = ctx.ctype_name(c_type(ftype.element_type))
         length_type = ctx.ctype_name(c_type(ftype.length_type))
 
-        inline_s = "static inline " if inline else ""
+        inline_s = "static inline " if inline else "FINCH_EXPORT "
         libcode = dedent(
             f"""
             {inline_s}{elt_type}*
@@ -305,10 +305,10 @@ class MallocBufferFType(CBufferFType, CStackFType):
     def c_resize(self, ctx: CContext, buf: Stack, new_len: AssemblyExpression):
         assert isinstance(buf.obj, CBufferFields)
 
-        if self not in ctx.datastructures:
+        if self not in ctx.buffer_methods:
             raise Exception("A Mallocbuffer must be unpacked before being operated on!")
 
-        methods: CMallocBufferMethods = ctx.datastructures[self]
+        methods: CMallocBufferMethods = ctx.buffer_methods[self]
 
         new_len = ctx(ctx.cache("len", new_len))
         data = buf.obj.data
@@ -329,7 +329,7 @@ class MallocBufferFType(CBufferFType, CStackFType):
         t = ctx.ctype_name(c_type(self.element_type))
         ctx.add_header("#include <stddef.h>")
 
-        if self not in ctx.datastructures:
+        if self not in ctx.buffer_methods:
             MallocBufferBackend.gen_code(ctx, self, inline=True)
 
         ctx.exec(
