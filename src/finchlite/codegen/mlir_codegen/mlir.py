@@ -411,14 +411,6 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
-def mlir_identifier(name: str) -> str:
-    """
-    Sanitize a finch variable name (which may contain characters like '#')
-    into a valid MLIR identifier.
-    """
-    return "".join(c if c.isalnum() or c in "_.$-" else "_" for c in name)
-
-
 def mlir_getattr(fmt: FType, ctx, obj, attrs):
     """
     Emit a single llvm.extractvalue for the chain of field accesses `attrs`
@@ -826,8 +818,6 @@ class MLIRContext(Context):
                 return buf_t.mlir_resize(self, self.resolve(buffer), size)
 
             case asm.GetAttr(obj, attr):
-                # Fold chained accesses (a.lvl.lvl.val) into one extraction
-                # path rooted at the innermost non-GetAttr object.
                 attrs = [attr.val]
                 base = obj
                 while True:
@@ -905,7 +895,7 @@ class MLIRContext(Context):
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            ssa = "%" + mlir_identifier(name)
+                            ssa = "%" + name.replace("#", "_")
                             statement.append(f"{ssa}: {mlir_type(t)}")
                             ctx_2.bindings[name] = (ssa, mlir_type(t))
                         case _:
