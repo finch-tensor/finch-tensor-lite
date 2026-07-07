@@ -412,14 +412,9 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
 
 
 def mlir_getattr(fmt: FType, ctx, obj, attrs):
-    """
-    Emit a single llvm.extractvalue for the chain of field accesses `attrs`
-    rooted at the struct value `obj`, converting the result back from its
-    lowered form. Results are memoized per scope, so repeated accesses reuse
-    the first extraction.
-    """
     idxs = []
     t = fmt
+
     for a in attrs:
         if not isinstance(t, StructFType):
             raise TypeError(f"Expected struct type, got: {t}")
@@ -427,37 +422,34 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
             raise ValueError(f"trying to get missing attr {a!r}")
         idxs.append(t.struct_fieldnames.index(a))
         t = t.struct_attrtype(a)
+
     key = f".getattr:{obj}[{','.join(map(str, idxs))}]"
+
     if key in ctx.bindings:
         return ctx.bindings[key][0]
+
     res = ctx.new_ssa()
     ctx.exec(
         f"{ctx.feed}{res} = llvm.extractvalue {obj}"
         f"[{', '.join(map(str, idxs))}] : {mlir_struct_type(fmt)}"
     )
-    # Struct fields are stored in their LLVM-lowered form; convert back to
-    # the type the rest of the program expects.
-    s = mlir_type(t)
-    lowered = llvm_lowered_type(s)
-    if lowered != s:
+
+    if llvm_type(mlir_type(t)) != mlir_type(t):
         cast = ctx.new_ssa()
-        if s == "index":
+        if mlir_type(t) == "index":
             ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {res} : i64 to index")
         else:
             ctx.exec(
                 f"{ctx.feed}{cast} = builtin.unrealized_conversion_cast {res} "
-                f": {lowered} to {s}"
+                f": {llvm_type(mlir_type(t))} to {mlir_type(t)}"
             )
         res = cast
-    ctx.bindings[key] = (res, s)
+
+    ctx.bindings[key] = (res, mlir_type(t))
     return res
 
 
-def llvm_lowered_type(s: str) -> str:
-    """
-    Return the LLVM-dialect spelling of an MLIR type, i.e. how a value of
-    that type is stored as a field inside an !llvm.struct.
-    """
+def llvm_type(s: str) -> str:
     if s.startswith("memref<") and s.endswith(">"):
         *dims, _ = s[len("memref<") : -1].split("x")
         return (
@@ -476,7 +468,7 @@ def mlir_struct_type(fmt: StructFType) -> str:
             case StructFType():
                 fields.append(mlir_struct_type(t))
             case _:
-                fields.append(llvm_lowered_type(mlir_type(t)))
+                fields.append(llvm_type(mlir_type(t)))
     return f"!llvm.struct<({', '.join(fields)})>"
 
 
