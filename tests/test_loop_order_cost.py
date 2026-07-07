@@ -13,7 +13,7 @@ from finchlite.autoschedule.loop_order_cost import (
     get_loop_lookups,
     loop_order_cost,
 )
-from finchlite.autoschedule.tensor_stats import DatabaseStatsFactory
+from finchlite.autoschedule.tensor_stats import DCStatsFactory
 from finchlite.finch_logic import Alias, Field, Literal, MapJoin, Table
 
 ORDERS = [
@@ -84,7 +84,7 @@ def _ref_cost(A, B, order, sf, expr, bindings):
 
 def test_loop_order_cost():
     rng = np.random.default_rng(42)
-    sf = DatabaseStatsFactory()
+    sf = DCStatsFactory()
     cases = [
         (
             np.array([[1, 0, 0], [0, 2, 0], [0, 0, 0]], float),
@@ -109,7 +109,7 @@ def test_loop_order_cost():
 
 
 def test_empty_relation():
-    sf = DatabaseStatsFactory()
+    sf = DCStatsFactory()
     # l_ is l, precommit throws bad name error otehrwise
     i, j, k, l_, m = (Field(name) for name in "ijklm")
     a, b, c, d = (Alias(name) for name in "ABCD")

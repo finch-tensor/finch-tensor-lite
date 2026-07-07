@@ -168,7 +168,7 @@ def needs_reformat(stats: TensorStats, prefix: tuple[Field, ...]) -> bool:
 
 
 # TODO: Julia's estimate used conditional indices for per-axis nnz fractions.
-# For now use prefix density only.
+# For now use prefix density.
 def _approx_axis_density(stats: TensorStats, rel_vars: set[Field]) -> float:
     if not isinstance(stats, NumericStats):
         return 1.0
