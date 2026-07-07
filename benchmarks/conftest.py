@@ -1,12 +1,12 @@
 import pytest
 
 import finchlite as fl
-from finchlite.autoschedule import COMPILE_NUMBA, INTERPRET_NOTATION_GALLEY
+from finchlite.autoschedule import COMPILE_NUMBA, COMPILE_NUMBA_GALLEY
 
 
 @pytest.fixture(
     params=[
-        pytest.param(INTERPRET_NOTATION_GALLEY, id="interpret_galley"),
+        pytest.param(COMPILE_NUMBA_GALLEY, id="compile_numba_galley"),
         pytest.param(COMPILE_NUMBA, id="compile_numba"),
     ]
 )

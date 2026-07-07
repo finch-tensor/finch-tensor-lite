@@ -746,15 +746,12 @@ class MLIRContext(Context):
 
     def resolve(self, node):
         match node:
-            case asm.Slot(var_n, var_t):
+            case asm.Slot(var_n, _):
                 if var_n in self.slots:
-                    var_o = self.slots[var_n]
-                    return asm.Stack(var_o, var_t)
+                    return self.slots[var_n]
                 raise KeyError(f"Slot {var_n} not found in context")
-            case asm.Stack(_, _):
-                return node
             case _:
-                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+                raise ValueError(f"Expected Slot, got: {type(node)}")
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
@@ -805,32 +802,28 @@ class MLIRContext(Context):
                 return mlir_function_call(op, self, *args)
 
             case asm.Length(buffer):
-                buf = self.resolve(buffer)
-                buf_t = buf.result_type
+                buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_length(self, buf)
+                return buf_t.mlir_length(self, self.resolve(buffer))
 
             case asm.Load(buffer, index):
-                buf = self.resolve(buffer)
-                buf_t = buf.result_type
+                buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_load(self, buf, index)
+                return buf_t.mlir_load(self, self.resolve(buffer), index)
 
             case asm.Store(buffer, index, value):
-                buf = self.resolve(buffer)
-                buf_t = buf.result_type
+                buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_store(self, buf, index, value)
+                return buf_t.mlir_store(self, self.resolve(buffer), index, value)
 
             case asm.Resize(buffer, size):
-                buf = self.resolve(buffer)
-                buf_t = buf.result_type
+                buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_resize(self, buf, size)
+                return buf_t.mlir_resize(self, self.resolve(buffer), size)
 
             case asm.GetAttr(obj, attr):
                 # Fold chained accesses (a.lvl.lvl.val) into one extraction

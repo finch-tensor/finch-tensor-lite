@@ -1,13 +1,13 @@
 import ctypes
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 import numpy as np
 
 import numba
 from mlir.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
-from finchlite.algebra import FType, ftype, ftypes
-from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
+from finchlite.algebra import FType, TupleFType, ftype, ftypes
+from finchlite.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type
 from finchlite.codegen.mlir_codegen import (
     MLIRBufferFType,
     MLIRContext,
@@ -16,7 +16,7 @@ from finchlite.codegen.mlir_codegen import (
 )
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
-from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
+from finchlite.finch_assembly.nodes import AssemblyExpression
 from finchlite.util import qual_str
 
 
@@ -70,14 +70,19 @@ class NumpyBuffer(Buffer):
         """
         Returns the ftype of the buffer, which is a NumpyBufferFType.
         """
-        return NumpyBufferFType(ftype(self.arr.dtype.type))
+        return NumpyBufferFType(ftype(self.arr.dtype))
 
     # TODO should be property
     def length(self):
         return self.arr.size
 
     def load(self, index: int):
-        return self.arr[index]
+        value = self.arr[index]
+        if isinstance(self.ftype.element_type, TupleFType):
+            return tuple(
+                value[name] for name in self.ftype.element_type.struct_fieldnames
+            )
+        return value
 
     def store(self, index: int, value):
         self.arr[index] = value
@@ -94,14 +99,16 @@ class NumpyBuffer(Buffer):
         return f"NumpyBuffer({arr_repr})"
 
 
-class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFType):
+class NumpyBufferFType(
+    CBufferFType, NumbaBufferFType, MLIRBufferFType, CUnpackableFType
+):
     """
     A ftype for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFType class.
     """
 
     def __init__(self, element_type: FType):
-        self._element_type = ftype(to_numpy_type(element_type).type)
+        self._element_type = ftype(to_numpy_type(ftype(element_type)))
 
     @property
     def _dtype(self):
@@ -142,33 +149,29 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
     def c_type(self):
         return ctypes.POINTER(CNumpyBuffer)
 
-    def c_length(self, ctx: "CContext", buf: "Stack"):
-        assert isinstance(buf.obj, CBufferFields)
-        return buf.obj.length
+    def c_length(self, ctx: "CContext", buf: CBufferFields):
+        return buf.length
 
-    def c_data(self, ctx: "CContext", buf: "Stack"):
-        assert isinstance(buf.obj, CBufferFields)
-        return buf.obj.data
+    def c_data(self, ctx: "CContext", buf: CBufferFields):
+        return buf.data
 
-    def c_load(self, ctx: "CContext", buf: "Stack", idx: "AssemblyExpression"):
-        assert isinstance(buf.obj, CBufferFields)
-        return f"({buf.obj.data})[{ctx(idx)}]"
+    def c_load(self, ctx: "CContext", buf: CBufferFields, idx: "AssemblyExpression"):
+        return f"({buf.data})[{ctx(idx)}]"
 
     def c_store(
         self,
         ctx: "CContext",
-        buf: "Stack",
+        buf: CBufferFields,
         idx: "AssemblyExpression",
         value: "AssemblyExpression",
     ):
-        assert isinstance(buf.obj, CBufferFields)
-        ctx.exec(f"{ctx.feed}({buf.obj.data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(value)};")
 
-    def c_resize(self, ctx, buf, new_len):
+    def c_resize(self, ctx, buf: CBufferFields, new_len):
         new_len = ctx(ctx.cache("len", new_len))
-        data = buf.obj.data
-        length = buf.obj.length
-        obj = buf.obj.obj
+        data = buf.data
+        length = buf.length
+        obj = buf.obj
         t = ctx.ctype_name(c_type(self.element_type))
         ctx.exec(
             f"{ctx.feed}{data} = ({t}*){obj}->resize(&{obj}->arr, {new_len});\n"
@@ -232,20 +235,36 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
             numba.types.Array(numba.from_dtype(self._dtype), 1, "C")
         )
 
-    def numba_length(self, ctx, buf):
-        arr = buf.obj.arr
+    def numba_length(self, ctx, buf: NumbaBufferFields):
+        arr = buf.arr
         return f"len({arr})"
 
     def numba_load(self, ctx, buf, idx):
-        arr = buf.obj.arr
+        buf = cast(NumbaBufferFields, buf)
+        arr = buf.arr
+        if isinstance(self.element_type, TupleFType):
+            idx = ctx(ctx.cache("idx", idx))
+            fields = ", ".join(
+                f"{arr}[{idx}]['{name}']"
+                for name in self.element_type.struct_fieldnames
+            )
+            return f"({fields},)"
         return f"{arr}[{ctx(idx)}]"
 
-    def numba_store(self, ctx, buf, idx, val):
-        arr = buf.obj.arr
-        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
+    def numba_store(self, ctx, buf, idx, value=None):
+        buf = cast(NumbaBufferFields, buf)
+        arr = buf.arr
+        if isinstance(self.element_type, TupleFType):
+            idx = ctx(ctx.cache("idx", idx))
+            value = ctx.cache("val", value)
+            val_code = ctx(value)
+            for i, name in enumerate(self.element_type.struct_fieldnames):
+                ctx.exec(f"{ctx.feed}{arr}[{idx}]['{name}'] = {val_code}[{i}]")
+            return
+        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(value)}")
 
-    def numba_resize(self, ctx, buf, new_len):
-        arr = buf.obj.arr
+    def numba_resize(self, ctx, buf: NumbaBufferFields, new_len):
+        arr = buf.arr
         ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
 
     def numba_unpack(self, ctx, var_n, val):
@@ -283,49 +302,50 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
     def mlir_type(self):
         return f"memref<?x{mlir_type(self.element_type)}>"
 
-    def mlir_length(self, ctx: "MLIRContext", buf: "Stack"):
+    def mlir_length(self, ctx: "MLIRContext", buf: MLIRBufferFields):
         c0 = ctx.new_ssa()
         ctx.exec(f"{ctx.feed}{c0} = arith.constant 0 : index")
         res = ctx.new_ssa()
         ctx.exec(
-            f"{ctx.feed}{res} = memref.dim {buf.obj.buffer}, {c0} : {self.mlir_type()}"
+            f"{ctx.feed}{res} = memref.dim {buf.buffer}, {c0} : {self.mlir_type()}"
         )
         return res
 
-    def mlir_index(self, ctx: "MLIRContext", idx: "AssemblyExpression"):
+    def _mlir_index(self, ctx: "MLIRContext", idx: "AssemblyExpression"):
+        i = ctx(idx)
         t = mlir_type(idx.result_type)
         if t == "index":
-            return ctx(idx)
-        cast = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {ctx(idx)} : {t} to index")
-        return cast
+            return i
+        cast_ = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{cast_} = arith.index_cast {i} : {t} to index")
+        return cast_
 
-    def mlir_load(self, ctx: "MLIRContext", buf: "Stack", idx: "AssemblyExpression"):
-        i = self.mlir_index(ctx, idx)
+    def mlir_load(
+        self, ctx: "MLIRContext", buf: MLIRBufferFields, idx: "AssemblyExpression"
+    ):
+        i = self._mlir_index(ctx, idx)
         c0 = ctx.new_ssa()
-        ctx.exec(
-            f"{ctx.feed}{c0} = memref.load {buf.obj.buffer}[{i}] : {self.mlir_type()}"
-        )
+        ctx.exec(f"{ctx.feed}{c0} = memref.load {buf.buffer}[{i}] : {self.mlir_type()}")
         return c0
 
     def mlir_store(
         self,
         ctx: "MLIRContext",
-        buf: "Stack",
+        buf: MLIRBufferFields,
         idx: "AssemblyExpression",
         value: "AssemblyExpression",
     ):
         new = ctx(value)
-        i = self.mlir_index(ctx, idx)
+        i = self._mlir_index(ctx, idx)
         ctx.exec(
-            f"{ctx.feed}memref.store {new}, {buf.obj.buffer}[{i}] : {self.mlir_type()}"
+            f"{ctx.feed}memref.store {new}, {buf.buffer}[{i}] : {self.mlir_type()}"
         )
         return
 
-    def mlir_resize(self, ctx: "MLIRContext", buf: "Stack", new_len):
+    def mlir_resize(self, ctx: "MLIRContext", buf: MLIRBufferFields, new_len):
         c0 = ctx.new_ssa()
         ctx.exec(
-            f"{ctx.feed}{c0} = memref.realloc {buf.obj.buffer}({ctx(new_len)}) "
+            f"{ctx.feed}{c0} = memref.realloc {buf.buffer}({ctx(new_len)}) "
             f": {self.mlir_type()} to {self.mlir_type()}"
         )
         return MLIRBufferFields(c0)

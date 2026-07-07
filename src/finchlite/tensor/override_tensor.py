@@ -80,6 +80,16 @@ ufunc_map: dict[Any, Any] = {
 
 class OverrideTensor(Tensor):
     @property
+    def mT(self):
+        return self.mod.matrix_transpose(self)
+
+    @property
+    def T(self):
+        if self.ndim != 2:
+            raise ValueError("T is only defined for 2D arrays")
+        return self.mod.matrix_transpose(self)
+
+    @property
     def mod(self):
         return self.override_module()
 

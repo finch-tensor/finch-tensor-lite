@@ -302,9 +302,29 @@ def concordize(
 ) -> LogicStatement:
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
+    field_orders: dict[Alias, tuple[Field, ...]] = {}
+
+    match root:
+        case Plan(bodies):
+            for body in bodies:
+                match body:
+                    case Query(lhs, rhs):
+                        field_orders[lhs] = rhs.fields()
 
     def rule_0(ex):
         match ex:
+            case Table(Alias(_) as var, idxs) if (
+                var in field_orders
+                and idxs != field_orders[var]
+                and set(idxs) == set(field_orders[var])
+            ):
+                perm = tuple(field_orders[var].index(idx) for idx in idxs)
+                return Table(
+                    needed_swizzles.setdefault(var, {}).setdefault(
+                        perm, Alias(namespace.freshen(var.name))
+                    ),
+                    idxs,
+                )
             case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
                 if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
                     idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
@@ -336,8 +356,9 @@ def concordize(
 
     root = flatten_plans(root)
     match root:
-        case Plan((*bodies, Produces(_) as prod)):
-            root = Plan(tuple(bodies))
+        case Plan(bodies) if isinstance(bodies[-1], Produces):
+            prod = bodies[-1]
+            root = Plan(bodies[:-1])
             root = Rewrite(PostWalk(rule_0))(root)
             root = Rewrite(PostWalk(rule_1))(root)
             # Consider also aliases from input arguments.
