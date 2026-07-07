@@ -1,10 +1,14 @@
 import ctypes
+import logging
 from abc import ABC, abstractmethod
-from functools import cache
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
 
+from mlir import ir
+from mlir.execution_engine import ExecutionEngine
+from mlir.passmanager import PassManager
 from mlir.runtime import make_nd_memref_descriptor
 
 from finchlite import algebra
@@ -12,10 +16,31 @@ from finchlite import finch_assembly as asm
 from finchlite.algebra import (
     FType,
     StructFType,
+    TupleFType,
     ffuncs,
+    fisinstance,
 )
 from finchlite.finch_assembly import BufferFType
-from finchlite.symbolic import Context, ScopedDict
+from finchlite.symbolic import Context, ScopedDict, UnvalidatedForm
+from finchlite.util.logging import LOG_BACKEND_MLIR
+
+from .stages import MLIRCode, MLIRLowerer
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_MLIR)
+
+
+mlir_memrefs: dict[Any, Any] = {}
+mlir_structs: dict[Any, Any] = {}
+MLIR_PIPELINE = (
+    "builtin.module("
+    "expand-strided-metadata,"
+    "convert-scf-to-cf,"
+    "convert-cf-to-llvm,"
+    "convert-arith-to-llvm,"
+    "finalize-memref-to-llvm,"
+    "convert-func-to-llvm,"
+    "reconcile-unrealized-casts)"
+)
 
 
 class MLIROperator(ABC):
@@ -42,6 +67,170 @@ class MLIRNAryOperator(MLIROperator):
 class MLIRBinaryOperator(MLIROperator):
     def mlir_function_call(self, ctx: Any, *args: Any) -> Any:
         return mlir_binary_function_call(self.mlir_name(), ctx, *args)
+
+
+def aliased_return_args(func):
+    match func:
+        case asm.Function(_, args, asm.Block(bodies)) if bodies:
+            pass
+        case _:
+            return None
+    params = []
+    for a in args:
+        match a:
+            case asm.Variable(name, _):
+                params.append(name)
+            case _:
+                return None
+    defs = {}
+    for stmt in bodies[:-1]:
+        match stmt:
+            case asm.Assign(asm.Variable(name, _), val):
+                defs[name] = val
+
+    def resolve(node):
+        seen = set()
+        while True:
+            match node:
+                case asm.Variable(name, _) if name in defs and name not in seen:
+                    seen.add(name)
+                    node = defs[name]
+                case asm.Variable(name, _) if name in params:
+                    return params.index(name)
+                case _:
+                    return None
+
+    match bodies[-1]:
+        case asm.Return(val):
+            pass
+        case _:
+            return None
+    seen = set()
+    while True:
+        match val:
+            case asm.Variable(name, _) if name in defs and name not in seen:
+                seen.add(name)
+                val = defs[name]
+            case _:
+                break
+    match val:
+        case asm.Call(asm.Literal(op), tuple_args) if op == ffuncs.make_tuple:
+            idxs = [resolve(a) for a in tuple_args]
+            if all(i is not None for i in idxs):
+                return tuple(idxs)
+    return None
+
+
+class MLIRKernel(asm.AssemblyKernel):
+    def __init__(self, engine, func_name, ret_type, argtypes, ret_alias=None):
+        self.engine = engine
+        self.func_name = func_name
+        self.ret_type = ret_type
+        self.argtypes = argtypes
+        self.ret_alias = ret_alias
+
+    def __call__(self, *args):
+        if len(args) != len(self.argtypes):
+            raise ValueError(
+                f"Expected {len(self.argtypes)} arguments, got {len(args)}"
+            )
+        for argtype, arg in zip(self.argtypes, args, strict=False):
+            if not fisinstance(arg, argtype):
+                raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
+        serial_args = list(map(serialize_to_mlir, self.argtypes, args))
+
+        packed = []
+        for t, sa in zip(self.argtypes, serial_args, strict=False):
+            if isinstance(t, BufferFType):
+                packed.append(ctypes.pointer(ctypes.pointer(sa)))
+            else:
+                packed.append(ctypes.pointer(sa))
+
+        if self.ret_type == algebra.none_ or self.ret_alias is not None:
+            res = None
+            self.engine.invoke(self.func_name, *packed)
+        elif isinstance(self.ret_type, StructFType):
+            res = mlir_field_ctype(self.ret_type)()
+            self.engine.invoke(
+                self.func_name, *packed, ctypes.pointer(ctypes.pointer(res))
+            )
+        else:
+            res = mlir_field_ctype(self.ret_type)()
+            self.engine.invoke(self.func_name, *packed, ctypes.pointer(res))
+
+        for arg_type, arg, serial_arg in zip(
+            self.argtypes, args, serial_args, strict=False
+        ):
+            deserialize_from_mlir(arg_type, arg, serial_arg)
+
+        if self.ret_alias is not None:
+            return tuple(args[i] for i in self.ret_alias)
+        if self.ret_type is type(None):
+            return None
+        return construct_from_mlir(self.ret_type, res)
+
+
+class MLIRLibrary(asm.AssemblyLibrary):
+    def __init__(self, mlir_module, kernels):
+        self.mlir_module = mlir_module
+        self.kernels = kernels
+
+    def __getattr__(self, name):
+        if name in self.kernels:
+            return self.kernels[name]
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
+
+
+@lru_cache(maxsize=10_000)
+def load_mlir_engine(mlir_code: str):
+    context = ir.Context()
+    with context:
+        module = ir.Module.parse(mlir_code)
+        pm = PassManager.parse(MLIR_PIPELINE)
+        try:
+            pm.run(module.operation)
+        except Exception as e:
+            logger.error(
+                f"MLIR pass pipeline failed on the following code:\n{mlir_code}"
+                f"\nError message: {e}"
+            )
+            raise
+        engine = ExecutionEngine(module)
+    return context, module, engine
+
+
+class MLIRCompiler(UnvalidatedForm, asm.AssemblyLoader):
+    def __init__(self, ctx: MLIRLowerer | None = None):
+        self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
+
+    def lower(self, prgm: asm.Module) -> MLIRLibrary:
+        if prgm.head() != asm.Module:
+            raise ValueError(
+                "MLIRCompiler expects a Module as the head of the program, "
+                f"got {type(prgm.head())}"
+            )
+        mlir_code = self.ctx(prgm).code
+        logger.debug(f"Compiling MLIR code:\n{mlir_code}")
+        context, module, engine = load_mlir_engine(mlir_code)
+        kernels = {}
+        for func in prgm.funcs:
+            match func:
+                case asm.Function(asm.Variable(func_name, return_t), args, _):
+                    arg_ts = [arg.result_type for arg in args]
+                    kernels[func_name] = MLIRKernel(
+                        engine,
+                        func_name,
+                        return_t,
+                        arg_ts,
+                        ret_alias=aliased_return_args(func),
+                    )
+                case _:
+                    raise NotImplementedError(
+                        f"Unrecognized function type: {type(func)}"
+                    )
+        return MLIRLibrary((context, module, engine), kernels)
 
 
 def mlir_function_name(op, arg: FType) -> str:
@@ -178,6 +367,19 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             return op.mlir_function_call(ctx, *args)
 
     match op:
+        case ffuncs._InitWrite():
+            return ctx(args[1])
+        case ffuncs.make_tuple:
+            t = TupleFType.from_tuple(tuple(a.result_type for a in args))
+            st = mlir_struct_type(t)
+            acc = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{acc} = llvm.mlir.undef : {st}")
+            for k, a in enumerate(args):
+                v = ctx(a)
+                nxt = ctx.new_ssa()
+                ctx.exec(f"{ctx.feed}{nxt} = llvm.insertvalue {v}, {acc}[{k}] : {st}")
+                acc = nxt
+            return acc
         case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
             return mlir_nary_function_call(
                 mlir_function_name(op, args[0].result_type), ctx, *args
@@ -209,13 +411,70 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
-def mlir_getattr(fmt: FType, ctx, obj, attr):
-    idx = fmt.struct_fieldnames.index(attr)
+def mlir_identifier(name: str) -> str:
+    """
+    Sanitize a finch variable name (which may contain characters like '#')
+    into a valid MLIR identifier.
+    """
+    return "".join(c if c.isalnum() or c in "_.$-" else "_" for c in name)
+
+
+def mlir_getattr(fmt: FType, ctx, obj, attrs):
+    """
+    Emit a single llvm.extractvalue for the chain of field accesses `attrs`
+    rooted at the struct value `obj`, converting the result back from its
+    lowered form. Results are memoized per scope, so repeated accesses reuse
+    the first extraction.
+    """
+    idxs = []
+    t = fmt
+    for a in attrs:
+        if not isinstance(t, StructFType):
+            raise TypeError(f"Expected struct type, got: {t}")
+        if not t.struct_hasattr(a):
+            raise ValueError(f"trying to get missing attr {a!r}")
+        idxs.append(t.struct_fieldnames.index(a))
+        t = t.struct_attrtype(a)
+    key = f".getattr:{obj}[{','.join(map(str, idxs))}]"
+    if key in ctx.bindings:
+        return ctx.bindings[key][0]
     res = ctx.new_ssa()
     ctx.exec(
-        f"{ctx.feed}{res} = llvm.extractvalue {obj}[{idx}] : {mlir_struct_type(fmt)}"
+        f"{ctx.feed}{res} = llvm.extractvalue {obj}"
+        f"[{', '.join(map(str, idxs))}] : {mlir_struct_type(fmt)}"
     )
+    # Struct fields are stored in their LLVM-lowered form; convert back to
+    # the type the rest of the program expects.
+    s = mlir_type(t)
+    lowered = llvm_lowered_type(s)
+    if lowered != s:
+        cast = ctx.new_ssa()
+        if s == "index":
+            ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {res} : i64 to index")
+        else:
+            ctx.exec(
+                f"{ctx.feed}{cast} = builtin.unrealized_conversion_cast {res} "
+                f": {lowered} to {s}"
+            )
+        res = cast
+    ctx.bindings[key] = (res, s)
     return res
+
+
+def llvm_lowered_type(s: str) -> str:
+    """
+    Return the LLVM-dialect spelling of an MLIR type, i.e. how a value of
+    that type is stored as a field inside an !llvm.struct.
+    """
+    if s.startswith("memref<") and s.endswith(">"):
+        *dims, _ = s[len("memref<") : -1].split("x")
+        return (
+            f"!llvm.struct<(ptr, ptr, i64, "
+            f"array<{len(dims)} x i64>, array<{len(dims)} x i64>)>"
+        )
+    if s == "index":
+        return "i64"
+    return s
 
 
 def mlir_struct_type(fmt: StructFType) -> str:
@@ -225,17 +484,15 @@ def mlir_struct_type(fmt: StructFType) -> str:
             case StructFType():
                 fields.append(mlir_struct_type(t))
             case _:
-                s = mlir_type(t)
-                if s.startswith("memref<") and s.endswith(">"):
-                    *dims, _ = s[len("memref<") : -1].split("x")
-                    s = (
-                        f"!llvm.struct<(ptr, ptr, i64, "
-                        f"array<{len(dims)} x i64>, array<{len(dims)} x i64>)>"
-                    )
-                elif s == "index":
-                    s = "i64"
-                fields.append(s)
+                fields.append(llvm_lowered_type(mlir_type(t)))
     return f"!llvm.struct<({', '.join(fields)})>"
+
+
+class MLIRGenerator(UnvalidatedForm, MLIRLowerer):
+    def lower(self, prgm: asm.AssemblyNode) -> MLIRCode:
+        ctx = MLIRContext()
+        ctx(prgm)
+        return MLIRCode(ctx.emit_global())
 
 
 class MLIRArgumentFType(ABC):
@@ -266,6 +523,8 @@ def mlir_type(t: FType):
             return "f64"
         case algebra.ftypes.FDTypeNumpy():
             return numpy_to_mlir_types(t)
+        case StructFType():
+            return mlir_struct_type(t)
         case _:
             raise NotImplementedError(f"No MLIR type mapping for {t}")
 
@@ -286,7 +545,12 @@ def numpy_to_mlir_types(t):
 
 def mlir_ctype(s: str):
     if s.startswith("memref<") and s.endswith(">"):
-        return mlir_memref_ctype(s)
+        res = mlir_memrefs.get(s)
+        if res is None:
+            *dims, elem = s[len("memref<") : -1].split("x")
+            res = make_nd_memref_descriptor(len(dims), mlir_ctype(elem))
+            mlir_memrefs[s] = res
+        return res
 
     match s:
         case "i1":
@@ -307,16 +571,13 @@ def mlir_ctype(s: str):
             raise NotImplementedError(f"No ctypes mapping for MLIR type {s}")
 
 
-@cache
-def mlir_memref_ctype(s: str):
-    *dims, elem = s[len("memref<") : -1].split("x")
-    return make_nd_memref_descriptor(len(dims), mlir_ctype(elem))
-
-
-@cache
 def mlir_struct_ctype(fmt: StructFType):
-    fields = [(name, mlir_field_ctype(t)) for name, t in fmt.struct_fields]
-    return type("MLIR" + fmt.struct_name, (ctypes.Structure,), {"_fields_": fields})
+    res = mlir_structs.get(fmt)
+    if res is None:
+        fields = [(name, mlir_field_ctype(t)) for name, t in fmt.struct_fields]
+        res = type("MLIR" + fmt.struct_name, (ctypes.Structure,), {"_fields_": fields})
+        mlir_structs[fmt] = res
+    return res
 
 
 def mlir_field_ctype(t: FType):
@@ -395,19 +656,6 @@ def construct_struct_from_mlir(fmt: StructFType, mlir_obj):
             for name, t in fmt.struct_fields
         )
     )
-
-
-def resolve(self, node):
-    match node:
-        case asm.Slot(var_n, var_t):
-            if var_n in self.slots:
-                var_o = self.slots[var_n]
-                return asm.Stack(var_o, var_t)
-            raise KeyError(f"Slot {var_n} not found in context")
-        case asm.Stack(_, _):
-            return node
-        case _:
-            raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
 
 
 class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
@@ -496,6 +744,18 @@ class MLIRContext(Context):
     def new_ssa(self) -> str:
         return "%" + self.freshen("v")
 
+    def resolve(self, node):
+        match node:
+            case asm.Slot(var_n, var_t):
+                if var_n in self.slots:
+                    var_o = self.slots[var_n]
+                    return asm.Stack(var_o, var_t)
+                raise KeyError(f"Slot {var_n} not found in context")
+            case asm.Stack(_, _):
+                return node
+            case _:
+                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
@@ -573,12 +833,22 @@ class MLIRContext(Context):
                 return buf_t.mlir_resize(self, buf, size)
 
             case asm.GetAttr(obj, attr):
-                obj_t = obj.result_type
+                # Fold chained accesses (a.lvl.lvl.val) into one extraction
+                # path rooted at the innermost non-GetAttr object.
+                attrs = [attr.val]
+                base = obj
+                while True:
+                    match base:
+                        case asm.GetAttr(inner, a):
+                            attrs.append(a.val)
+                            base = inner
+                        case _:
+                            break
+                attrs.reverse()
+                obj_t = base.result_type
                 if not isinstance(obj_t, StructFType):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
-                if not obj_t.struct_hasattr(attr.val):
-                    raise ValueError("trying to get missing attr")
-                return mlir_getattr(obj_t, self, self(obj), attr.val)
+                return mlir_getattr(obj_t, self, self(base), attrs)
 
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 if val.result_type != var_t:
@@ -600,11 +870,34 @@ class MLIRContext(Context):
 
             case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
                 lo, hi = self(start), self(end)
+                for bound_t, name in (
+                    (start.result_type, "lo"),
+                    (end.result_type, "hi"),
+                ):
+                    if mlir_type(bound_t) != "index":
+                        cast = self.new_ssa()
+                        old = lo if name == "lo" else hi
+                        self.exec(
+                            f"{feed}{cast} = arith.index_cast {old} "
+                            f": {mlir_type(bound_t)} to index"
+                        )
+                        if name == "lo":
+                            lo = cast
+                        else:
+                            hi = cast
                 step = self.new_ssa()
                 self.exec(f"{feed}{step} = arith.constant 1 : index")
                 iv = self.new_ssa()
                 ctx_2 = self.subblock()
-                ctx_2.bindings[var_n] = (iv, mlir_type(var_t))
+                if mlir_type(var_t) == "index":
+                    ctx_2.bindings[var_n] = (iv, "index")
+                else:
+                    iv_cast = ctx_2.new_ssa()
+                    ctx_2.exec(
+                        f"{ctx_2.feed}{iv_cast} = arith.index_cast {iv} "
+                        f": index to {mlir_type(var_t)}"
+                    )
+                    ctx_2.bindings[var_n] = (iv_cast, mlir_type(var_t))
                 ctx_2(body)
                 self.exec(
                     f"{feed}scf.for {iv} = {lo} to {hi} step {step} {{\n"
@@ -619,16 +912,30 @@ class MLIRContext(Context):
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            statement.append(f"%{name}: {mlir_type(t)}")
-                            ctx_2.bindings[name] = (f"%{name}", mlir_type(t))
+                            ssa = "%" + mlir_identifier(name)
+                            statement.append(f"{ssa}: {mlir_type(t)}")
+                            ctx_2.bindings[name] = (ssa, mlir_type(t))
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized argument type: {arg}"
                             )
+                if isinstance(return_t, StructFType):
+                    if aliased_return_args(prgm) is not None:
+                        ctx_2.bindings[".ret_alias"] = ("", "")
+                        ret = ""
+                    else:
+                        statement.append("%_ret: !llvm.ptr")
+                        ctx_2.bindings[".ret_ptr"] = ("%_ret", "!llvm.ptr")
+                        ret = ""
+                else:
+                    ret = (
+                        ""
+                        if return_t == algebra.none_
+                        else f" -> {mlir_type(return_t)}"
+                    )
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 feed = self.feed
-                ret = "" if return_t == algebra.none_ else f" -> {mlir_type(return_t)}"
 
                 self.exec(
                     f"{feed}func.func @{func_name}({', '.join(statement)}){ret} "
@@ -641,6 +948,17 @@ class MLIRContext(Context):
             case asm.Return(value):
                 if value.result_type == algebra.none_:
                     self.exec(f"{feed}func.return")
+                elif isinstance(value.result_type, StructFType):
+                    if ".ret_alias" in self.bindings:
+                        self.exec(f"{feed}func.return")
+                    else:
+                        v = self(value)
+                        ptr = self.bindings[".ret_ptr"][0]
+                        self.exec(
+                            f"{feed}llvm.store {v}, {ptr} "
+                            f": {mlir_type(value.result_type)}, !llvm.ptr"
+                        )
+                        self.exec(f"{feed}func.return")
                 else:
                     v = self(value)
                     self.exec(f"{feed}func.return {v} : {mlir_type(value.result_type)}")

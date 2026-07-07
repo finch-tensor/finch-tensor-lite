@@ -8,7 +8,12 @@ from mlir.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 from finchlite.algebra import FType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CStackFType, c_type
-from finchlite.codegen.mlir_codegen import MLIRBufferFType, MLIRContext, mlir_type
+from finchlite.codegen.mlir_codegen import (
+    MLIRBufferFType,
+    MLIRContext,
+    mlir_ctype,
+    mlir_type,
+)
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression, Stack
@@ -287,8 +292,16 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
         )
         return res
 
+    def mlir_index(self, ctx: "MLIRContext", idx: "AssemblyExpression"):
+        t = mlir_type(idx.result_type)
+        if t == "index":
+            return ctx(idx)
+        cast = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {ctx(idx)} : {t} to index")
+        return cast
+
     def mlir_load(self, ctx: "MLIRContext", buf: "Stack", idx: "AssemblyExpression"):
-        i = ctx(idx)
+        i = self.mlir_index(ctx, idx)
         c0 = ctx.new_ssa()
         ctx.exec(
             f"{ctx.feed}{c0} = memref.load {buf.obj.buffer}[{i}] : {self.mlir_type()}"
@@ -303,7 +316,7 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
         value: "AssemblyExpression",
     ):
         new = ctx(value)
-        i = ctx(idx)
+        i = self.mlir_index(ctx, idx)
         ctx.exec(
             f"{ctx.feed}memref.store {new}, {buf.obj.buffer}[{i}] : {self.mlir_type()}"
         )
@@ -318,20 +331,16 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, MLIRBufferFType, CStackFT
         return MLIRBufferFields(c0)
 
     def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
-        raw = ctx(val)
-        c0 = ctx.new_ssa()
-        ctx.exec(
-            f"{ctx.feed}{c0} = builtin.unrealized_conversion_cast {raw} "
-            f": !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> "
-            f"to {self.mlir_type()}"
-        )
-        return MLIRBufferFields(c0)
+        return MLIRBufferFields(ctx(val))
 
     def mlir_repack(self, ctx: "MLIRContext", lhs, obj):
-        raise NotImplementedError
+        pass
 
     def serialize_to_mlir(self, obj):
-        return get_ranked_memref_descriptor(obj.arr)
+        src = get_ranked_memref_descriptor(obj.arr)
+        desc = mlir_ctype(self.mlir_type())()
+        ctypes.memmove(ctypes.byref(desc), ctypes.byref(src), ctypes.sizeof(desc))
+        return desc
 
     def deserialize_from_mlir(self, obj, mlir_buffer):
         obj.arr = ranked_memref_to_numpy(ctypes.pointer(mlir_buffer))
