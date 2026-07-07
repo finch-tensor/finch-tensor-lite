@@ -1,5 +1,5 @@
 import ctypes
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 import numpy as np
 
@@ -227,7 +227,8 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CUnpackableFType):
         return f"len({arr})"
 
     def numba_load(self, ctx, buf, idx):
-        arr = buf.obj.arr
+        buf = cast(NumbaBufferFields, buf)
+        arr = buf.arr
         if isinstance(self.element_type, TupleFType):
             idx = ctx(ctx.cache("idx", idx))
             fields = ", ".join(
@@ -237,16 +238,17 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CUnpackableFType):
             return f"({fields},)"
         return f"{arr}[{ctx(idx)}]"
 
-    def numba_store(self, ctx, buf, idx, val):
-        arr = buf.obj.arr
+    def numba_store(self, ctx, buf, idx, value=None):
+        buf = cast(NumbaBufferFields, buf)
+        arr = buf.arr
         if isinstance(self.element_type, TupleFType):
             idx = ctx(ctx.cache("idx", idx))
-            val = ctx.cache("val", val)
-            val_code = ctx(val)
+            value = ctx.cache("val", value)
+            val_code = ctx(value)
             for i, name in enumerate(self.element_type.struct_fieldnames):
                 ctx.exec(f"{ctx.feed}{arr}[{idx}]['{name}'] = {val_code}[{i}]")
             return
-        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(val)}")
+        ctx.exec(f"{ctx.feed}{arr}[{ctx(idx)}] = {ctx(value)}")
 
     def numba_resize(self, ctx, buf: NumbaBufferFields, new_len):
         arr = buf.arr
