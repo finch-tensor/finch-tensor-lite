@@ -29,7 +29,7 @@ def stats_with_false_fill(
     stats_factory: StatsFactory,
     stats: TensorStats,
 ) -> TensorStats:
-    stats_copy = stats_factory.copy_stats(stats)
+    stats_copy = stats_factory.copy(stats)
     stats_copy.fill_value = False
     return stats_copy
 
