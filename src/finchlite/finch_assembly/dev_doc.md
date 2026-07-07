@@ -8,7 +8,7 @@ It is a low-level imperative description of the program with control flow, linea
 The following is a rough grammar for FinchAssembly, written in terms of the current `__repr__`s of the corresponding AssemblyNodes.
 
 ```
-EXPR       := LITERAL | VARIABLE | SLOT | STACK | GETATTR | CALL | LOAD | LENGTH
+EXPR       := LITERAL | VARIABLE | SLOT | GETATTR | CALL | LOAD | LENGTH
 STMT       := UNPACK | REPACK | ASSIGN | SETATTR | STORE | RESIZE | FORLOOP
             | BUFFERLOOP | WHILELOOP | IF | IFELSE | FUNCTION | RETURN | BREAK
             | BLOCK | MODULE
@@ -19,15 +19,14 @@ VARIABLE   := Variable(name=IDENT, type=TYPE)
 SLOT       := Slot(name=IDENT, type=TYPE)
 UNPACK     := Unpack(lhs=SLOT, rhs=EXPR)
 REPACK     := Repack(val=SLOT)
-ASSIGN     := Assign(lhs=VARIABLE | STACK, rhs=EXPR)
+ASSIGN     := Assign(lhs=VARIABLE, rhs=EXPR)
 GETATTR    := GetAttr(obj=EXPR, attr=LITERAL)
 SETATTR    := SetAttr(obj=EXPR, attr=LITERAL, value=EXPR)
 CALL       := Call(op=LITERAL, args=EXPR...)
-LOAD       := Load(buffer=SLOT | STACK, index=EXPR)
-STORE      := Store(buffer=SLOT | STACK, index=EXPR, value=EXPR)
-RESIZE     := Resize(buffer=SLOT | STACK, new_size=EXPR)
-LENGTH     := Length(buffer=SLOT | STACK)
-STACK      := Stack(obj=ANY, type=TYPE)
+LOAD       := Load(buffer=SLOT, index=EXPR)
+STORE      := Store(buffer=SLOT, index=EXPR, value=EXPR)
+RESIZE     := Resize(buffer=SLOT, new_size=EXPR)
+LENGTH     := Length(buffer=SLOT)
 FORLOOP    := ForLoop(var=VARIABLE, start=EXPR, end=EXPR, body=NODE)
 BUFFERLOOP := BufferLoop(buffer=EXPR, var=VARIABLE, body=NODE)
 WHILELOOP  := WhileLoop(condition=EXPR, body=NODE)

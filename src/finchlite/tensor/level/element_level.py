@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, NamedTuple
+from typing import Any
 
 import numpy as np
 
@@ -8,11 +8,7 @@ from finchlite import finch_notation as ntn
 from finchlite.algebra import FType, ImmutableStructFType, ftype
 from finchlite.codegen import NumpyBufferFType
 from finchlite.compile.lower import AssemblyContext
-from finchlite.tensor.fiber_tensor import FiberTensorFields, Level, LevelFType
-
-
-class ElementLevelFields(NamedTuple):
-    buf_s: asm.Slot
+from finchlite.tensor.fiber_tensor import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
@@ -106,55 +102,39 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val)
 
-    @staticmethod
-    def _get_buf_s(lvl_fields) -> asm.Slot:
-        assert isinstance(lvl_fields, ElementLevelFields)
-        return lvl_fields.buf_s
-
-    def level_asm_unpack(self, ctx, var_n, val) -> ElementLevelFields:
-        buf = asm.Variable(f"{var_n}_buf", self.buffer_type)
-        buf_e = asm.GetAttr(val, asm.Literal("val"))
-        ctx.exec(asm.Assign(buf, buf_e))
-        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buffer_type)
-        ctx.exec(asm.Unpack(buf_s, buf))
-        return ElementLevelFields(buf_s)
-
-    def level_asm_repack(self, ctx, lvl_fields: ElementLevelFields):
-        ctx.exec(asm.Repack(lvl_fields.buf_s))
-
-    def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
-        buf_s = self._get_buf_s(lvl_fields)
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
-        body = asm.Store(buf_s, i_var, asm.Literal(init.val))
-        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf_s), body))
+        body = asm.Store(buf, i_var, asm.Literal(init.val))
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
-    def level_lower_unwrap(self, ctx, obj: FiberTensorFields, pos):
-        buf_s = self._get_buf_s(obj.lvl_fields)
-        return asm.Load(buf_s, pos)
+    def level_lower_unwrap(self, ctx, obj, pos):
+        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
+        return asm.Load(buf, pos)
 
     def level_lower_increment(
         self,
         ctx: AssemblyContext,
-        obj: FiberTensorFields,
+        obj,
         op: ntn.Literal,
         val: ntn.NotationExpression,
         pos: ntn.Variable,
     ):
-        buf_s = self._get_buf_s(obj.lvl_fields)
+        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
         pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
-                buf_s,
+                buf,
                 pos_e,
-                asm.Call(op_e, (asm.Load(buf_s, pos_e), val_e)),
+                asm.Call(op_e, (asm.Load(buf, pos_e), val_e)),
             )
         )
 
-    def level_lower_freeze(self, ctx, lvl_fields, op, pos):
-        return self._get_buf_s(lvl_fields)
+    def level_lower_freeze(self, ctx, lvl, op, pos):
+        return asm.GetAttr(lvl, asm.Literal("val"))
 
-    def level_lower_thaw(self, ctx, lvl_fields, op, pos):
-        return self._get_buf_s(lvl_fields)
+    def level_lower_thaw(self, ctx, lvl, op, pos):
+        return asm.GetAttr(lvl, asm.Literal("val"))
 
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")

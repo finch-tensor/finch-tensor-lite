@@ -34,7 +34,6 @@ from .nodes import (
     Return,
     SetAttr,
     Slot,
-    Stack,
     Store,
     Unpack,
     Variable,
@@ -43,6 +42,7 @@ from .nodes import (
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
+from .struct_slots import LowerPackedStructSlots
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 from .utils import get_vars_in_expr
 
@@ -77,6 +77,7 @@ __all__ = [
     "Length",
     "Literal",
     "Load",
+    "LowerPackedStructSlots",
     "Module",
     "NumberedStatement",
     "Repack",
@@ -84,7 +85,6 @@ __all__ = [
     "Return",
     "SetAttr",
     "Slot",
-    "Stack",
     "Store",
     "Unpack",
     "Variable",

@@ -614,21 +614,18 @@ class CContext(Context):
 
     def resolve(self, node):
         match node:
-            case asm.Slot(var_n, var_t):
+            case asm.Slot(var_n, _):
                 if var_n in self.slots:
-                    var_o = self.slots[var_n]
-                    return asm.Stack(var_o, var_t)
+                    return self.slots[var_n]
                 raise KeyError(f"Slot {var_n} not found in context")
-            case asm.Stack(_, _):
-                return node
             case _:
-                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+                raise ValueError(f"Expected Slot, got: {type(node)}")
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def cache(self, name, val):
-        if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
+        if isinstance(val, asm.Literal | asm.Variable):
             return val
         var_n = self.freshen(name)
         var_t = val.result_type
@@ -682,10 +679,6 @@ class CContext(Context):
                 return None
             case asm.Call(f, args):
                 return c_function_call(f.val, self, *args)
-            # case asm.Slot(var_n, var_t) as ref:
-            #    return self(self.deref(ref))
-            # case asm.Stack(obj, var_t) as ref:
-            #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:
@@ -715,29 +708,25 @@ class CContext(Context):
                 var_t.c_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_load(self, buf, idx)
+                return buf_t.c_load(self, self.resolve(buf), idx)
             case asm.Store(buf, idx, val):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_store(self, buf, idx, val)
+                return buf_t.c_store(self, self.resolve(buf), idx, val)
             case asm.Resize(buf, len):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_resize(self, buf, len)
+                return buf_t.c_resize(self, self.resolve(buf), len)
             case asm.Length(buf):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_length(self, buf)
+                return buf_t.c_length(self, self.resolve(buf))
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -861,16 +850,16 @@ class CContext(Context):
                 )
 
 
-class CStackFType(ABC):
+class CUnpackableFType(ABC):
     """
-    Abstract base class for symbolic formats in C. Stack formats must also
-    support other functions with symbolic inputs in addition to variable ones.
+    Abstract base class for unpackable formats in C. Unpackable formats must also
+    support other functions with unpacked inputs in addition to variable ones.
     """
 
     @abstractmethod
     def c_unpack(self, ctx, lhs, rhs):
         """
-        Convert a value to a symbolic representation in C. Returns a NamedTuple
+        Convert a value to an unpacked representation in C. Returns a NamedTuple
         of unpacked variable names, etc. The `lhs` is the variable namespace to
         assign to.
         """
@@ -879,8 +868,8 @@ class CStackFType(ABC):
     @abstractmethod
     def c_repack(self, ctx, lhs, rhs):
         """
-        Update an object based on a symbolic representation. The `rhs` is the
-        symbolic representation to update from, and `lhs` is a variable name referring
+        Update an object based on an unpacked representation. The `rhs` is the
+        unpacked representation to update from, and `lhs` is a variable name referring
         to the original object to update.
         """
         ...
