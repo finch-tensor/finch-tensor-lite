@@ -16,6 +16,7 @@ from finchlite.algebra import ftypes
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
+    MLIRGenerator,
     NumbaCompiler,
     NumbaGenerator,
     NumpyBuffer,
@@ -999,3 +1000,191 @@ def test_e2e_transpose_numba(a, dtype):
     wa = finchlite.lazy(finchlite.asarray(a))
     result = finchlite.compute(finchlite.permute_dims(wa, axes=(1, 0)))
     finch_assert_equal(result, a.T)
+
+
+@pytest.mark.parametrize(
+    "fmt_fn",
+    [
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(ftype(dtype)),
+            ndim=2,
+            dimension_type=(ftypes.intp, ftypes.intp),
+        ),
+        lambda dtype: fiber_tensor(
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
+        ),
+    ],
+)
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fmt_fn(dtype)
+    wa = finchlite.lazy(finchlite.asarray(a, format=fmt))
+    wb = finchlite.lazy(finchlite.asarray(b, format=fmt))
+
+    plan = finchlite.matmul(wa, wb)
+    result = finchlite.compute(plan)
+    finch_assert_equal(result, a @ b)
+
+
+def test_matmul_mlir_regression(file_regression):
+    m, k, n = 2, 3, 4
+    ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
+    bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
+    cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
+
+    def call(op, *args):
+        return asm.Call(asm.Literal(op), args)
+
+    i = asm.Variable("i", ftypes.intp)
+    j = asm.Variable("j", ftypes.intp)
+    p = asm.Variable("p", ftypes.intp)
+    a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+    b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
+    c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
+
+    c_idx = call(ffuncs.add, call(ffuncs.mul, i, asm.Literal(np.intp(n))), j)
+    a_idx = call(ffuncs.add, call(ffuncs.mul, i, asm.Literal(np.intp(k))), p)
+    b_idx = call(ffuncs.add, call(ffuncs.mul, p, asm.Literal(np.intp(n))), j)
+    body = asm.Store(
+        c_slt,
+        c_idx,
+        call(
+            ffuncs.add,
+            asm.Load(c_slt, c_idx),
+            call(ffuncs.mul, asm.Load(a_slt, a_idx), asm.Load(b_slt, b_idx)),
+        ),
+    )
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("matmul", ftypes.none_),
+                (a_v, b_v, c_v),
+                asm.Block(
+                    (
+                        asm.Unpack(a_slt, a_v),
+                        asm.Unpack(b_slt, b_v),
+                        asm.Unpack(c_slt, c_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.intp(0)),
+                            asm.Literal(np.intp(m)),
+                            asm.Block(
+                                (
+                                    asm.ForLoop(
+                                        j,
+                                        asm.Literal(np.intp(0)),
+                                        asm.Literal(np.intp(n)),
+                                        asm.Block(
+                                            (
+                                                asm.ForLoop(
+                                                    p,
+                                                    asm.Literal(np.intp(0)),
+                                                    asm.Literal(np.intp(k)),
+                                                    asm.Block((body,)),
+                                                ),
+                                            )
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(a_slt),
+                        asm.Repack(b_slt),
+                        asm.Repack(c_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+
+
+def test_mlir_form_rejects_loop_carried_assign():
+    a = np.array([1.0, 2.0, 3.0])
+    ab = NumpyBuffer(a)
+    c = asm.Variable("c", finchlite.float64)
+    i = asm.Variable("i", finchlite.int64)
+    ab_v, ab_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("dot", finchlite.float64),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (c, asm.Load(ab_slt, i)),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+    with pytest.raises(NotImplementedError, match="across loop iterations"):
+        MLIRGenerator()(prgm)
+
+
+def test_mlir_form_rejects_unsupported_statements():
+    a = np.array([1.0, 2.0, 3.0])
+    ab = NumpyBuffer(a)
+    ab_v, ab_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("f", ftypes.none_),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.If(
+                            asm.Literal(True),
+                            asm.Block(
+                                (
+                                    asm.Store(
+                                        ab_slt,
+                                        asm.Literal(np.int64(0)),
+                                        asm.Literal(np.float64(1.0)),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    with pytest.raises(NotImplementedError, match="does not yet support If"):
+        MLIRGenerator()(prgm)

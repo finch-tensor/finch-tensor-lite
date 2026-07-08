@@ -21,7 +21,7 @@ from finchlite.algebra import (
     fisinstance,
 )
 from finchlite.finch_assembly import BufferFType
-from finchlite.symbolic import Context, ScopedDict, UnvalidatedForm
+from finchlite.symbolic import Context, Form, ScopedDict
 from finchlite.util.logging import LOG_BACKEND_MLIR
 
 from .stages import MLIRCode, MLIRLowerer
@@ -201,7 +201,80 @@ def load_mlir_engine(mlir_code: str):
     return context, module, engine
 
 
-class MLIRCompiler(UnvalidatedForm, asm.AssemblyLoader):
+class MLIRForm(Form):
+    """
+    Validates that a FinchAssembly program only uses constructs the MLIR
+    backend can lower, raising a named error for each known limitation
+    instead of failing deep inside code generation.
+    """
+
+    @classmethod
+    def validate_inputs(cls, prgm):
+        match prgm:
+            case asm.Module(funcs):
+                for func in funcs:
+                    cls.validate_function(func)
+            case _:
+                raise TypeError(f"MLIR backend expects an asm.Module, got {type(prgm)}")
+
+    @classmethod
+    def validate_function(cls, func):
+        match func:
+            case asm.Function(asm.Variable(func_name, return_type), args, body):
+                pass
+            case _:
+                raise TypeError(f"MLIR backend expects asm.Function, got {func}")
+        defined = {}
+        for arg in args:
+            match arg:
+                case asm.Variable(name, t):
+                    cls.validate_type(func_name, f"argument {name!r}", t)
+                    defined[name] = 0
+                case _:
+                    raise TypeError(
+                        f"MLIR backend expects variable arguments in "
+                        f"{func_name!r}, got {arg}"
+                    )
+        if return_type != algebra.none_:
+            cls.validate_type(func_name, "return value", return_type)
+        cls.validate_stmt(func_name, body, defined, depth=0)
+
+    @classmethod
+    def validate_type(cls, func_name, what, t):
+        try:
+            mlir_type(t)
+        except NotImplementedError as e:
+            raise NotImplementedError(
+                f"MLIR backend cannot lower the type of {what} "
+                f"in function {func_name!r}: {t}"
+            ) from e
+
+    @classmethod
+    def validate_stmt(cls, func_name, node, defined, depth):
+        match node:
+            case asm.Block(bodies):
+                for body in bodies:
+                    cls.validate_stmt(func_name, body, defined, depth)
+            case asm.Assign(asm.Variable(name, _), _):
+                if name in defined and defined[name] < depth:
+                    raise NotImplementedError(
+                        f"MLIR backend does not yet support assigning to "
+                        f"{name!r} across loop iterations in {func_name!r} "
+                        f"(scalar reductions require scf.for iter_args)"
+                    )
+                defined.setdefault(name, depth)
+            case asm.ForLoop(asm.Variable(name, _), _, _, body):
+                inner = dict(defined)
+                inner[name] = depth + 1
+                cls.validate_stmt(func_name, body, inner, depth + 1)
+            case _:
+                raise NotImplementedError(
+                    f"MLIR backend does not yet support "
+                    f"{type(node).__name__} (in function {func_name!r})"
+                )
+
+
+class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
     def __init__(self, ctx: MLIRLowerer | None = None):
         self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
 
@@ -449,7 +522,7 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
     return res
 
 
-class MLIRGenerator(UnvalidatedForm, MLIRLowerer):
+class MLIRGenerator(MLIRForm, MLIRLowerer):
     def lower(self, prgm: asm.AssemblyNode) -> MLIRCode:
         ctx = MLIRContext()
         ctx(prgm)
@@ -490,12 +563,24 @@ def mlir_type(t: FType):
             raise NotImplementedError(f"No MLIR type mapping for {t}")
 
 
+def memref_shape(s: str) -> tuple[int, str]:
+    """
+    Split the inside of a memref type into (rank, element type). Only
+    dimension-shaped tokens ('?' or digits) count toward the rank, so
+    element types containing 'x' (like 'index') parse correctly.
+    """
+    toks = s[len("memref<") : -1].split("x")
+    rank = 0
+    while rank < len(toks) - 1 and (toks[rank] == "?" or toks[rank].isdigit()):
+        rank += 1
+    return rank, "x".join(toks[rank:])
+
+
 def llvm_type(s: str) -> str:
     if s.startswith("memref<") and s.endswith(">"):
-        *dims, _ = s[len("memref<") : -1].split("x")
+        rank, _ = memref_shape(s)
         return (
-            f"!llvm.struct<(ptr, ptr, i64, "
-            f"array<{len(dims)} x i64>, array<{len(dims)} x i64>)>"
+            f"!llvm.struct<(ptr, ptr, i64, array<{rank} x i64>, array<{rank} x i64>)>"
         )
     if s == "index":
         return "i64"
@@ -531,8 +616,8 @@ def mlir_ctype(s: str):
     if s.startswith("memref<") and s.endswith(">"):
         res = mlir_memrefs.get(s)
         if res is None:
-            *dims, elem = s[len("memref<") : -1].split("x")
-            res = make_nd_memref_descriptor(len(dims), mlir_ctype(elem))
+            rank, elem = memref_shape(s)
+            res = make_nd_memref_descriptor(rank, mlir_ctype(elem))
             mlir_memrefs[s] = res
         return res
 
