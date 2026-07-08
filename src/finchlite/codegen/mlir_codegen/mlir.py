@@ -267,6 +267,10 @@ class MLIRForm(Form):
                 inner = dict(defined)
                 inner[name] = depth + 1
                 cls.validate_stmt(func_name, body, inner, depth + 1)
+            # TODO:
+            case asm.Unpack(_, _) | asm.Repack(_) | asm.Store(_, _, _) | asm.Return(_):
+                pass
+
             case _:
                 raise NotImplementedError(
                     f"MLIR backend does not yet support "
@@ -564,11 +568,6 @@ def mlir_type(t: FType):
 
 
 def memref_shape(s: str) -> tuple[int, str]:
-    """
-    Split the inside of a memref type into (rank, element type). Only
-    dimension-shaped tokens ('?' or digits) count toward the rank, so
-    element types containing 'x' (like 'index') parse correctly.
-    """
     toks = s[len("memref<") : -1].split("x")
     rank = 0
     while rank < len(toks) - 1 and (toks[rank] == "?" or toks[rank].isdigit()):

@@ -1045,26 +1045,62 @@ def test_matmul_mlir_regression(file_regression):
     bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
     cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
 
-    def call(op, *args):
-        return asm.Call(asm.Literal(op), args)
-
     i = asm.Variable("i", ftypes.intp)
     j = asm.Variable("j", ftypes.intp)
     p = asm.Variable("p", ftypes.intp)
+
     a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
     b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
     c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
 
-    c_idx = call(ffuncs.add, call(ffuncs.mul, i, asm.Literal(np.intp(n))), j)
-    a_idx = call(ffuncs.add, call(ffuncs.mul, i, asm.Literal(np.intp(k))), p)
-    b_idx = call(ffuncs.add, call(ffuncs.mul, p, asm.Literal(np.intp(n))), j)
+    c_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
+    a_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(k))),
+            ),
+            p,
+        ),
+    )
+
+    b_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (p, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
     body = asm.Store(
         c_slt,
         c_idx,
-        call(
-            ffuncs.add,
-            asm.Load(c_slt, c_idx),
-            call(ffuncs.mul, asm.Load(a_slt, a_idx), asm.Load(b_slt, b_idx)),
+        asm.Call(
+            asm.Literal(ffuncs.add),
+            (
+                asm.Load(c_slt, c_idx),
+                asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (
+                        asm.Load(a_slt, a_idx),
+                        asm.Load(b_slt, b_idx),
+                    ),
+                ),
+            ),
         ),
     )
     prgm = asm.Module(
