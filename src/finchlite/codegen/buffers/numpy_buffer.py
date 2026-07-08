@@ -303,8 +303,7 @@ class NumpyBufferFType(
         return f"memref<?x{mlir_type(self.element_type)}>"
 
     def mlir_length(self, ctx: "MLIRContext", buf: MLIRBufferFields):
-        c0 = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{c0} = arith.constant 0 : index")
+        c0 = ctx.constant(0, "index")
         res = ctx.new_ssa()
         ctx.exec(
             f"{ctx.feed}{res} = memref.dim {buf.buffer}, {c0} : {self.mlir_type()}"

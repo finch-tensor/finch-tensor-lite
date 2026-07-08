@@ -449,29 +449,6 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
     return res
 
 
-def llvm_type(s: str) -> str:
-    if s.startswith("memref<") and s.endswith(">"):
-        *dims, _ = s[len("memref<") : -1].split("x")
-        return (
-            f"!llvm.struct<(ptr, ptr, i64, "
-            f"array<{len(dims)} x i64>, array<{len(dims)} x i64>)>"
-        )
-    if s == "index":
-        return "i64"
-    return s
-
-
-def mlir_struct_type(fmt: StructFType) -> str:
-    fields = []
-    for _, t in fmt.struct_fields:
-        match t:
-            case StructFType():
-                fields.append(mlir_struct_type(t))
-            case _:
-                fields.append(llvm_type(mlir_type(t)))
-    return f"!llvm.struct<({', '.join(fields)})>"
-
-
 class MLIRGenerator(UnvalidatedForm, MLIRLowerer):
     def lower(self, prgm: asm.AssemblyNode) -> MLIRCode:
         ctx = MLIRContext()
@@ -511,6 +488,29 @@ def mlir_type(t: FType):
             return mlir_struct_type(t)
         case _:
             raise NotImplementedError(f"No MLIR type mapping for {t}")
+
+
+def llvm_type(s: str) -> str:
+    if s.startswith("memref<") and s.endswith(">"):
+        *dims, _ = s[len("memref<") : -1].split("x")
+        return (
+            f"!llvm.struct<(ptr, ptr, i64, "
+            f"array<{len(dims)} x i64>, array<{len(dims)} x i64>)>"
+        )
+    if s == "index":
+        return "i64"
+    return s
+
+
+def mlir_struct_type(fmt: StructFType) -> str:
+    fields = []
+    for _, t in fmt.struct_fields:
+        match t:
+            case StructFType():
+                fields.append(mlir_struct_type(t))
+            case _:
+                fields.append(llvm_type(mlir_type(t)))
+    return f"!llvm.struct<({', '.join(fields)})>"
 
 
 def numpy_to_mlir_types(t):
@@ -728,6 +728,15 @@ class MLIRContext(Context):
     def new_ssa(self) -> str:
         return "%" + self.freshen("v")
 
+    def constant(self, value, type_: str) -> str:
+        key = f".const:{value}:{type_}"
+        if key in self.bindings:
+            return self.bindings[key][0]
+        ssa = self.new_ssa()
+        self.exec(f"{self.feed}{ssa} = arith.constant {value} : {type_}")
+        self.bindings[key] = (ssa, type_)
+        return ssa
+
     def resolve(self, node):
         match node:
             case asm.Slot(var_n, _):
@@ -768,9 +777,7 @@ class MLIRContext(Context):
                     if MLIROperator.is_float(prgm.result_type)
                     else int(value)
                 )
-                s = self.new_ssa()
-                self.exec(f"{self.feed}{s} = arith.constant {new} : {t}")
-                return s
+                return self.constant(new, t)
 
             case asm.Variable(name, _):
                 if name not in self.bindings:
@@ -860,8 +867,7 @@ class MLIRContext(Context):
                             lo = cast
                         else:
                             hi = cast
-                step = self.new_ssa()
-                self.exec(f"{feed}{step} = arith.constant 1 : index")
+                step = self.constant(1, "index")
                 iv = self.new_ssa()
                 ctx_2 = self.subblock()
                 if mlir_type(var_t) == "index":
