@@ -1,5 +1,5 @@
 import ctypes
-from typing import NamedTuple, cast
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 
@@ -330,9 +330,9 @@ class NumpyBufferFType(
     def mlir_store(
         self,
         ctx: "MLIRContext",
-        buf: MLIRBufferFields,
-        idx: "AssemblyExpression",
-        value: "AssemblyExpression",
+        buf: Any,
+        idx: Any,
+        value: Any = None,
     ):
         new = ctx(value)
         i = self._mlir_index(ctx, idx)

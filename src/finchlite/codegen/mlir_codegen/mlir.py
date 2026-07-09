@@ -489,8 +489,11 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
 
 
 def mlir_getattr(fmt: FType, ctx, obj, attrs):
+    if not isinstance(fmt, StructFType):
+        raise TypeError(f"Expected struct type, got: {fmt}")
+
     idxs = []
-    t = fmt
+    t: FType = fmt
 
     for a in attrs:
         if not isinstance(t, StructFType):
