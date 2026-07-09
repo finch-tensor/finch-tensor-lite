@@ -1017,6 +1017,7 @@ def test_e2e_transpose_numba(a, dtype):
         ),
     ],
 )
+@pytest.mark.mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
@@ -1039,6 +1040,7 @@ def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
     finch_assert_equal(result, a @ b)
 
 
+@pytest.mark.mlir_backend
 def test_matmul_mlir_regression(file_regression):
     m, k, n = 2, 3, 4
     ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))

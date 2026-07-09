@@ -568,11 +568,11 @@ def mlir_type(t: FType):
 
 
 def memref_shape(s: str) -> tuple[int, str]:
-    toks = s[len("memref<") : -1].split("x")
+    t = s[len("memref<") : -1].split("x")
     rank = 0
-    while rank < len(toks) - 1 and (toks[rank] == "?" or toks[rank].isdigit()):
+    while rank < len(t) - 1 and (t[rank] == "?" or t[rank].isdigit()):
         rank += 1
-    return rank, "x".join(toks[rank:])
+    return rank, "x".join(t[rank:])
 
 
 def llvm_type(s: str) -> str:

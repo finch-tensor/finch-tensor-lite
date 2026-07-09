@@ -57,11 +57,13 @@ ignore-pypi-mapping = false
 [tool.pixi.environments]
 test = { features = ["test"], solve-group = "default" }
 test-c = { features = ["test", "c"], solve-group = "default" }
+test-mlir = { features = ["test", "mlir"], solve-group = "mlir" }
 mindeps = { features = ["test", "mindeps"], solve-group = "mindeps" }
 benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 c = { features = ["c"], solve-group = "default" }
 c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
+mlir = { features = ["mlir"], solve-group = "mlir" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
@@ -104,6 +106,11 @@ cmd = "python -m pytest -m c_backend"
 depends-on = ["compile"]
 default-environment = "test-c"
 
+[tool.pixi.feature.test.tasks.test-mlir]
+cmd = "python -m pytest -m mlir_backend"
+depends-on = ["compile"]
+default-environment = "test-mlir"
+
 [tool.pixi.feature.benchmark.tasks.benchmark]
 cmd = "pytest --codspeed benchmarks/"
 depends-on = ["compile"]
@@ -143,6 +150,9 @@ clang = "*"
 
 [tool.pixi.feature.c-clang.activation.env]
 CC = "clang"
+
+[tool.pixi.feature.mlir.dependencies]
+mlir-python-bindings = ">=22.1,<23"
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"
