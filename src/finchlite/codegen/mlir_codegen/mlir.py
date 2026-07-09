@@ -6,11 +6,6 @@ from typing import Any
 
 import numpy as np
 
-from mlir import ir
-from mlir.execution_engine import ExecutionEngine
-from mlir.passmanager import PassManager
-from mlir.runtime import make_nd_memref_descriptor
-
 from finchlite import algebra
 from finchlite import finch_assembly as asm
 from finchlite.algebra import (
@@ -185,6 +180,10 @@ class MLIRLibrary(asm.AssemblyLibrary):
 
 @lru_cache(maxsize=10_000)
 def load_mlir_engine(mlir_code: str):
+    from mlir import ir
+    from mlir.execution_engine import ExecutionEngine
+    from mlir.passmanager import PassManager
+
     context = ir.Context()
     with context:
         module = ir.Module.parse(mlir_code)
@@ -618,6 +617,8 @@ def mlir_ctype(s: str):
     if s.startswith("memref<") and s.endswith(">"):
         res = mlir_memrefs.get(s)
         if res is None:
+            from mlir.runtime import make_nd_memref_descriptor
+
             rank, elem = memref_shape(s)
             res = make_nd_memref_descriptor(rank, mlir_ctype(elem))
             mlir_memrefs[s] = res

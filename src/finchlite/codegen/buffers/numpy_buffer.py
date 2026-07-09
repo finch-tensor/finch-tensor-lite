@@ -4,7 +4,6 @@ from typing import Any, NamedTuple, cast
 import numpy as np
 
 import numba
-from mlir.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 from finchlite.algebra import FType, TupleFType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type
@@ -356,13 +355,19 @@ class NumpyBufferFType(
         pass
 
     def serialize_to_mlir(self, obj):
+        from mlir.runtime import get_ranked_memref_descriptor
+
         src = get_ranked_memref_descriptor(obj.arr)
         desc = mlir_ctype(self.mlir_type())()
         ctypes.memmove(ctypes.byref(desc), ctypes.byref(src), ctypes.sizeof(desc))
         return desc
 
     def deserialize_from_mlir(self, obj, mlir_buffer):
+        from mlir.runtime import ranked_memref_to_numpy
+
         obj.arr = ranked_memref_to_numpy(ctypes.pointer(mlir_buffer))
 
     def construct_from_mlir(self, mlir_buffer):
+        from mlir.runtime import ranked_memref_to_numpy
+
         return NumpyBuffer(ranked_memref_to_numpy(ctypes.pointer(mlir_buffer)))
