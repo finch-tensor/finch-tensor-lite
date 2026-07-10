@@ -10,7 +10,6 @@ from .tensor_def import TensorDef
 from .tensor_stats import BaseTensorStatsFactory
 
 
-
 def _duj1(d_n:float,f_1:float,q:float,n:float)->float:
     """"
     Using un-smoothened first order jackknife estimator
@@ -25,7 +24,7 @@ def _duj1(d_n:float,f_1:float,q:float,n:float)->float:
 
 
 def _outer_multiply(a:np.ndarray,a_order:list,b:np.ndarray,b_order:list)->tuple[np.ndarray,list]:
-    "multiplying sketches and keepinmg their index order"
+    "multiplying sketches and keeping their index order"
     combined_order = list(a_order)
     for f in b_order:
         if f not in combined_order:
@@ -91,33 +90,22 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
     
     def _mapjoin_join(self, new_def:TensorDef, op:FinchOperator, join_args:list[SamplingStats]):
         """
-        N(C)_i = sum_{j u k \\ i} N(A)_j * N(B)_k
-        Summing over free dimensions
-        Why sum ?
+        N(C)_i =  N(A)_j * N(B)_k 
         """
 
         if len(join_args)==1:
             return self.copy_stats(join_args[0])
         
-        output_indices = set(new_def.index_order)
         result = join_args[0].sketch.copy()
         result_order = list(join_args[0].tensordef.index_order)
 
         for arg in join_args[1:]:
-            result,result_order = _outer_multiply(result,result_order,arg.sketch,list(arg.tensordef.index_order),)
-        
-        """Added to match papers idea but is actually dead code as axes_to_sum in always empty ?"""
-        axes_to_sum = [result_order.index(f)
-                       for f in list(result_order)
-                       if f not in output_indices
-                       ]
-        for axis in sorted(axes_to_sum,reverse=True):
-            result = np.sum(result,axis=axis)
-            result_order = [f for i,f in enumerate(result_order) if i!=axis]
+            result,result_order = _outer_multiply(result,result_order,arg.sketch,list(arg.tensordef.index_order))
 
         new_remainder: set[Field] = set()
         new_remainder_sizes : dict = {}
         for arg in join_args:
+
             new_remainder |= arg.remainder_dims
             new_remainder_sizes.update(arg.remainder_dim_sizes)
         
@@ -127,7 +115,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
     
     def _mapjoin_union(self, new_def:TensorDef, op:FinchOperator, union_args:list[SamplingStats]):
         """
-        N(C)_i = sum_{juk\\i}[N(A)_j *prod_{l in k\\j}n(B)_l + N(B)_k *prod_{l in j\\k}n(A)_l ]
+        N(C)_i = sum_{juk\\i}[N(A)_j *prod_{l in k\\j}n(B)_l + N(B)_k *prod_{l in j\\k}n(A)_l ] - N(A)_j*N(B)_k 
         """
         output_indices = set(new_def.index_order)
         result_shape = tuple(int(new_def.dim_sizes[f]) for f in new_def.index_order)
@@ -151,24 +139,27 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             expanded = _expand_sketch_to(arg.sketch,list(arg.tensordef.index_order),
                                          list(new_def.index_order),new_def,)
             
-            arg_order = list(arg.tensordef.index_order)
-            axes_to_sum = [
-                i for i,f in enumerate(arg_order)
-                if f not in output_indices
-            ]
-
-            for axis in sorted(axes_to_sum,reverse=True):
-                expanded = np.sum(expanded,axis=axis)
-            
-            result = result + expanded*other_free_size
+            result = result + expanded*other_free_size 
             new_remainder |= arg.remainder_dims
+
+        if len(union_args)>=2:
+            inter = union_args[0].sketch.copy()
+            inter_order = list(union_args[0].tensordef.index_order)
+            for arg in union_args[1:]:
+                inter,inter_order = _outer_multiply(inter,inter_order,arg.sketch,list(arg.tensordef.index_order),)
+            
+            inter_expanded = _expand_sketch_to(inter,inter_order,list(new_def.index_order),
+                                               new_def,)
+            
+            result = result - inter_expanded
 
         return SamplingStats.from_def(new_def,result,new_remainder,self.sample_prob,new_remainder_sizes)
 
     def aggregate(self, op:FinchOperator, init: Any| None, reduce_indices : tuple[Field,...], stats:SamplingStats):
         """
-        annihilating : N(B)_i = sum_j N(A)_j 
-        non-annihilating : N(B)_i = prod(l in j)n_l * exists(N(A)_j)
+        op is identity on fill : N(B)_i = sum_j N(A)_j 
+        op annihilates fill: N(B)_i = prod(l in k)n_l * min_k 1[N(A)_j > 0]
+        otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)
         """
 
         new_def = TensorDef.aggregate(op,init,reduce_indices,stats.tensordef)
@@ -183,7 +174,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             for axis in sorted(reduce_axes,reverse=True):
                 new_sketch = np.sum(new_sketch,axis = axis)
         elif is_annihilator(op,stats.tensordef.fill_value):
-            exists = (stats.sketch>0).astype(float)
+            exists = (stats.sketch>0).astype(float)#why > 0 ?
             for axis in sorted(reduce_axes,reverse=True):
                 exists = np.min(exists,axis=axis)
             new_sketch = exists * math.prod(int(stats.tensordef.dim_sizes[f]) for f in reduce_set)
@@ -192,7 +183,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             exists = (stats.sketch>0).astype(float)
             for axis in sorted(reduce_axes,reverse=True):
                 exists = np.max(exists,axis=axis)
-            new_sketch = prod_n*exists
+            new_sketch = prod_n*exists 
         
         new_remainder = stats.remainder_dims | reduce_set
         new_remainder_sizes = dict(stats.remainder_dim_sizes)
@@ -289,7 +280,9 @@ class SamplingStats(NumericStats):
         remainder_size = math.prod(int(self.remainder_dim_sizes.get(f,1)) for f in self.remainder_dims
                                    ) if self.remainder_dims else 1
         N = bound_size*remainder_size
-        q = n/ max(float(N),1.0)
+        all_dims = list(self.tensordef.index_order) + list(self.remainder_dims)
+        ndims = len(all_dims)
+        q = self.sample_prob ** ndims
 
         return _duj1(d_n,f_1,q,n)
     
