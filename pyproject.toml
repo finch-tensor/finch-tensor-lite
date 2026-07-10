@@ -152,8 +152,7 @@ clang = "*"
 CC = "clang"
 
 [tool.pixi.feature.mlir.dependencies]
-python = "3.12.*"
-mlir-python-bindings = ">=22.1,<23"
+mlir-python-bindings = ">=21.1,<22"
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"
