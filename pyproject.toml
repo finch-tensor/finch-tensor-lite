@@ -97,7 +97,7 @@ pytest-regressions = "~=2.8.1"
 pytest-mypy = ">=1,<2"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend'"
+cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
 depends-on = ["compile"]
 default-environment = "test"
 
@@ -152,6 +152,7 @@ clang = "*"
 CC = "clang"
 
 [tool.pixi.feature.mlir.dependencies]
+python = "3.12.*"
 mlir-python-bindings = ">=21.1,<22"
 
 [tool.pixi.feature.pre-commit.dependencies]
