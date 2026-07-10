@@ -67,7 +67,7 @@ class ScalarFType(TensorFType):
         return ()
 
     def lower_unwrap(self, ctx, obj):
-        return obj.obj
+        return ctx(obj)
 
 
 class Scalar(OverrideTensor):

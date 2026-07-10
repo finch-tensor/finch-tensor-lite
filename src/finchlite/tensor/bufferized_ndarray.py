@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import replace
 from typing import Any, cast
 
 import numpy as np
@@ -208,14 +208,6 @@ class BufferizedNDArray(OverrideTensor):
         return f"{self.ftype}(shape={self.shape})"
 
 
-@dataclass(unsafe_hash=True)
-class BufferizedNDArrayFields:
-    stride: tuple[asm.Variable, ...]
-    buf: asm.Variable
-    buf_s: asm.Slot
-    dirty_bit: bool
-
-
 class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     """
     A ftype for bufferized NumPy arrays that provides metadata about the array.
@@ -361,21 +353,21 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
-            asm.GetAttr(obj.buf, asm.Literal("shape")),
+            asm.GetAttr(obj.root, asm.Literal("shape")),
             asm.Literal(f"element_{r}"),
         )
 
-    def lower_declare(self, ctx, tns: ntn.Stack, init, op, shape):
+    def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
         i_var = asm.Variable("i", self.buf_t.length_type)
+        buf = asm.GetAttr(tns.root, asm.Literal("val"))
         body = asm.Store(
-            tns.obj.buf_s,
+            buf,
             i_var,
             asm.Literal(init.val),
         )
-        ctx.exec(
-            asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(tns.obj.buf_s), body)
-        )
-        tns.obj.dirty_bit = True
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
+        if isinstance(tns.root, asm.Slot):
+            ctx.slots[tns.root.name] = replace(tns, dirty=True)
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -388,12 +380,17 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         op = None
         if isinstance(mode, ntn.Update):
             op = mode.op
-        tns = ctx.resolve(tns).obj
+        tns = ctx.resolve(tns)
         acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf_t.length_type, op)
-        obj = BufferizedNDArrayAccessorFields(
-            tns, 0, asm.Literal(self.buf_t.length_type(0)), op
+        view = ntn.Fiber(
+            tns.root,
+            tns.lvl,
+            asm.Literal(self.buf_t.length_type(0)),
+            acc_t,
+            tns.idxs,
+            tns.dirty,
         )
-        return acc_t.unfurl(ctx, ntn.Stack(obj, acc_t), ext, mode, proto)
+        return acc_t.unfurl(ctx, view, ext, mode, proto)
 
     def reshape(self, arr, new_shape: tuple):
         new_shape = tuple(np.intp(s) for s in new_shape)
@@ -422,32 +419,6 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def lower_unwrap(self, ctx, obj): ...
 
     def lower_increment(self, ctx, obj, op, val): ...
-
-    def asm_unpack(self, ctx, var_n, val):
-        """
-        Unpack the into asm context.
-        """
-        stride = []
-        for i in range(self.ndim):
-            stride_i = asm.Variable(f"{var_n}_stride_{i}", self.buf_t.length_type)
-            stride.append(stride_i)
-            stride_e = asm.GetAttr(val, asm.Literal("strides"))
-            stride_i_e = asm.GetAttr(stride_e, asm.Literal(f"element_{i}"))
-            ctx.exec(asm.Assign(stride_i, stride_i_e))
-        buf = asm.Variable(f"{var_n}_buf", self.buf_t)
-        buf_e = asm.GetAttr(val, asm.Literal("val"))
-        ctx.exec(asm.Assign(buf, buf_e))
-        buf_s = asm.Slot(f"{var_n}_buf_slot", self.buf_t)
-        ctx.exec(asm.Unpack(buf_s, buf))
-
-        return BufferizedNDArrayFields(tuple(stride), val, buf_s, dirty_bit=False)
-
-    def asm_repack(self, ctx, lhs, obj):
-        """
-        Repack the buffer from C context.
-        """
-        ctx.exec(asm.Repack(obj.buf_s))
-        return
 
 
 class BufferizedNDArrayAccessor(Tensor):
@@ -543,14 +514,6 @@ class BufferizedNDArrayAccessor(Tensor):
         return self
 
 
-@dataclass(eq=True, frozen=True)
-class BufferizedNDArrayAccessorFields:
-    tns: BufferizedNDArrayFields
-    nind: int
-    pos: asm.AssemblyNode
-    op: Any
-
-
 class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def __init__(self, tns, nind, pos, op):
         self.tns = tns
@@ -610,7 +573,10 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return self.tns.element_type
 
     def lower_dim(self, ctx, obj, r):
-        return self.tns.lower_dim(ctx, obj.tns, r)
+        return asm.GetAttr(
+            asm.GetAttr(obj.root, asm.Literal("shape")),
+            asm.Literal(f"element_{self.nind + r}"),
+        )
 
     def lower_declare(self, ctx, tns, init, op, shape):
         raise NotImplementedError(
@@ -627,57 +593,32 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
-    # TODO: We should unpack arrays before passing them to freeze/thaw
-    # def asm_unpack(self, ctx, var_n, val):
-    #     """
-    #     Unpack the into asm context.
-    #     """
-    #     tns = self.tns.asm_unpack(ctx, f"{var_n}_tns", asm.GetAttr(val, "tns"))
-    #     nind = asm.Variable(f"{var_n}_nind", self.nind)
-    #     pos = asm.Variable(f"{var_n}_pos", self.pos)
-    #     op = asm.Variable(f"{var_n}_op", self.op)
-    #     ctx.exec(asm.Assign(pos, asm.GetAttr(val, "pos")))
-    #     ctx.exec(asm.Assign(nind, asm.GetAttr(val, "nind")))
-    #     ctx.exec(asm.Assign(op, asm.GetAttr(val, "op")))
-    #     return BufferizedNDArrayFields(tns, pos, nind, op)
-
-    def asm_repack(self, ctx, lhs, obj):
-        """
-        Repack the buffer from C context.
-        """
-        self.tns.asm_repack(ctx, lhs.tns, obj.tns)
-        ctx.exec(
-            asm.Block(
-                asm.SetAttr(lhs, "tns", obj.tns),
-                asm.SetAttr(lhs, "pos", obj.pos),
-                asm.SetAttr(lhs, "nind", obj.nind),
-                asm.SetAttr(lhs, "op", obj.op),
-            )
-        )
-
     def lower_unwrap(self, ctx, tns):
-        return asm.Load(tns.obj.tns.buf_s, tns.obj.pos)
+        return asm.Load(
+            asm.GetAttr(tns.root, asm.Literal("val")),
+            tns.pos,
+        )
 
     def lower_increment(
         self,
         ctx: AssemblyContext,
-        tns: ntn.Stack,
+        tns: ntn.Fiber,
         op: ntn.Literal,
         val: ntn.NotationExpression,
     ):
-        obj = tns.obj
-        op_e, pos_e, val_e = ctx(op), obj.pos, ctx(val)
+        buf = asm.GetAttr(tns.root, asm.Literal("val"))
+        op_e, pos_e, val_e = ctx(op), tns.pos, ctx(val)
         increment_call = asm.Call(
             op_e,
-            (asm.Load(obj.tns.buf_s, pos_e), val_e),
+            (asm.Load(buf, pos_e), val_e),
         )
-        if obj.tns.dirty_bit and op.val is ffuncs.overwrite:
+        if tns.dirty and op.val is ffuncs.overwrite:
             increment_call = asm.Call(
                 asm.Literal(ffuncs.init_write(tns.type.fill_value)),
-                (asm.Load(obj.tns.buf_s, pos_e), increment_call),
+                (asm.Load(buf, pos_e), increment_call),
             )
 
-        ctx.exec(asm.Store(obj.tns.buf_s, pos_e, increment_call))
+        ctx.exec(asm.Store(buf, pos_e, increment_call))
 
     def unfurl(self, ctx: AssemblyContext, tns, ext, mode, proto):
         def child_accessor(ctx, idx):
@@ -688,11 +629,14 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                     asm.Call(
                         asm.Literal(ffuncs.add),
                         (
-                            tns.obj.pos,
+                            tns.pos,
                             asm.Call(
                                 asm.Literal(ffuncs.mul),
                                 (
-                                    tns.obj.tns.stride[self.nind],
+                                    asm.GetAttr(
+                                        asm.GetAttr(tns.root, asm.Literal("strides")),
+                                        asm.Literal(f"element_{self.nind}"),
+                                    ),
                                     asm.Variable(idx.name, idx.type_),
                                 ),
                             ),
@@ -700,16 +644,16 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                     ),
                 )
             )
-            return ntn.Stack(
-                BufferizedNDArrayAccessorFields(
-                    tns=tns.obj.tns,
-                    nind=self.nind - 1,
-                    pos=pos_2,
-                    op=self.op,
-                ),
-                BufferizedNDArrayAccessorFType(
-                    self.tns, self.nind + 1, self.pos, self.op
-                ),
+            child_type = BufferizedNDArrayAccessorFType(
+                self.tns, self.nind + 1, self.pos, self.op
+            )
+            return ntn.Fiber(
+                tns.root,
+                tns.lvl,
+                pos_2,
+                child_type,
+                tns.idxs,
+                tns.dirty,
             )
 
         return lplt.Lookup(

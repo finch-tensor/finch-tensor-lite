@@ -110,9 +110,6 @@ class AssemblyTypeChecker:
                 check_type(var_t)
                 self.check_in_ctxt(var_n, var_t)
                 return var_t
-            case asm.Stack(obj, obj_t):
-                check_type(obj_t)
-                return obj_t
             case asm.GetAttr(obj, asm.Literal(attr)):
                 obj_type = self.check_struct(obj)
                 return check_attrtype(obj_type, attr)
@@ -167,8 +164,6 @@ class AssemblyTypeChecker:
                 else:
                     self.ctxt[var_n] = var_t
                 return None
-            case asm.Assign(asm.Stack(_obj, _obj_t), _rhs):
-                raise NotImplementedError("Cannot assign to stack currently.")
             case asm.SetAttr(obj, asm.Literal(attr), value):
                 obj_type = self.check_struct(obj)
                 attrtype = check_attrtype(obj_type, attr)

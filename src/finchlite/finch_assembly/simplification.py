@@ -49,12 +49,12 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
                             (asm.Load(asm.Slot(_) as s2, idx2), asm.Literal(arg)),
                         ),
                     ),
-                )
+                ) as bodies
             ) if s1 == s2 and idx1 == idx2:
                 if op == ffuncs.init_write(arg.val):
-                    return asm.Block(())
+                    return asm.Block(bodies[:-1])
                 if is_identity(op, arg.val):
-                    return asm.Block(())
+                    return asm.Block(bodies[:-1])
             # loop(...) {} is removed
             case asm.ForLoop(_, _, _, asm.Block(())):
                 return asm.Block(())
