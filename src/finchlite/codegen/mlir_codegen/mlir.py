@@ -64,65 +64,12 @@ class MLIRBinaryOperator(MLIROperator):
         return mlir_binary_function_call(self.mlir_name(), ctx, *args)
 
 
-def aliased_return_args(func):
-    match func:
-        case asm.Function(_, args, asm.Block(bodies)) if bodies:
-            pass
-        case _:
-            return None
-    params = []
-    for a in args:
-        match a:
-            case asm.Variable(name, _):
-                params.append(name)
-            case _:
-                return None
-    defs = {}
-    for stmt in bodies[:-1]:
-        match stmt:
-            case asm.Assign(asm.Variable(name, _), val):
-                defs[name] = val
-
-    def resolve(node):
-        seen = set()
-        while True:
-            match node:
-                case asm.Variable(name, _) if name in defs and name not in seen:
-                    seen.add(name)
-                    node = defs[name]
-                case asm.Variable(name, _) if name in params:
-                    return params.index(name)
-                case _:
-                    return None
-
-    match bodies[-1]:
-        case asm.Return(val):
-            pass
-        case _:
-            return None
-    seen = set()
-    while True:
-        match val:
-            case asm.Variable(name, _) if name in defs and name not in seen:
-                seen.add(name)
-                val = defs[name]
-            case _:
-                break
-    match val:
-        case asm.Call(asm.Literal(op), tuple_args) if op == ffuncs.make_tuple:
-            idxs = [resolve(a) for a in tuple_args]
-            if all(i is not None for i in idxs):
-                return tuple(idxs)
-    return None
-
-
 class MLIRKernel(asm.AssemblyKernel):
-    def __init__(self, engine, func_name, ret_type, argtypes, ret_alias=None):
+    def __init__(self, engine, func_name, ret_type, argtypes):
         self.engine = engine
         self.func_name = func_name
         self.ret_type = ret_type
         self.argtypes = argtypes
-        self.ret_alias = ret_alias
 
     def __call__(self, *args):
         if len(args) != len(self.argtypes):
@@ -141,7 +88,7 @@ class MLIRKernel(asm.AssemblyKernel):
             else:
                 packed.append(ctypes.pointer(sa))
 
-        if self.ret_type == algebra.none_ or self.ret_alias is not None:
+        if self.ret_type == algebra.none_:
             res = None
             self.engine.invoke(self.func_name, *packed)
         elif isinstance(self.ret_type, StructFType):
@@ -158,8 +105,6 @@ class MLIRKernel(asm.AssemblyKernel):
         ):
             deserialize_from_mlir(arg_type, arg, serial_arg)
 
-        if self.ret_alias is not None:
-            return tuple(args[i] for i in self.ret_alias)
         if self.ret_type is type(None):
             return None
         return construct_from_mlir(self.ret_type, res)
@@ -300,7 +245,6 @@ class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
                         func_name,
                         return_t,
                         arg_ts,
-                        ret_alias=aliased_return_args(func),
                     )
                 case _:
                     raise NotImplementedError(
@@ -569,17 +513,12 @@ def mlir_type(t: FType):
             raise NotImplementedError(f"No MLIR type mapping for {t}")
 
 
-def memref_shape(s: str) -> tuple[int, str]:
-    t = s[len("memref<") : -1].split("x")
-    rank = 0
-    while rank < len(t) - 1 and (t[rank] == "?" or t[rank].isdigit()):
-        rank += 1
-    return rank, "x".join(t[rank:])
-
-
 def llvm_type(s: str) -> str:
     if s.startswith("memref<") and s.endswith(">"):
-        rank, _ = memref_shape(s)
+        t = s[len("memref<") : -1].split("x")
+        rank = 0
+        while rank < len(t) - 1 and (t[rank] == "?" or t[rank].isdigit()):
+            rank += 1
         return (
             f"!llvm.struct<(ptr, ptr, i64, array<{rank} x i64>, array<{rank} x i64>)>"
         )
@@ -619,7 +558,11 @@ def mlir_ctype(s: str):
         if res is None:
             from mlir.runtime import make_nd_memref_descriptor
 
-            rank, elem = memref_shape(s)
+            t = s[len("memref<") : -1].split("x")
+            rank = 0
+            while rank < len(t) - 1 and (t[rank] == "?" or t[rank].isdigit()):
+                rank += 1
+            elem = "x".join(t[rank:])
             res = make_nd_memref_descriptor(rank, mlir_ctype(elem))
             mlir_memrefs[s] = res
         return res
@@ -989,13 +932,9 @@ class MLIRContext(Context):
                                 f"Unrecognized argument type: {arg}"
                             )
                 if isinstance(return_t, StructFType):
-                    if aliased_return_args(prgm) is not None:
-                        ctx_2.bindings[".ret_alias"] = ("", "")
-                        ret = ""
-                    else:
-                        statement.append("%_ret: !llvm.ptr")
-                        ctx_2.bindings[".ret_ptr"] = ("%_ret", "!llvm.ptr")
-                        ret = ""
+                    statement.append("%_ret: !llvm.ptr")
+                    ctx_2.bindings[".ret_ptr"] = ("%_ret", "!llvm.ptr")
+                    ret = ""
                 else:
                     ret = (
                         ""
@@ -1018,16 +957,13 @@ class MLIRContext(Context):
                 if value.result_type == algebra.none_:
                     self.exec(f"{feed}func.return")
                 elif isinstance(value.result_type, StructFType):
-                    if ".ret_alias" in self.bindings:
-                        self.exec(f"{feed}func.return")
-                    else:
-                        v = self(value)
-                        ptr = self.bindings[".ret_ptr"][0]
-                        self.exec(
-                            f"{feed}llvm.store {v}, {ptr} "
-                            f": {mlir_type(value.result_type)}, !llvm.ptr"
-                        )
-                        self.exec(f"{feed}func.return")
+                    v = self(value)
+                    ptr = self.bindings[".ret_ptr"][0]
+                    self.exec(
+                        f"{feed}llvm.store {v}, {ptr} "
+                        f": {mlir_type(value.result_type)}, !llvm.ptr"
+                    )
+                    self.exec(f"{feed}func.return")
                 else:
                     v = self(value)
                     self.exec(f"{feed}func.return {v} : {mlir_type(value.result_type)}")

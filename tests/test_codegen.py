@@ -1,4 +1,5 @@
 import ctypes
+import logging
 import re
 import subprocess
 import sys
@@ -1149,3 +1150,38 @@ def test_matmul_mlir_regression(file_regression):
         )
     )
     file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+
+
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_dense_matmul_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="finchlite.codegen.mlir_codegen.mlir"):
+        result = finchlite.compute(
+            finchlite.matmul(
+                finchlite.lazy(finchlite.asarray(a, format=fmt)),
+                finchlite.lazy(finchlite.asarray(b, format=fmt)),
+            )
+        )
+
+    finch_assert_equal(result, a @ b)
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finchlite.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    )
+    file_regression.check(mlir_code, extension=".mlir")
