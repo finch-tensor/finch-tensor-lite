@@ -1184,4 +1184,5 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
         if record.name == "finchlite.codegen.mlir_codegen.mlir"
         and record.message.startswith("Compiling MLIR code:\n")
     )
+    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
     file_regression.check(mlir_code, extension=".mlir")
