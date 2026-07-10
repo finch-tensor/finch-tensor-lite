@@ -78,9 +78,18 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
     def __init__(self, sample_prob:float=0.5):
         super().__init__(SamplingStats)
         self.sample_prob = sample_prob
+        self._masks : dict = {}
+        self._rng = np.random.default_rng()
+
+    def _get_mask(self,field:Field,size:int)->np.ndarray:
+        "Returns mask for dimension that already exists or creates a new one"
+        mask_key = (field,size)
+        if mask_key not in self._masks:
+            self._masks[mask_key]=(self._rng.random(size)<self.sample_prob).astype(float)
+        return self._masks[mask_key]
 
     def __call__(self, tensor:Any, fields:tuple[Field,...])->SamplingStats:
-        return SamplingStats(tensor,fields,sample_prob=self.sample_prob)
+        return SamplingStats(tensor,fields,sample_prob=self.sample_prob,mask_fn=self._get_mask)
     
     def copy_stats(self,stat:SamplingStats)->SamplingStats:
         if not isinstance(stat,SamplingStats):
@@ -211,13 +220,12 @@ class SamplingStats(NumericStats):
     remainder_dims : set
     sample_prob : float
 
-    def __init__(self, tensor:Any, fields:tuple[Field,...],sample_prob:float=0.5):
+    def __init__(self, tensor:Any, fields:tuple[Field,...],sample_prob:float=0.5,mask_fn=None):
         self.tensordef = TensorDef.from_tensor(tensor,fields)
         self.sample_prob = sample_prob
         self.remainder_dims = set()
         self.remainder_dim_sizes : dict = {}
 
-        rng = np.random.default_rng()
         val = tensor
         if hasattr(val,"tns"):
             val = val.tns.val
@@ -236,7 +244,10 @@ class SamplingStats(NumericStats):
         masks = []
         for field in fields:
             size = int(self.tensordef.dim_sizes[field])
-            mask = (rng.random(size)<sample_prob).astype(float)
+            if mask_fn is not None:
+                mask = mask_fn(field,size)
+            else :
+                mask = (np.random.default_rng().random(size)<sample_prob).astype(float)
             masks.append(mask)
         
         #combining the masks to create a filter to sample 
