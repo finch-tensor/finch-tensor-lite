@@ -718,6 +718,7 @@ def test_scheduler_e2e_sddmm(file_regression):
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"
     )
 
+
 def test_scheduler_inplace(file_regression):
     plan = Plan(
         bodies=(
@@ -795,4 +796,3 @@ def test_scheduler_inplace(file_regression):
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_inplace"
     )
-
