@@ -15,6 +15,8 @@ jobs:
             task: test
           - environment: test-c
             task: test-c
+          - environment: test-mlir
+            task: test-mlir
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:

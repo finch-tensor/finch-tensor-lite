@@ -66,9 +66,11 @@ ignore-pypi-mapping = false
 [tool.pixi.environments]
 test = { features = ["test"], solve-group = "default" }
 test-c = { features = ["test", "c"], solve-group = "default" }
+test-mlir = { features = ["test", "mlir"], solve-group = "mlir" }
 mindeps = { features = ["test", "mindeps"], solve-group = "mindeps" }
 benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 c = { features = ["c"], solve-group = "default" }
+mlir = { features = ["mlir"], solve-group = "mlir" }
 c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
@@ -87,7 +89,7 @@ finch-tensor-lite.path = "."
 compile = "python -c 'import finchlite'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend'"
+cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
 depends-on = ["compile"]
 default-environment = "test"
 
@@ -95,6 +97,11 @@ default-environment = "test"
 cmd = "python -m pytest -m c_backend"
 depends-on = ["compile"]
 default-environment = "test-c"
+
+[tool.pixi.feature.test.tasks.test-mlir]
+cmd = "python -m pytest -m mlir_backend"
+depends-on = ["compile"]
+default-environment = "test-mlir"
 
 [tool.pixi.feature.benchmark.tasks.benchmark]
 cmd = "pytest --codspeed benchmarks/"
@@ -131,6 +138,22 @@ clang = "*"
 
 [tool.pixi.feature.c-clang.activation.env]
 CC = "clang"
+
+[tool.pixi.feature.mlir]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+
+[tool.pixi.feature.mlir.system-requirements]
+libc = { family = "glibc", version = "2.34" }
+
+[tool.pixi.feature.mlir.dependencies]
+pyyaml = "<=6.0.1"
+
+[tool.pixi.feature.mlir.pypi-options]
+index-url = "https://pypi.org/simple"
+find-links = [{ url = "https://llvm.github.io/eudsl" }]
+
+[tool.pixi.feature.mlir.pypi-dependencies]
+mlir-python-bindings = "*"
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"
