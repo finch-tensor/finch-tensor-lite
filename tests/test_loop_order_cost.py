@@ -90,7 +90,12 @@ def _ref_cost(A, B, order, sf, expr, bindings):
             if any(stat is s for s in seen):
                 continue
             seen.append(stat)
-            if needs_reformat(stat, prefix):
+
+        prev = prefix[:-1]
+        for stat in seen:
+            if needs_reformat(stat, prefix) and not (
+                prev and needs_reformat(stat, prev)
+            ):
                 cost += cost_of_reformat(stat)
     return cost
 

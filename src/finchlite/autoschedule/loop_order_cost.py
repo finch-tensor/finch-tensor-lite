@@ -229,7 +229,7 @@ def get_prefix_cost(
         lookup_factor += SEQ_WRITE_COST
 
     prev = new_prefix[:-1]
-    transpose_cost = 0
+    transpose_cost = 0.0
     for stat in seen:
         if needs_reformat(stat, new_prefix) and not (
             prev and needs_reformat(stat, prev)
