@@ -22,7 +22,6 @@ from finchlite.autoschedule import (
 )
 from finchlite.autoschedule.compiler import LogicCompiler
 from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
-from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.autoschedule.tensor_stats import UniformStatsFactory
 from finchlite.codegen.numba_codegen.numba import NumbaCompiler
 from finchlite.compile.lower import NotationCompiler
@@ -73,16 +72,14 @@ def _build_expr(empty_last):
 def _make_pipeline():
     optimizer = GalleyLogicalOptimizer(
         DefaultLoopOrderer(
-            LogicStandardizer(
-                DefaultLogicFormatter(
-                    LogicCompiler(
-                        NotationCompiler(
-                            NumbaCompiler(),
-                            ctx_transforms=(
-                                LowerPackedStructSlots(),
-                                AssemblySimplify(),
-                            ),
-                        )
+            DefaultLogicFormatter(
+                LogicCompiler(
+                    NotationCompiler(
+                        NumbaCompiler(),
+                        ctx_transforms=(
+                            LowerPackedStructSlots(),
+                            AssemblySimplify(),
+                        ),
                     )
                 )
             )
@@ -114,6 +111,6 @@ def test_galley_matmul_chain(
     if metric == "optimize":
         patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
     else:
-        patch_benchmark(benchmark, monkeypatch, LogicStandardizer, "lower")
+        patch_benchmark(benchmark, monkeypatch, DefaultLogicFormatter, "lower")
 
     pipeline(plan)
