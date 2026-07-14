@@ -28,14 +28,39 @@ from finchlite.symbolic import (
     PostWalk,
     PreWalk,
     Rewrite,
+    gensym,
 )
 
-from .standardize import (
-    flatten_plans,
-    isolate_aggregates,
-    propagate_copy_queries,
-    push_fields,
-)
+from .util import flatten_plans, propagate_copy_queries, push_fields
+
+
+def isolate_aggregates(root: LogicStatement) -> LogicStatement:
+    def transform(stmt):
+        stack = []
+
+        def rule_1(ex):
+            match ex:
+                case Aggregate(_, _, _, _) as agg:
+                    var = Alias(gensym("A"))
+                    stack.append(Query(var, agg))
+                    return Table(var, agg.fields())
+                case _:
+                    return None
+
+        match stmt:
+            case Query(lhs, Aggregate(op, init, arg, idxs)):
+                arg = Rewrite(PostWalk(rule_1))(arg)
+                return Plan((*stack, Query(lhs, Aggregate(op, init, arg, idxs))))
+            case Query(lhs, rhs):
+                rhs = Rewrite(PostWalk(rule_1))(rhs)
+                return Plan((*stack, Query(lhs, rhs)))
+            case Produces(args):
+                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
+                return Plan((*stack, Produces(args)))
+            case _:
+                return None
+
+    return Rewrite(PostWalk(transform))(root)
 
 
 def with_unique_lhs(
