@@ -1,0 +1,4 @@
+#A#0 = Reorder(Aggregate(add, 0, Reorder(MapJoin(mul, Table(A0, i0, i1), Table(A1, i1, i2)), i0, i1, i2), i1), i0, i2)
+A2_5 = Reorder(Aggregate(overwrite, 0, Reorder(MapJoin(add, Table(#A#0, i0, i2), MapJoin(add, Table(A2, i0, i2), Table(A1, i0, i2))), i0, i2), ), i0, i2)
+A2 = Reorder(Table(A2_5, i_5, i_6), i_5, i_6)
+return A2
