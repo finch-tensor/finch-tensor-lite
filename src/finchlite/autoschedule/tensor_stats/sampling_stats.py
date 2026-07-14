@@ -22,6 +22,192 @@ def _duj1(d_n:float,f_1:float,q:float,n:float)->float:
         return d_n
     return d_n/denom
 
+def _dsj1(d_n:float,q:float,N:float)-> float :
+    """
+    Smoothened first order jacknife
+    D * (1-(1-q)^(N/D)) = d_n
+
+    d_n = positions observed in the sample
+    q = sample_prob**2
+    N = total population = prod(dim_size)
+    """
+    if d_n == 0:
+        return 0.0
+    if q>=1.0:
+        return d_n
+    
+    def equation(D):
+        #D must be >=dn and <=N
+        if D<=0:
+            return -d_n
+        return D*(1 - (1-q)**(N/D)) - d_n
+    
+    lo = d_n
+    hi = N
+
+    if equation(lo)>=0:
+        return lo
+    if equation(hi)<=0:
+        return hi
+    
+    for _ in range(50):
+        mid = (lo+hi)/2
+        if equation(mid)<0:
+            lo = mid
+        else :
+            hi = mid
+        if (hi-lo)<0.01:
+            break
+    return (lo+hi)/2
+
+def _gamma2(d_n:float,frequencies:dict,n:float,N:float)->float:
+    """
+    gamma^2 = max(0,D/n^2*sum_i[i*(i-1)*f_i]+ D/N - 1)
+
+    We are supposed to use D here but since we don't have that we use d_n, we could use unsmoothened estimate too ?
+
+    d_n : positions observed in the sample
+    frequencies : {i:f_i} -> historgam of sketch counts
+    n : np.sum(sketch) -> total sample size
+    N : total population
+    """
+
+    if d_n <=0 or n<=0 :
+        return 0.0
+    
+    full_sum = sum(i*(i-1)*fi for i,fi in frequencies.items())
+
+    gamma2 = max(0.0,(d_n/max(n,1.0)**2)*full_sum + d_n/max(N,1.0)-1.0)
+
+    return gamma2
+
+
+def _duj2(d_n:float,f_1:float,frequencies:dict,q:float,n:float,N:float)->float:
+    """
+    Unsmoothened second-order jackknife
+    d_n : positions observed 
+    f_1 : positions seen once
+    frequencies :  {i:f_i} -> historgam of sketch counts
+    q : sample_prob**ndims
+    n : np.sum(sketch) -> total sample size
+    N : total population size
+
+    The gamma^2 containing term account for variance in multiplicty
+    """
+    if d_n == 0 :
+        return 0.0
+    if q<=0.0:
+        return d_n
+    if q>=1.0:
+        return d_n
+    
+    gamma2 = _gamma2(d_n,frequencies,n,N)
+
+    ln1mq = math.log(1.0-q)
+    lhs = 1.0 - f_1*(1.0-q)/max(n,1.0)
+    rhs = d_n - f_1*(1.0-q)*ln1mq*gamma2/q
+
+    estimate = rhs/lhs
+    return max(float(estimate),d_n)
+
+def _dsh(d_n:float,f_1:float,frequencies:dict,q:float,n:float)->float:
+    """
+    Schlosser estimator - uses all frequency counts
+
+    K_Sh = n * sum((1-q)^i * f_i) / sum(i*q*(1-q)^(i-1) * f_i)
+
+    num : higher i, smaller weight -> estimates number of positions missed
+    denom : expected total sample size contribution per missed position
+
+    Using D = d_n + K*f_1/n
+    """
+
+    if d_n == 0 :
+        return 0.0
+    if q >=1.0:
+        return d_n
+    if not frequencies:
+        return d_n
+    num = sum(((1-q)**i)*fi for i,fi in frequencies.items())
+
+    denom = sum(i*q*((1-q)**(i-1))*fi for i,fi in frequencies.items())
+
+    if denom==0:
+        return d_n
+    
+    K_Sh = n*num/denom
+
+    return d_n + K_Sh*f_1/max(n,1.0)
+
+def _dsh2(d_n:float,f_1:float,frequencies:dict,q:float,n:float,N:float)->float:
+    """
+    Modified Schlosser - corrects the bias in K_Sh
+    N_bar = N/D_uj1
+    
+    Correction factor = q*(1+q)^(N_bar-1) / ((1+q)^N_bar - 1)
+
+    Initial estimate for D = D_uj1
+    """
+    if d_n == 0 :
+        return 0.0
+    if q >=1.0:
+        return d_n
+    if not frequencies:
+        return d_n
+    
+    f_1_val = frequencies.get(1,0.0)
+    D_uj1 = _duj1(d_n,f_1_val,q,n)
+
+    N_bar = N/max(D_uj1,1.0)
+
+    one_plus_q_neg_Nbar = (1.0 + q) ** (-N_bar)
+    denom = 1.0 - one_plus_q_neg_Nbar
+    
+    if denom == 0:
+        return d_n
+        
+    correction = (q / (1.0 + q)) / denom
+
+    K_Sh = _dsh(d_n,f_1,frequencies,q,n)
+    #We did D = d_n + K*f_1/n -> We need just K
+    raw_K = (K_Sh-d_n)*max(n,1.0)/max(f_1,1e-10)
+
+    K_star = correction*raw_K
+    return d_n + K_star*f_1/max(n,1.0)
+
+def _dsh3(d_n:float,f_1:float,frequencies:dict,q:float,n:float):
+    """
+    Further modified Schlosser 
+    num1 = sum(i * q^2 * (1-q^2)^(i-1) * f_i)
+    den1 = sum((1-q)^i * ((1+q)^i - 1) * f_i)
+    """
+    if d_n == 0 :
+        return 0.0
+    if q >=1.0:
+        return d_n
+    if not frequencies:
+        return d_n
+    
+    q2 = q**2
+    
+    num1 = sum(i*q2*((1-q2)**(i-1))*fi
+               for i,fi in frequencies.items())
+    denom1 = sum(((1.0 - q) ** i) * (((1.0 + q) ** i) - 1.0) * fi
+        for i, fi in frequencies.items())
+    
+    if denom1 == 0:
+        return d_n
+    
+    ratio1 = num1/denom1
+
+    num_K = sum(((1.0 - q) ** i) * fi for i, fi in frequencies.items())
+    denom_K = sum(i * q * ((1.0 - q) ** (i - 1)) * fi for i, fi in frequencies.items())
+
+    K_raw = num_K/denom_K 
+
+    return d_n + f_1*ratio1*(K_raw**2)
+
+
 
 def _outer_multiply(a:np.ndarray,a_order:list,b:np.ndarray,b_order:list)->tuple[np.ndarray,list]:
     "multiplying sketches and keeping their index order"
@@ -75,9 +261,10 @@ def _reorder_to(sketch:np.ndarray,current_order:list,target_order:list)->np.ndar
 
 class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
-    def __init__(self, sample_prob:float=0.5):
+    def __init__(self, sample_prob:float=0.5,estimator: str = "uj1"):
         super().__init__(SamplingStats)
         self.sample_prob = sample_prob
+        self.estimator = estimator
         self._masks : dict = {}
         self._rng = np.random.default_rng()
 
@@ -89,13 +276,13 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         return self._masks[mask_key]
 
     def __call__(self, tensor:Any, fields:tuple[Field,...])->SamplingStats:
-        return SamplingStats(tensor,fields,sample_prob=self.sample_prob,mask_fn=self._get_mask)
+        return SamplingStats(tensor,fields,sample_prob=self.sample_prob,estimator=self.estimator,mask_fn=self._get_mask)
     
     def copy_stats(self,stat:SamplingStats)->SamplingStats:
         if not isinstance(stat,SamplingStats):
             raise TypeError("copy_stats expected a SamplingStats instance")
         return SamplingStats.from_def(stat.tensordef.copy(),stat.sketch.copy(),
-                                      set(stat.remainder_dims),stat.sample_prob,dict(stat.remainder_dim_sizes))
+                                      set(stat.remainder_dims),stat.sample_prob,dict(stat.remainder_dim_sizes),estimator=stat.estimator)
     
     def _mapjoin_join(self, new_def:TensorDef, op:FinchOperator, join_args:list[SamplingStats]):
         """
@@ -120,7 +307,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         
         result = _reorder_to(result,result_order,list(new_def.index_order))
 
-        return SamplingStats.from_def(new_def,result,new_remainder,self.sample_prob,new_remainder_sizes)
+        return SamplingStats.from_def(new_def,result,new_remainder,self.sample_prob,new_remainder_sizes,estimator=self.estimator)
     
     def _mapjoin_union(self, new_def:TensorDef, op:FinchOperator, union_args:list[SamplingStats]):
         """
@@ -162,7 +349,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             
             result = result - inter_expanded
 
-        return SamplingStats.from_def(new_def,result,new_remainder,self.sample_prob,new_remainder_sizes)
+        return SamplingStats.from_def(new_def,result,new_remainder,self.sample_prob,new_remainder_sizes,estimator=self.estimator)
 
     def aggregate(self, op:FinchOperator, init: Any| None, reduce_indices : tuple[Field,...], stats:SamplingStats):
         """
@@ -198,15 +385,15 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         new_remainder_sizes = dict(stats.remainder_dim_sizes)
         for f in reduce_set:
             new_remainder_sizes[f] = stats.tensordef.dim_sizes[f]
-        return SamplingStats.from_def(new_def,new_sketch,new_remainder,stats.sample_prob,new_remainder_sizes)
+        return SamplingStats.from_def(new_def,new_sketch,new_remainder,stats.sample_prob,new_remainder_sizes,estimator=stats.estimator)
 
     def relabel(self, stats:SamplingStats, relabel_indices:tuple[Field,...])->SamplingStats:
         new_def = TensorDef.relabel(stats.tensordef,relabel_indices)
-        return SamplingStats.from_def(new_def,stats.sketch.copy(),set(stats.remainder_dims),stats.sample_prob,dict(stats.remainder_dim_sizes))
+        return SamplingStats.from_def(new_def,stats.sketch.copy(),set(stats.remainder_dims),stats.sample_prob,dict(stats.remainder_dim_sizes),estimator=stats.estimator)
 
     def reorder(self,stats:SamplingStats,reorder_indices:tuple[Field,...])->SamplingStats:
         new_def = TensorDef.reorder(stats.tensordef,reorder_indices)
-        return SamplingStats.from_def(new_def,stats.sketch.copy(),set(stats.remainder_dims),stats.sample_prob,dict(stats.remainder_dim_sizes))
+        return SamplingStats.from_def(new_def,stats.sketch.copy(),set(stats.remainder_dims),stats.sample_prob,dict(stats.remainder_dim_sizes),estimator=stats.estimator)
 
 
 class SamplingStats(NumericStats):
@@ -220,10 +407,11 @@ class SamplingStats(NumericStats):
     remainder_dims : set
     sample_prob : float
 
-    def __init__(self, tensor:Any, fields:tuple[Field,...],sample_prob:float=0.5,mask_fn=None):
+    def __init__(self, tensor:Any, fields:tuple[Field,...],sample_prob:float=0.5,estimator : str = "uj1",mask_fn=None):
         self.tensordef = TensorDef.from_tensor(tensor,fields)
         self.sample_prob = sample_prob
         self.remainder_dims = set()
+        self.estimator = estimator
         self.remainder_dim_sizes : dict = {}
 
         val = tensor
@@ -261,12 +449,13 @@ class SamplingStats(NumericStats):
         self.sketch = non_fill*combined
 
     @classmethod
-    def from_def(cls,d:TensorDef,sketch:np.ndarray,remainder_dims:set,sample_prob:float, remainder_dim_sizes: dict| None=None)->SamplingStats:
+    def from_def(cls,d:TensorDef,sketch:np.ndarray,remainder_dims:set,sample_prob:float, remainder_dim_sizes: dict| None=None, estimator : str = "uj1")->SamplingStats:
         ss = object.__new__(cls)
         ss.tensordef = d.copy()
         ss.sketch = sketch.copy()
         ss.remainder_dims = set(remainder_dims)
         ss.sample_prob = sample_prob
+        ss.estimator = estimator
         ss.remainder_dim_sizes = dict(remainder_dim_sizes) if remainder_dim_sizes else {}
         return ss
     
@@ -295,7 +484,35 @@ class SamplingStats(NumericStats):
         ndims = len(all_dims)
         q = self.sample_prob ** ndims
 
-        return _duj1(d_n,f_1,q,n)
+        needs_freq = self.estimator in ("uj2","schlosser","sh2","sh3")
+        if needs_freq:
+            nonzero_vals = flat[flat>0]
+            unique_vals,counts = np.unique(nonzero_vals,return_counts=True)
+            frequencies = {int(v):float(c) for v,c in zip(unique_vals,counts)}
+        else :
+            frequencies = {}
+        if self.estimator == "uj1":
+            return _duj1(d_n, f_1, q, n)
+
+        elif self.estimator == "sj1":
+            return _dsj1(d_n, q, N)
+
+        elif self.estimator == "uj2":
+            return _duj2(d_n, f_1, frequencies, q, n, N)
+        elif self.estimator == "schlosser":
+            return _dsh(d_n, f_1, frequencies, q, n)
+
+        elif self.estimator == "sh2":
+            return _dsh2(d_n, f_1, frequencies, q, n, N)
+
+        elif self.estimator == "sh3":
+            return _dsh3(d_n, f_1, frequencies, q, n)
+
+        else:
+            raise ValueError(
+                f"Unknown estimator: {self.estimator!r}."
+                f"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3"
+            )
     
     def get_embedding(self)->np.ndarray:
         sizes = [float(self.tensordef.dim_sizes[f]) for f in self.tensordef.index_order]

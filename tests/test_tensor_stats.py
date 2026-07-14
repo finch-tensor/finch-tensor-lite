@@ -24,6 +24,7 @@ from finchlite.autoschedule.tensor_stats import (
     SamplingStats,
     SamplingStatsFactory,
 )
+from finchlite.autoschedule.tensor_stats.sampling_stats import _duj1
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
@@ -190,6 +191,51 @@ def test_sampling_reorder():
     assert reordered.index_order == (j,i)
     assert reordered.estimate_non_fill_values() == pytest.approx(stats.estimate_non_fill_values(),abs=1.0)
 
+def test_stats_estimator_isolated():
+    # more generalised example ?
+    
+    #A = np.eye(100)
+    A = np.zeros((10,10))
+    A[0,:] = 1.0
+    A[2,:3] = 1.0
+    A[4,5] = 1.0
+    A[6,:7] = 1.0
+    A[8,::2] = 1.0
+    rows,cols = np.nonzero(A)
+    true_D = len(np.unique(rows))
+    N = len(rows) #[0,0,0...10times,2,2,2,....] = total nnz overall 
+
+    print(f"Non-zero rows : {np.unique(rows)}")
+    print(f"True D :{true_D}")
+    print(f"Total nnz N : {N}")
+    
+    #sampling
+    rng = np.random.default_rng(42)
+    q = 0.5
+    n_trials = 10000
+    estimates = []
+
+    for _ in range(n_trials):
+        mask = rng.random(N) < q
+        sample = rows[mask]
+
+        if len(sample) == 0:
+            continue
+
+        #frequencies
+        _, counts = np.unique(sample, return_counts=True)
+        d_n = float(len(counts))#how many rows contribute
+        f_1 = float(np.sum(counts == 1))#how many rows have only one contributing element
+        n   = float(len(sample))#how many total nnz -> sum of frequencies
+
+        estimates.append(_duj1(d_n, f_1, q, n))
+
+    mean_est = np.mean(estimates)
+    error = abs(mean_est - true_D) / true_D * 100
+
+    print(f"True D:{true_D}")
+    print(f"Estimated D:{mean_est}")
+    print(f"Error:{error:.1f}%")
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
 
