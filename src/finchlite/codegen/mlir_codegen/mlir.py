@@ -92,12 +92,12 @@ class MLIRKernel(asm.AssemblyKernel):
             res = None
             self.engine.invoke(self.func_name, *packed)
         elif isinstance(self.ret_type, StructFType):
-            res = mlir_field_ctype(self.ret_type)()
+            res = mlir_ctype(self.ret_type)()
             self.engine.invoke(
                 self.func_name, *packed, ctypes.pointer(ctypes.pointer(res))
             )
         else:
-            res = mlir_field_ctype(self.ret_type)()
+            res = mlir_ctype(self.ret_type)()
             self.engine.invoke(self.func_name, *packed, ctypes.pointer(res))
 
         for arg_type, arg, serial_arg in zip(
@@ -391,7 +391,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             return ctx(args[1])
         case ffuncs.make_tuple:
             t = TupleFType.from_tuple(tuple(a.result_type for a in args))
-            st = mlir_struct_type(t)
+            st = mlir_type(t)
             acc = ctx.new_ssa()
             ctx.exec(f"{ctx.feed}{acc} = llvm.mlir.undef : {st}")
             for k, a in enumerate(args):
@@ -454,7 +454,7 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
     res = ctx.new_ssa()
     ctx.exec(
         f"{ctx.feed}{res} = llvm.extractvalue {obj}"
-        f"[{', '.join(map(str, idxs))}] : {mlir_struct_type(fmt)}"
+        f"[{', '.join(map(str, idxs))}] : {mlir_type(fmt)}"
     )
 
     if llvm_type(mlir_type(t)) != mlir_type(t):
@@ -506,9 +506,21 @@ def mlir_type(t: FType):
         case algebra.float_:
             return "f64"
         case algebra.ftypes.FDTypeNumpy():
-            return numpy_to_mlir_types(t)
+            dt = np.dtype(t.dtype)
+            match dt.kind:
+                case "b":
+                    return "i1"
+                case "i" | "u":
+                    return f"i{dt.itemsize * 8}"
+                case "f":
+                    return f"f{dt.itemsize * 8}"
+                case _:
+                    raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
         case StructFType():
-            return mlir_struct_type(t)
+            fields = (
+                llvm_type(mlir_type(field_type)) for _, field_type in t.struct_fields
+            )
+            return f"!llvm.struct<({', '.join(fields)})>"
         case _:
             raise NotImplementedError(f"No MLIR type mapping for {t}")
 
@@ -527,32 +539,13 @@ def llvm_type(s: str) -> str:
     return s
 
 
-def mlir_struct_type(fmt: StructFType) -> str:
-    fields = []
-    for _, t in fmt.struct_fields:
-        match t:
-            case StructFType():
-                fields.append(mlir_struct_type(t))
-            case _:
-                fields.append(llvm_type(mlir_type(t)))
-    return f"!llvm.struct<({', '.join(fields)})>"
+def mlir_ctype(s: FType | str):
+    match s:
+        case StructFType():
+            return mlir_struct_ctype(s)
+        case FType():
+            return mlir_ctype(mlir_type(s))
 
-
-def numpy_to_mlir_types(t):
-    dt = np.dtype(t.dtype)
-    if dt.kind == "b":
-        return "i1"
-
-    bits = dt.itemsize * 8
-    if dt.kind in ("i", "u"):
-        return f"i{bits}"
-    if dt.kind == "f":
-        return f"f{bits}"
-
-    raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
-
-
-def mlir_ctype(s: str):
     if s.startswith("memref<") and s.endswith(">"):
         res = mlir_memrefs.get(s)
         if res is None:
@@ -589,18 +582,10 @@ def mlir_ctype(s: str):
 def mlir_struct_ctype(fmt: StructFType):
     res = mlir_structs.get(fmt)
     if res is None:
-        fields = [(name, mlir_field_ctype(t)) for name, t in fmt.struct_fields]
+        fields = [(name, mlir_ctype(t)) for name, t in fmt.struct_fields]
         res = type("MLIR" + fmt.struct_name, (ctypes.Structure,), {"_fields_": fields})
         mlir_structs[fmt] = res
     return res
-
-
-def mlir_field_ctype(t: FType):
-    match t:
-        case StructFType():
-            return mlir_struct_ctype(t)
-        case _:
-            return mlir_ctype(mlir_type(t))
 
 
 def serialize_to_mlir(fmt: FType, obj):
