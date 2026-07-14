@@ -9,9 +9,11 @@ from finchlite import ffuncs
 from finchlite.autoschedule.loop_order_cost import (
     SEQ_READ_COST,
     SEQ_WRITE_COST,
+    cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
     get_loop_lookups,
     loop_order_cost,
+    needs_reformat,
 )
 from finchlite.autoschedule.tensor_stats import DCStatsFactory
 from finchlite.finch_logic import Alias, Field, Literal, MapJoin, Table
@@ -77,8 +79,19 @@ def _ref_cost(A, B, order, sf, expr, bindings):
     cost = 0.0
     for j in range(1, len(order) + 1):
         prefix = order[:j]
+        prefix_set = set(prefix)
         lookups = get_loop_lookups(prefix, conjunct_stats, disjunct_stats, sf)
         cost += lookups * _prefix_lookup_factor(A, B, prefix)
+
+        seen = []
+        for stat in conjunct_stats + disjunct_stats:
+            if not prefix_set.intersection(stat.index_order):
+                continue
+            if any(stat is s for s in seen):
+                continue
+            seen.append(stat)
+            if needs_reformat(stat, prefix):
+                cost += cost_of_reformat(stat)
     return cost
 
 

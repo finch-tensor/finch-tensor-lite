@@ -214,11 +214,6 @@ def get_prefix_cost(
         rel_vars = set(stat.index_order) & prefix_set
         approx_sparsity = _approx_axis_density(stat, rel_vars)
         is_dense = approx_sparsity > 0.05
-
-        if needs_reformat(stat, new_prefix):
-            lookup_factor += SEQ_READ_COST / 5 if is_dense else SEQ_READ_COST
-            continue
-
         lookup_factor += SEQ_READ_COST / 5 if is_dense else SEQ_READ_COST
 
     if output_vars is not None and new_var in output_vars:
@@ -233,7 +228,14 @@ def get_prefix_cost(
     else:
         lookup_factor += SEQ_WRITE_COST
 
-    return lookups * lookup_factor
+    prev = new_prefix[:-1]
+    transpose_cost = 0
+    for stat in seen:
+        if needs_reformat(stat, new_prefix) and not (
+            prev and needs_reformat(stat, prev)
+        ):
+            transpose_cost += cost_of_reformat(stat)
+    return lookups * lookup_factor + transpose_cost
 
 
 def loop_order_cost(
