@@ -10,8 +10,9 @@ from finchlite.autoschedule import (
     normalize_names,
 )
 from finchlite.autoschedule.formatter import DefaultLogicFormatter
-from finchlite.autoschedule.loop_ordering import set_loop_order
+from finchlite.autoschedule.loop_ordering import concordize, set_loop_order
 from finchlite.autoschedule.optimize import (
+    isolate_aggregates,
     lift_fields,
     optimize,
     propagate_copy_queries,
@@ -19,14 +20,8 @@ from finchlite.autoschedule.optimize import (
     propagate_map_queries_backward,
     propagate_transpose_queries,
 )
-from finchlite.autoschedule.standardize import (
-    concordize,
-    flatten_plans,
-    isolate_aggregates,
-    push_fields,
-    standardize,
-)
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory
+from finchlite.autoschedule.util import flatten_plans, push_fields
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -41,6 +36,8 @@ from finchlite.finch_logic import (
     Table,
 )
 from finchlite.symbolic.gensym import _sg
+
+from .conftest import reset_name_counts
 
 
 def test_propagate_map_queries():
@@ -664,7 +661,6 @@ def test_scheduler_e2e_matmul(file_regression):
             Alias("B"): ftype(finchlite.asarray(b)),
         },
     )
-    plan_opt, bindings = standardize(plan_opt, bindings)
 
     file_regression.check(
         str(plan_opt), extension=".txt", basename="test_scheduler_e2e_matmul_plan"
@@ -725,7 +721,7 @@ def test_scheduler_e2e_sddmm(file_regression):
     )
 
 
-def test_logic_standardizer_inplace(file_regression):
+def test_scheduler_inplace(file_regression):
     plan = Plan(
         bodies=(
             Query(
@@ -782,6 +778,10 @@ def test_logic_standardizer_inplace(file_regression):
             ),
         ),
     )
+    capture = LogicCapture()
+    scheduler = DefaultLogicOptimizer(
+        DefaultLoopOrderer(DefaultLogicFormatter(capture))
+    )
 
     bindings = {
         Alias(name="A0"): finchlite.asarray(np.array([[1, 2], [3, 4]])),
@@ -789,12 +789,14 @@ def test_logic_standardizer_inplace(file_regression):
         Alias(name="A2"): finchlite.asarray(np.array([[1, 1], [1, 1]])),
     }
 
-    plan_std, bindings = standardize(
-        plan, {var: ftype(val) for var, val in bindings.items()}
-    )
+    binding_ftypes = {var: val.ftype for var, val in bindings.items()}
+    stats_factory = DenseStatsFactory()
+    stats = {}
+    scheduler(plan, binding_ftypes, stats, stats_factory)
+    plan_opt = capture.last_prgm
 
     file_regression.check(
-        str(plan_std),
+        reset_name_counts(str(plan_opt)),
         extension=".txt",
-        basename="test_logic_standardizer_inplace_program",
+        basename="test_scheduler_inplace",
     )
