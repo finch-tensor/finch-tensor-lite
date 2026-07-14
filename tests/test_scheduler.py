@@ -37,6 +37,8 @@ from finchlite.finch_logic import (
 )
 from finchlite.symbolic.gensym import _sg
 
+from .conftest import reset_name_counts
+
 
 def test_propagate_map_queries():
     plan = Plan(
@@ -794,5 +796,7 @@ def test_scheduler_inplace(file_regression):
     plan_opt = capture.last_prgm
 
     file_regression.check(
-        str(plan_opt), extension=".txt", basename="test_scheduler_inplace"
+        reset_name_counts(str(plan_opt)),
+        extension=".txt",
+        basename="test_scheduler_inplace",
     )
