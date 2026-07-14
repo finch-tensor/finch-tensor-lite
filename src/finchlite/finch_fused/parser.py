@@ -423,12 +423,14 @@ class _FusedToPythonAST:
                 )
 
     def _literal_to_expr(self, value: Any) -> ast.expr:
-        if isinstance(value, (str, bytes, int, float, complex, bool, type(None))):
+        if value is None or isinstance(
+            value, str | bytes | int | float | complex | bool
+        ):
             return ast.Constant(value=value)
 
         if callable(value):
             if getattr(builtins, getattr(value, "__name__", ""), None) is value:
-                return ast.Name(id=value.__name__, ctx=ast.Load())
+                return ast.Name(id=value.__name__, ctx=ast.Load())  # type: ignore[union-attr]
 
             name = getattr(value, "__name__", None)
             if name is not None and name.isidentifier():
