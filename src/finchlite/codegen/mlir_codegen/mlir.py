@@ -494,6 +494,9 @@ class MLIRArgumentFType(ABC):
 
 
 def mlir_type(t: FType):
+    """
+    Convert an FType into the MLIR type string
+    """
     match t:
         case MLIRArgumentFType():
             return t.mlir_type()
@@ -526,6 +529,9 @@ def mlir_type(t: FType):
 
 
 def llvm_type(s: str) -> str:
+    """
+    Rewrite a MLIR type string into the LLVM dialect type
+    """
     if s.startswith("memref<") and s.endswith(">"):
         t = s[len("memref<") : -1].split("x")
         rank = 0
@@ -540,6 +546,10 @@ def llvm_type(s: str) -> str:
 
 
 def mlir_ctype(s: FType | str):
+    """
+    Return the ctypes equivalent of an FType or MLIR type string, so Python
+    can pass arguments to and read results from a compiled MLIR kernel.
+    """
     match s:
         case StructFType():
             return mlir_struct_ctype(s)
@@ -580,6 +590,10 @@ def mlir_ctype(s: FType | str):
 
 
 def mlir_struct_ctype(fmt: StructFType):
+    """
+    Build a ctypes.Structure subclass named "MLIR<struct_name>" following
+    the fields of a StructFType, converting each field through mlir_ctype.
+    """
     res = mlir_structs.get(fmt)
     if res is None:
         fields = [(name, mlir_ctype(t)) for name, t in fmt.struct_fields]
