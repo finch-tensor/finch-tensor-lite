@@ -26,7 +26,7 @@ from finchlite.autoschedule.standardize import LogicStandardizer
 from finchlite.autoschedule.tensor_stats import UniformStatsFactory
 from finchlite.codegen.numba_codegen.numba import NumbaCompiler
 from finchlite.compile.lower import NotationCompiler
-from finchlite.finch_assembly.simplification import AssemblySimplify
+from finchlite.finch_assembly import AssemblySimplify, LowerPackedStructSlots
 from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
 from finchlite.symbolic import gensym
 
@@ -77,7 +77,11 @@ def _make_pipeline():
                 DefaultLogicFormatter(
                     LogicCompiler(
                         NotationCompiler(
-                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                            NumbaCompiler(),
+                            ctx_transforms=(
+                                LowerPackedStructSlots(),
+                                AssemblySimplify(),
+                            ),
                         )
                     )
                 )
