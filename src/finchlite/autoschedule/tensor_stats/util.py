@@ -1,15 +1,5 @@
-"""Shared tensor degree-scan machinery used by structural statistics classes.
-
-Both :class:`DCStats` and :class:`LPStats` need the same underlying scan of a
-tensor: for each dimension ``i`` they need the *degree sequence* ``x_i`` where
-``x_i[v]`` is the number of non-fill entries whose index along dimension ``i``
-equals ``v`` (i.e. ``deg({all fields} | {i})``), plus the total number of
-non-fill values (``nnz``).
-
-``DCStats`` reduces these sequences to a distinct-count and a max-degree;
-``LPStats`` reduces them to the ``ell_p``-norms of the degree sequence for a
-configurable set of ``p`` values. The expensive part -- scanning the tensor
-via a compiled finch-notation program -- is identical, so it lives here.
+"""
+Shared functionality across TensorStats implementations.
 """
 
 from __future__ import annotations
