@@ -13,6 +13,7 @@ from finchlite.tensor import (
     FiberTensor,
     Level,
     Scalar,
+    SparseByteMapLevel,
     SparseCOOLevel,
     SparseListLevel,
 )
@@ -32,15 +33,13 @@ def _as_julia_scalar(val):
     return val
 
 
-def _buffer_to_jl(buffer: Buffer | np.ndarray):
+def _buffer_to_jl(buffer: Buffer):
     if isinstance(buffer, NumpyBuffer):
         return jl.Vector(buffer.arr)
-    if isinstance(buffer, np.ndarray):
-        return jl.Vector(buffer)
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
 
-def _plus_one_buffer_to_jl(buffer: Buffer | np.ndarray):
+def _plus_one_buffer_to_jl(buffer: Buffer):
     return jl.Finch.PlusOneVector(_buffer_to_jl(buffer))
 
 
@@ -59,8 +58,22 @@ def level_to_jl(level: Level):
             return jl.SparseListLevel(
                 level_to_jl(lvl),
                 int(dimension),
-                _plus_one_buffer_to_jl(cast(Buffer | np.ndarray, ptr)),
-                _plus_one_buffer_to_jl(cast(Buffer | np.ndarray, idx)),
+                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                _plus_one_buffer_to_jl(cast(Buffer, idx)),
+            )
+        case SparseByteMapLevel(
+            lvl=lvl, dimension=dimension, ptr=ptr, tbl=tbl, srt=srt
+        ):
+            if ptr is None or tbl is None or srt is None:
+                raise ValueError(
+                    "SparseByteMapLevel must have ptr, tbl, and srt buffers"
+                )
+            return jl.SparseByteMapLevel(
+                level_to_jl(lvl),
+                int(dimension),
+                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                _buffer_to_jl(cast(Buffer, tbl)),
+                _plus_one_buffer_to_jl(cast(Buffer, srt)),
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
             return jl.SparseCOOLevel(

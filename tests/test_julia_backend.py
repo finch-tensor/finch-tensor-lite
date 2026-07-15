@@ -13,6 +13,7 @@ from finchlite import (
     FiberTensor,
     NumpyBuffer,
     NumpyBufferFType,
+    SparseByteMapLevel,
     SparseListLevel,
     element,
     ftype,
@@ -126,6 +127,70 @@ def test_julia_kernel_converts_native_tensors(monkeypatch):
     assert kernel(arg) == ("python-result",)
     assert converted == [arg]
     assert returned == ["jl-result"]
+
+
+def test_julia_interop_converts_sparse_bytemap_level(monkeypatch):
+    from finchlite.compile_jl import interop
+
+    calls = []
+
+    class FakeFinch:
+        @staticmethod
+        def PlusOneVector(arg):
+            calls.append(("plus_one", arg))
+            return ("plus_one", arg)
+
+    class FakeJL:
+        Finch = FakeFinch
+
+        @staticmethod
+        def Vector(arg):
+            calls.append(("vector", arg))
+            return ("vector", arg)
+
+        @staticmethod
+        def ElementLevel(fill, val):
+            calls.append(("element", fill, val))
+            return ("element", fill, val)
+
+        @staticmethod
+        def SparseByteMapLevel(lvl, dimension, ptr, tbl, srt):
+            calls.append(("bytemap", lvl, dimension, ptr, tbl, srt))
+            return ("bytemap", lvl, dimension, ptr, tbl, srt)
+
+    monkeypatch.setattr(interop, "jl", FakeJL())
+
+    dtype = np.int64
+    ptr = NumpyBuffer(np.array([0, 2], dtype=np.intp))
+    tbl = NumpyBuffer(np.array([False, True, True], dtype=np.bool_))
+    srt = NumpyBuffer(np.array([1, 2], dtype=np.intp))
+    data = NumpyBuffer(np.array([0, 4, 5], dtype=dtype))
+    elem_ftype = element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)
+    level = SparseByteMapLevel(
+        ElementLevel(elem_ftype, data),
+        np.intp(3),
+        ptr,
+        tbl,
+        srt,
+    )
+
+    result = interop.level_to_jl(level)
+
+    assert result == (
+        "bytemap",
+        ("element", np.int64(0), ("vector", data.arr)),
+        3,
+        ("plus_one", ("vector", ptr.arr)),
+        ("vector", tbl.arr),
+        ("plus_one", ("vector", srt.arr)),
+    )
+
+
+def test_julia_interop_rejects_raw_ndarray_buffers():
+    from finchlite.compile_jl import interop
+
+    with pytest.raises(ValueError, match="Unsupported buffer type"):
+        interop._buffer_to_jl(np.array([1, 2, 3]))
 
 
 def test_compile_julia_executes_native_bufferized_ndarray():
