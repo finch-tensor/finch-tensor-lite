@@ -14,9 +14,9 @@ from finchlite.algebra import Tensor
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
-from .util import degree_count_scan
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .util import degree_count_scan
 
 DEFAULT_PS: tuple[float, ...] = (1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
 

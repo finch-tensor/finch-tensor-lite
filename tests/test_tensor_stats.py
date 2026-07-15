@@ -2838,9 +2838,7 @@ def test_lp_base_tensor_matches_dc():
         replace=False,
         cache={},
     )
-    assert lp.estimate_non_fill_values() == pytest.approx(
-        dc.estimate_non_fill_values()
-    )
+    assert lp.estimate_non_fill_values() == pytest.approx(dc.estimate_non_fill_values())
 
 
 def test_lp_empty_tensor_is_zero():
@@ -2909,9 +2907,7 @@ def test_lp_intermediate_p_is_tighter():
 
     def bound(ps):
         f = LPStatsFactory(ps=ps)
-        out = f.mapjoin(
-            ffuncs.mul, f(fl.asarray(R), (i, j)), f(fl.asarray(S), (j, k))
-        )
+        out = f.mapjoin(ffuncs.mul, f(fl.asarray(R), (i, j)), f(fl.asarray(S), (j, k)))
         return out.estimate_non_fill_values()
 
     b_inf = bound((1.0, math.inf))
@@ -2940,9 +2936,7 @@ def test_lp_relabel_and_reorder():
     # renaming must remap the field names inside the degree records, so the
     # bound is unchanged and no record still references the old field `i`.
     assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.lpdcs)
-    assert all(
-        (dc.from_indices | dc.to_indices) <= {k, j} for dc in relabeled.lpdcs
-    )
+    assert all((dc.from_indices | dc.to_indices) <= {k, j} for dc in relabeled.lpdcs)
     assert relabeled.estimate_non_fill_values() == pytest.approx(
         stats.estimate_non_fill_values()
     )

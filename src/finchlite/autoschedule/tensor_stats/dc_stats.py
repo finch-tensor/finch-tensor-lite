@@ -12,9 +12,9 @@ from finchlite.algebra import Tensor
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
-from .util import degree_count_scan
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .util import degree_count_scan
 
 
 @dataclass(frozen=True)
