@@ -96,6 +96,11 @@ cmd = "python -m pytest -m c_backend"
 depends-on = ["compile"]
 default-environment = "test-c"
 
+[tool.pixi.feature.julia.tasks.test-julia]
+cmd = "python -m pytest tests/test_julia_backend.py"
+depends-on = ["compile"]
+default-environment = "test-julia"
+
 [tool.pixi.feature.benchmark.tasks.benchmark]
 cmd = "pytest --codspeed benchmarks/"
 depends-on = ["compile"]
