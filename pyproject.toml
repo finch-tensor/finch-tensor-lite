@@ -18,6 +18,9 @@ julia = [
     "juliapkg>=0.1.16,<0.2.0",
     "juliacall>=0.9.24,<0.10.0",
 ]
+mlir = [
+    "mlir-python-bindings>=20260715",
+]
 
 [dependency-groups]
 test = [
@@ -147,13 +150,19 @@ libc = { family = "glibc", version = "2.34" }
 
 [tool.pixi.feature.mlir.dependencies]
 pyyaml = "<=6.0.1"
+python = "3.12.*"
 
-[tool.pixi.feature.mlir.pypi-options]
-index-url = "https://pypi.org/simple"
-find-links = [{ url = "https://llvm.github.io/eudsl" }]
+[tool.pixi.feature.mlir.target.linux-64.pypi-dependencies]
+mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_x86_64.whl" }
 
-[tool.pixi.feature.mlir.pypi-dependencies]
-mlir-python-bindings = "*"
+[tool.pixi.feature.mlir.target.linux-aarch64.pypi-dependencies]
+mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_aarch64.whl" }
+
+[tool.pixi.feature.mlir.target.osx-arm64.pypi-dependencies]
+mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-macosx_13_0_arm64.whl" }
+
+[tool.pixi.feature.mlir.target.win-64.pypi-dependencies]
+mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-win_amd64.whl" }
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"

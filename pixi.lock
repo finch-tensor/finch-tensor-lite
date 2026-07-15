@@ -1986,8 +1986,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    find-links:
-    - url: https://llvm.github.io/eudsl
     packages:
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda
@@ -2026,8 +2024,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/yaml-0.2.5-h925e9cb_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
       - conda_source: finch-tensor-lite[e4d02307] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-macosx_13_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/a8/b8/3c70881695e056f8a32f8b941126cf78775d9a4d7feba8abcb52cb7b04f2/ml_dtypes-0.5.4-cp312-cp312-macosx_10_13_universal2.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-macosx_13_0_arm64.whl
       p1:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_9.conda
@@ -2070,8 +2068,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-8_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda_source: finch-tensor-lite[82d17f2b] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/3a/cb/28ce52eb94390dda42599c98ea0204d74799e4d8047a0eb559b6fd648056/ml_dtypes-0.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-manylinux_2_34_x86_64.whl
       p2:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/_openmp_mutex-4.5-20_gnu.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/bzip2-1.0.8-h4777abc_9.conda
@@ -2115,8 +2113,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-8_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda_source: finch-tensor-lite[314ae241] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/54/0f/428ef6881782e5ebb7eca459689448c0394fa0a80bea3aa9262cba5445ea/ml_dtypes-0.5.4-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-manylinux_2_34_aarch64.whl
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/donfig-0.8.1.post1-pyhd8ed1ab_1.conda
@@ -2158,9 +2156,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/yaml-0.2.5-h6a83c73_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
       - conda_source: finch-tensor-lite[5a5ee9cb] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/2b/54/9a9edb45345bd6744da5ddfb6628e5d5185920494c6a67ec45b6381004cb/scipy-1.18.0-cp312-cp312-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/f5/f0/0cfadd537c5470378b1b32bd859cf2824972174b51b873c9d95cfd7475a5/ml_dtypes-0.5.4-cp312-cp312-win_amd64.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-win_amd64.whl
   pre-commit:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
@@ -3490,8 +3488,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    find-links:
-    - url: https://llvm.github.io/eudsl
     packages:
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda
@@ -3530,6 +3526,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/yaml-0.2.5-h925e9cb_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
       - conda_source: finch-tensor-lite[e4d02307] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-macosx_13_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/2f/4d852bb8a9c73a68b18eca9b5b085285282122166e158f4d2a477639bfee/hypothesis-6.156.6-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl
@@ -3561,7 +3558,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ed/ee/a423e857f5b45da3adc8ddbcfbfd4a0e9a047edce3915d3e3d6e189b6bd9/ndindex-1.10.1-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-macosx_13_0_arm64.whl
       p1:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_9.conda
@@ -3604,6 +3600,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-8_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda_source: finch-tensor-lite[82d17f2b] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/00/a9/753806f5292b40aeab1d269e408e3a7e85be3c0d88828fb78ab4a34d6626/hypothesis-6.156.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl
@@ -3635,7 +3632,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/e5/81/c7009ed7ea9765adb2b9d095054d748266fae5f07ac6c5f925f33715fcde/coverage-7.15.1-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-manylinux_2_34_x86_64.whl
       p2:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/_openmp_mutex-4.5-20_gnu.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/bzip2-1.0.8-h4777abc_9.conda
@@ -3679,6 +3675,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-8_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda_source: finch-tensor-lite[314ae241] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/03/e7/a197e7bc72baf2c61ce7fdc6906a5054dc05bd8da0819aa894e4857bf87e/librt-0.13.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/1f/40/139b6b050ba2b2a0bb40e0381a352b1eb6551302dcb8f86fb4c97dd34e92/ndindex-1.10.1-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl
@@ -3710,7 +3707,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-manylinux_2_34_aarch64.whl
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/donfig-0.8.1.post1-pyhd8ed1ab_1.conda
@@ -3752,6 +3748,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/yaml-0.2.5-h6a83c73_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
       - conda_source: finch-tensor-lite[5a5ee9cb] @ .
+      - pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/54/9a9edb45345bd6744da5ddfb6628e5d5185920494c6a67ec45b6381004cb/scipy-1.18.0-cp312-cp312-win_amd64.whl
@@ -3785,7 +3782,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f5/f0/0cfadd537c5470378b1b32bd859cf2824972174b51b873c9d95cfd7475a5/ml_dtypes-0.5.4-cp312-cp312-win_amd64.whl
-      - pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-win_amd64.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
   build_number: 20
@@ -10543,6 +10539,42 @@ packages:
   - conda: https://conda.anaconda.org/conda-forge/osx-arm64/uv-0.11.28-hc169f86_0.conda
   - conda: https://conda.anaconda.org/conda-forge/osx-arm64/uv-build-0.11.28-h9b24fd1_0.conda
   - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
+- pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-macosx_13_0_arm64.whl
+  name: mlir-python-bindings
+  version: 20260715+3f6af3be1
+  requires_dist:
+  - numpy>=1.19.5
+  - pyyaml>=5.4.0,<=6.0.1
+  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
+  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
+  requires_python: '>=3.8'
+- pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_aarch64.whl
+  name: mlir-python-bindings
+  version: 20260715+3f6af3be1
+  requires_dist:
+  - numpy>=1.19.5
+  - pyyaml>=5.4.0,<=6.0.1
+  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
+  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
+  requires_python: '>=3.8'
+- pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_x86_64.whl
+  name: mlir-python-bindings
+  version: 20260715+3f6af3be1
+  requires_dist:
+  - numpy>=1.19.5
+  - pyyaml>=5.4.0,<=6.0.1
+  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
+  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
+  requires_python: '>=3.8'
+- pypi: direct+https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-win_amd64.whl
+  name: mlir-python-bindings
+  version: 20260715+3f6af3be1
+  requires_dist:
+  - numpy>=1.19.5
+  - pyyaml>=5.4.0,<=6.0.1
+  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
+  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/00/a9/753806f5292b40aeab1d269e408e3a7e85be3c0d88828fb78ab4a34d6626/hypothesis-6.156.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   name: hypothesis
   version: 6.156.6
@@ -12096,43 +12128,3 @@ packages:
   requires_dist:
   - numpy ; extra == 'arrays'
   requires_python: '>=3.9'
-- pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-macosx_13_0_arm64.whl
-  name: mlir-python-bindings
-  version: 20260714+2b8488ac1
-  index: https://llvm.github.io/eudsl
-  requires_dist:
-  - numpy>=1.19.5
-  - pyyaml>=5.4.0,<=6.0.1
-  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
-  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
-  requires_python: '>=3.8'
-- pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-manylinux_2_34_aarch64.whl
-  name: mlir-python-bindings
-  version: 20260714+2b8488ac1
-  index: https://llvm.github.io/eudsl
-  requires_dist:
-  - numpy>=1.19.5
-  - pyyaml>=5.4.0,<=6.0.1
-  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
-  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
-  requires_python: '>=3.8'
-- pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-manylinux_2_34_x86_64.whl
-  name: mlir-python-bindings
-  version: 20260714+2b8488ac1
-  index: https://llvm.github.io/eudsl
-  requires_dist:
-  - numpy>=1.19.5
-  - pyyaml>=5.4.0,<=6.0.1
-  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
-  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
-  requires_python: '>=3.8'
-- pypi: https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260714+2b8488ac1-cp312-cp312-win_amd64.whl
-  name: mlir-python-bindings
-  version: 20260714+2b8488ac1
-  index: https://llvm.github.io/eudsl
-  requires_dist:
-  - numpy>=1.19.5
-  - pyyaml>=5.4.0,<=6.0.1
-  - ml-dtypes>=0.1.0,<=0.6.0 ; python_full_version < '3.13'
-  - ml-dtypes>=0.5.0,<=0.6.0 ; python_full_version >= '3.13'
-  requires_python: '>=3.8'
