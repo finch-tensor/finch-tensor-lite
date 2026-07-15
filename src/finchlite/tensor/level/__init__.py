@@ -6,6 +6,7 @@ from .sparse_bytemap_level import (
     sparse_bytemap,
 )
 from .sparse_coo_level import SparseCOOLevel, SparseCOOLevelFType, sparse_coo
+from .sparse_hash_level import SparseHashLevel, SparseHashLevelFType, sparse_hash
 from .sparse_list_level import SparseListLevel, SparseListLevelFType, sparse_list
 
 __all__ = [
@@ -17,11 +18,14 @@ __all__ = [
     "SparseByteMapLevelFType",
     "SparseCOOLevel",
     "SparseCOOLevelFType",
+    "SparseHashLevel",
+    "SparseHashLevelFType",
     "SparseListLevel",
     "SparseListLevelFType",
     "dense",
     "element",
     "sparse_bytemap",
     "sparse_coo",
+    "sparse_hash",
     "sparse_list",
 ]

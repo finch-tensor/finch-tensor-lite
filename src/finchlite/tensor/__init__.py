@@ -9,12 +9,15 @@ from .level import (
     SparseByteMapLevelFType,
     SparseCOOLevel,
     SparseCOOLevelFType,
+    SparseHashLevel,
+    SparseHashLevelFType,
     SparseListLevel,
     SparseListLevelFType,
     dense,
     element,
     sparse_bytemap,
     sparse_coo,
+    sparse_hash,
     sparse_list,
 )
 from .override_tensor import OverrideTensor
@@ -71,6 +74,8 @@ __all__ = [
     "SparseByteMapLevelFType",
     "SparseCOOLevel",
     "SparseCOOLevelFType",
+    "SparseHashLevel",
+    "SparseHashLevelFType",
     "SparseListLevel",
     "SparseListLevelFType",
     "UpperTriangleTensor",
@@ -79,5 +84,6 @@ __all__ = [
     "fiber_tensor",
     "sparse_bytemap",
     "sparse_coo",
+    "sparse_hash",
     "sparse_list",
 ]
