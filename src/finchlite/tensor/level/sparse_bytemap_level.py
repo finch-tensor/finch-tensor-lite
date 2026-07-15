@@ -80,7 +80,9 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
 
-    def construct(self, *, shape) -> "SparseByteMapLevel":
+    def construct(self, shape, **kwargs) -> "SparseByteMapLevel":
+        if kwargs:
+            raise TypeError("SparseByteMapLevelFType.construct does not accept kwargs")
         lvl = self.lvl_t.construct(shape=shape[1:])
         return SparseByteMapLevel(lvl, self.dimension_type(shape[0]))
 

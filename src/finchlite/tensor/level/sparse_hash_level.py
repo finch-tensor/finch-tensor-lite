@@ -98,7 +98,9 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
 
-    def construct(self, *, shape) -> "SparseHashLevel":
+    def construct(self, shape, **kwargs) -> "SparseHashLevel":
+        if kwargs:
+            raise TypeError("SparseHashLevelFType.construct does not accept kwargs")
         lvl = self.lvl_t.construct(shape=shape[1:])
         return SparseHashLevel(
             lvl,
