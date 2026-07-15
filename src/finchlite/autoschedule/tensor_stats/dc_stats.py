@@ -8,13 +8,11 @@ from typing import Any
 
 import numpy as np
 
-from finchlite import finch_notation as ntn
-from finchlite.algebra import Tensor, ffuncs, ftype, int64
+from finchlite.algebra import Tensor
 from finchlite.algebra.algebra import FinchOperator
-from finchlite.compile import make_extent
 from finchlite.finch_logic import Field
-from finchlite.tensor import BufferizedNDArray
 
+from ._degree_scan import degree_count_scan
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
@@ -35,13 +33,6 @@ class DC:
     from_indices: frozenset[Field]
     to_indices: frozenset[Field]
     value: float
-
-
-_INT64_VECTOR_FTYPE = BufferizedNDArray.from_numpy(np.zeros(1, dtype=np.int64)).ftype
-
-
-def _int_tuple_ftype(size: int):
-    return ftype(tuple(np.int64(0) for _ in range(size)))
 
 
 class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
@@ -120,7 +111,18 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
 
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
         base_stats = self.relabel_def(stats, relabel_indices)
-        dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
+        if isinstance(stats, DCStats):
+            mapping = dict(zip(stats.index_order, relabel_indices, strict=True))
+            dcs = {
+                DC(
+                    frozenset(mapping.get(f, f) for f in dc.from_indices),
+                    frozenset(mapping.get(f, f) for f in dc.to_indices),
+                    dc.value,
+                )
+                for dc in stats.dcs
+            }
+        else:
+            dcs = set()
         return DCStats.from_base_stats(base_stats, dcs=dcs)
 
     def reorder(self, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
@@ -173,228 +175,15 @@ class DCStats(NumericStats):
     # Additionally, we compute the nnz for the full tensor DC({}, {*fields}).
     def _array_to_dcs(self, arr: Any, fields: Iterable[Field]) -> set[DC]:
         fields = list(fields)
-        ndims = len(fields)
-        dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
-        dim_array_variables = [
-            ntn.Variable(f"x_{fields[i]}", _INT64_VECTOR_FTYPE) for i in range(ndims)
-        ]
-        dim_size_variables = [
-            ntn.Variable(f"n_{fields[i]}", int64) for i in range(ndims)
-        ]
-        dim_array_slots = [
-            ntn.Slot(f"x_{fields[i]}_", _INT64_VECTOR_FTYPE) for i in range(ndims)
-        ]
-        dim_proj_variables = [
-            ntn.Variable(f"proj_{fields[i]}", int64) for i in range(ndims)
-        ]
-        dim_dc_variables = [
-            ntn.Variable(f"dc_{fields[i]}", int64) for i in range(ndims)
-        ]
+        counts, nnz = degree_count_scan(arr, fields, self.fill_value)
 
-        A = ntn.Variable("A", arr.ftype)
-        A_ = ntn.Slot("A_", arr.ftype)
-        A_access = ntn.Unwrap(ntn.Access(A_, ntn.Read(), tuple(dim_loop_variables)))
-        A_nnz_variable = ntn.Variable("nnz", int64)
-
-        dim_size_assignments = []
-        dim_proj_variable_assigments = []
-        dim_dc_variable_assigments = []
-        dim_array_unpacks = []
-        dim_array_declares = []
-        dim_array_increments = []
-        for i in range(ndims):
-            dim_size_assignments.append(
-                ntn.Assign(
-                    dim_size_variables[i],
-                    ntn.Dimension(A_, ntn.Literal(i)),
-                )
-            )
-            dim_proj_variable_assigments.append(
-                ntn.Assign(dim_proj_variables[i], ntn.Literal(int64(0)))
-            )
-            dim_dc_variable_assigments.append(
-                ntn.Assign(dim_dc_variables[i], ntn.Literal(int64(0)))
-            )
-            dim_array_unpacks.append(
-                ntn.Unpack(dim_array_slots[i], dim_array_variables[i])
-            )
-            dim_array_declares.append(
-                ntn.Declare(
-                    dim_array_slots[i],
-                    ntn.Literal(int64(0)),
-                    ntn.Literal(ffuncs.add),
-                    (dim_size_variables[i],),
-                )
-            )
-            inc_expr = ntn.Increment(
-                ntn.Access(
-                    dim_array_slots[i],
-                    ntn.Update(ntn.Literal(ffuncs.add)),
-                    (dim_loop_variables[i],),
-                ),
-                ntn.Call(
-                    ntn.Literal(ffuncs.ne),
-                    (
-                        A_access,
-                        ntn.Literal(self.fill_value),
-                    ),
-                ),
-            )
-            dim_array_increments.append(inc_expr)
-
-        array_build_loop: ntn.NotationStatement = ntn.Block(
-            (
-                *dim_array_increments,
-                ntn.Assign(
-                    A_nnz_variable,
-                    ntn.Call(
-                        ntn.Literal(ffuncs.add),
-                        (
-                            A_nnz_variable,
-                            ntn.Call(
-                                ntn.Literal(ffuncs.ne),
-                                (
-                                    A_access,
-                                    ntn.Literal(self.fill_value),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            )
-        )
-        for i in range(ndims):
-            array_build_loop = ntn.Loop(
-                dim_loop_variables[i],
-                ntn.Call(
-                    ntn.Literal(make_extent),
-                    (ntn.Literal(int64(0)), dim_size_variables[i]),
-                ),
-                array_build_loop,
-            )
-
-        dim_array_freezes = []
-        dc_compute_loops = []
-        dim_array_repacks = []
-        for i in range(ndims):
-            dim_array_freezes.append(
-                ntn.Freeze(dim_array_slots[i], ntn.Literal(ffuncs.add))
-            )
-            dc_compute_loops.append(
-                ntn.Loop(
-                    dim_loop_variables[i],
-                    ntn.Call(
-                        ntn.Literal(make_extent),
-                        (ntn.Literal(int64(0)), dim_size_variables[i]),
-                    ),
-                    ntn.Block(
-                        (
-                            ntn.If(
-                                ntn.Call(
-                                    ntn.Literal(ffuncs.ne),
-                                    (
-                                        ntn.Unwrap(
-                                            ntn.Access(
-                                                dim_array_slots[i],
-                                                ntn.Read(),
-                                                (dim_loop_variables[i],),
-                                            )
-                                        ),
-                                        ntn.Literal(np.int64(0)),
-                                    ),
-                                ),
-                                ntn.Assign(
-                                    dim_proj_variables[i],
-                                    ntn.Call(
-                                        ntn.Literal(ffuncs.add),
-                                        (
-                                            dim_proj_variables[i],
-                                            ntn.Literal(np.int64(1)),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            ntn.Assign(
-                                dim_dc_variables[i],
-                                ntn.Call(
-                                    ntn.Literal(ffuncs.max),
-                                    (
-                                        dim_dc_variables[i],
-                                        ntn.Unwrap(
-                                            ntn.Access(
-                                                dim_array_slots[i],
-                                                ntn.Read(),
-                                                (dim_loop_variables[i],),
-                                            )
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        )
-                    ),
-                )
-            )
-            dim_array_repacks.append(
-                ntn.Repack(dim_array_slots[i], dim_array_variables[i])
-            )
-
-        def to_tuple(*args):
-            return (*args,)
-
-        dc_args = []
-        for i in range(ndims):
-            dc_args.append(dim_proj_variables[i])
-            dc_args.append(dim_dc_variables[i])
-        return_expr = ntn.Return(
-            ntn.Call(
-                ntn.Literal(to_tuple),
-                (*dc_args, A_nnz_variable),
-            )
-        )
-
-        prgm = ntn.Module(
-            (
-                ntn.Function(
-                    ntn.Variable("array_to_dcs", _int_tuple_ftype(2 * ndims + 1)),
-                    (A, *dim_array_variables),
-                    ntn.Block(
-                        (
-                            ntn.Unpack(A_, A),
-                            *dim_size_assignments,
-                            ntn.Assign(A_nnz_variable, ntn.Literal(int64(0))),
-                            *dim_proj_variable_assigments,
-                            *dim_dc_variable_assigments,
-                            *dim_array_unpacks,
-                            *dim_array_declares,
-                            array_build_loop,
-                            *dim_array_freezes,
-                            *dc_compute_loops,
-                            *dim_array_repacks,
-                            ntn.Repack(A_, A),
-                            return_expr,
-                        )
-                    ),
-                ),
-            )
-        )
-        mod = ntn.NotationInterpreter()(prgm)
-
-        dim_array_instances = [
-            BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64))
-            for i in range(ndims)
-        ]
-        dc_proj_pairs = mod.array_to_dcs(arr, *dim_array_instances)
         dcs = set()
-        for i in range(ndims):
-            dcs.add(DC(frozenset({}), frozenset({fields[i]}), dc_proj_pairs[2 * i]))
-            dcs.add(
-                DC(
-                    frozenset({fields[i]}),
-                    frozenset({*fields}),
-                    dc_proj_pairs[2 * i + 1],
-                )
-            )
-        dcs.add(DC(frozenset({}), frozenset({*fields}), dc_proj_pairs[-1]))
+        for i in range(len(fields)):
+            proj = float(np.count_nonzero(counts[i]))
+            max_deg = float(counts[i].max()) if counts[i].size else 0.0
+            dcs.add(DC(frozenset({}), frozenset({fields[i]}), proj))
+            dcs.add(DC(frozenset({fields[i]}), frozenset({*fields}), max_deg))
+        dcs.add(DC(frozenset({}), frozenset({*fields}), float(nnz)))
         return dcs
 
     def estimate_non_fill_values(self) -> float:
