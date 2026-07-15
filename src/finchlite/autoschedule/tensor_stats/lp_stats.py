@@ -18,7 +18,7 @@ from ._degree_scan import degree_count_scan
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
-DEFAULT_PS: tuple[float, ...] = (1.0, 2.0, math.inf)
+DEFAULT_PS: tuple[float, ...] = (1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
 
 
 @dataclass(frozen=True)
