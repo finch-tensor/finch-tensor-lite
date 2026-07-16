@@ -14,7 +14,7 @@ from finchlite.autoschedule.tensor_stats import (
     BaseTensorStatsFactory,
     BlockedStats,
     BlockedStatsFactory,
-    DatabaseStatsFactory,
+    VPStatsFactory,
     DCStats,
     DCStatsFactory,
     DenseStats,
@@ -567,10 +567,10 @@ def test_dummy_reorder():
     assert reordered.get_dim_size(Field("j")) == stats.get_dim_size(Field("j"))
 
 
-# ─────────────────────────────── DatabaseStats tests ─────────────────────────────
+# ─────────────────────────────── VPStats tests ─────────────────────────────
 
 
-def test_database_from_tensor_and_getters():
+def test_vp_from_tensor_and_getters():
     data = np.zeros((2, 3))
     data[0, 0] = 1.0
     data[1, 1] = 1.0
@@ -578,7 +578,7 @@ def test_database_from_tensor_and_getters():
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -601,7 +601,7 @@ def test_database_from_tensor_and_getters():
         ((2, 2), [(0, 0), (0, 1), (1, 0), (1, 1)], 4.0),
     ],
 )
-def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
+def test_vp_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     axes = tuple(Field(f"x{i}") for i in range(len(shape)))
     data = np.zeros(shape)
     for idx in nnz_indices:
@@ -611,7 +611,7 @@ def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     node = Table(Literal(arr), axes)
 
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -622,7 +622,7 @@ def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     assert stats.estimate_non_fill_values() == expected_nnz
 
 
-def test_database_mapjoin_join():
+def test_vp_mapjoin_join():
     i, k, j = Field("i"), Field("k"), Field("j")
     data_a = np.eye(10)
     data_b = np.eye(10)
@@ -632,14 +632,14 @@ def test_database_mapjoin_join():
 
     cache = {}
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -648,7 +648,7 @@ def test_database_mapjoin_join():
 
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -657,7 +657,7 @@ def test_database_mapjoin_join():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_mapjoin_elementwise():
+def test_vp_mapjoin_elementwise():
     i, j = Field("i"), Field("j")
     data_a = np.zeros((10, 10))
     data_a[:5, :] = 1.0
@@ -669,14 +669,14 @@ def test_database_mapjoin_elementwise():
 
     cache = {}
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -684,7 +684,7 @@ def test_database_mapjoin_elementwise():
     )
 
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=MapJoin(Literal(ffuncs.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
@@ -693,7 +693,7 @@ def test_database_mapjoin_elementwise():
     assert stats.estimate_non_fill_values() == pytest.approx(100.0)
 
 
-def test_database_mapjoin_broadcast():
+def test_vp_mapjoin_broadcast():
     i, j, k = Field("i"), Field("j"), Field("k")
 
     data_a = np.zeros((4, 5))
@@ -710,14 +710,14 @@ def test_database_mapjoin_broadcast():
 
     cache = {}
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -725,7 +725,7 @@ def test_database_mapjoin_broadcast():
     )
 
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=MapJoin(Literal(ffuncs.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
@@ -737,7 +737,7 @@ def test_database_mapjoin_broadcast():
     assert stats.V[k] == pytest.approx(3.0)
 
 
-def test_database_aggregate():
+def test_vp_aggregate():
     i, j = Field("i"), Field("j")
     data = np.eye(10)
     table = Table(Literal(fl.asarray(data)), (i, j))
@@ -749,7 +749,7 @@ def test_database_aggregate():
         idxs=(j,),
     )
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node_sum,
         bindings=OrderedDict(),
         replace=False,
@@ -760,35 +760,35 @@ def test_database_aggregate():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_copy():
+def test_vp_copy():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    copy = DatabaseStatsFactory().copy(stats)
+    copy = VPStatsFactory().copy(stats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
     assert copy is not stats
 
 
-def test_database_relabel():
+def test_vp_relabel():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    relabeled = DatabaseStatsFactory().relabel(stats, (Field("row"), Field("col")))
+    relabeled = VPStatsFactory().relabel(stats, (Field("row"), Field("col")))
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
     assert relabeled.V[Field("row")] == stats.V[Field("i")]
@@ -797,18 +797,18 @@ def test_database_relabel():
     assert Field("j") not in relabeled.V
 
 
-def test_database_reorder():
+def test_vp_reorder():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    reordered = DatabaseStatsFactory().reorder(stats, (Field("j"), Field("i")))
+    reordered = VPStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
 

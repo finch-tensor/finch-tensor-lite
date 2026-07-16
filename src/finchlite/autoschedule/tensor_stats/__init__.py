@@ -1,7 +1,7 @@
 from finchlite.finch_logic import TensorStats
 
 from .blocked_stats import BlockedStats, BlockedStatsFactory
-from .database_stats import DatabaseStats, DatabaseStatsFactory
+from .vp_stats import VPStats, VPStatsFactory
 from .dc_stats import DC, DCStats, DCStatsFactory
 from .dense_stat import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
@@ -17,8 +17,8 @@ __all__ = [
     "BlockedStatsFactory",
     "DCStats",
     "DCStatsFactory",
-    "DatabaseStats",
-    "DatabaseStatsFactory",
+    "VPStats",
+    "VPStatsFactory",
     "DenseStats",
     "DenseStatsFactory",
     "DummyStats",
