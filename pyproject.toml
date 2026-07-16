@@ -19,7 +19,7 @@ julia = [
     "juliacall>=0.9.24,<0.10.0",
 ]
 mlir = [
-    "mlir-python-bindings>=20260715",
+    "pyyaml>=6.0.1",
 ]
 
 [dependency-groups]
@@ -51,7 +51,13 @@ module-name = "finchlite"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64", "linux-ppc64le", "osx-arm64", "win-64"]
+platforms = [
+    { name = "linux-amd64", platform = "linux-64", glibc = "2.34" },
+    { name = "linux-arm64", platform = "linux-aarch64", glibc = "2.34" },
+    { name = "linux-ppc64", platform = "linux-ppc64le", glibc = "2.34" },
+    { name = "macos-arm64", platform = "osx-arm64", macos = "15.0" },
+    { name = "win-amd64", platform = "win-64" },
+]
 preview = ["pixi-build"]
 requires-pixi = ">=0.71.0"
 
@@ -124,13 +130,13 @@ default-environment = "test"
 python = "3.11.*"
 
 [tool.pixi.feature.benchmark]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
 
 [tool.pixi.feature.benchmark.dependencies]
 pytest-codspeed = "*"
 
 [tool.pixi.feature.julia]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
 
 [tool.pixi.feature.c.dependencies]
 c-compiler = "*"
@@ -148,26 +154,11 @@ clang = "*"
 CC = "clang"
 
 [tool.pixi.feature.mlir]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
-
-[tool.pixi.feature.mlir.system-requirements]
-libc = { family = "glibc", version = "2.34" }
+platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
 
 [tool.pixi.feature.mlir.dependencies]
-pyyaml = "<=6.0.1"
-python = "3.12.*"
-
-[tool.pixi.feature.mlir.target.linux-64.pypi-dependencies]
-mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_x86_64.whl" }
-
-[tool.pixi.feature.mlir.target.linux-aarch64.pypi-dependencies]
-mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-manylinux_2_34_aarch64.whl" }
-
-[tool.pixi.feature.mlir.target.osx-arm64.pypi-dependencies]
-mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-macosx_13_0_arm64.whl" }
-
-[tool.pixi.feature.mlir.target.win-64.pypi-dependencies]
-mlir-python-bindings = { url = "https://github.com/llvm/eudsl/releases/download/mlir-python-bindings/mlir_python_bindings-20260715+3f6af3be1-cp312-cp312-win_amd64.whl" }
+python = "3.13.*"
+mlir-python-bindings = ">=22.1.0,<23"
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"
