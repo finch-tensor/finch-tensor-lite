@@ -30,27 +30,17 @@ __all__ = [
     "LPStatsFactory",
 ]
 
-# The set of ``ell_p`` norm orders kept by :class:`LPStats` by default.
+# Default ell_p norm orders kept by LPStats.
 DEFAULT_PS: tuple[float, ...] = (1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
 
 
 @dataclass(frozen=True)
 class DC:
     """
-    A degree constraint: a bound on the ``ell_p``-norm of a degree sequence.
+    A degree constraint: ``value`` bounds ``||deg(to_indices | from_indices)||_p``.
 
-    ``value`` bounds ``||deg(to_indices | from_indices)||_p`` (in linear space).
-    A *classic* degree constraint -- the number of distinct ``to_indices``
-    combinations for a fixed ``from_indices`` -- is the ``p = inf`` case (the
-    maximum degree), which is why ``p`` defaults to ``math.inf``. Smaller ``p``
-    values capture skew: ``p = 1`` is the total count (cardinality), and
-    intermediate ``p`` interpolate between the two.
-
-    Attributes:
-        from_indices: Conditioning index names ``X``.
-        to_indices: Index names ``Y`` whose degrees (given ``X``) are counted.
-        value: ``||deg(to_indices | from_indices)||_p``.
-        p: The norm order (``math.inf`` is allowed).
+    ``p = inf`` (the default) is the classic max-degree constraint; ``p = 1`` is
+    the distinct count; intermediate ``p`` capture skew between the two.
     """
 
     from_indices: frozenset[Field]
@@ -74,19 +64,12 @@ def _lp_norm(counts: np.ndarray, p: float) -> float:
 
 class BoundStats(NumericStats):
     """
-    Base class for degree-constraint-based upper-bound statistics.
+    Base for degree-constraint upper-bound statistics: a guaranteed bound on the
+    number of non-fill values, built from ``ell_p``-norms of degree sequences.
 
-    A ``BoundStats`` scans a tensor into a set of degree constraints
-    (:class:`DC`) recording ``ell_p``-norms of degree sequences for a chosen set
-    of ``p`` values, and uses them to produce a *guaranteed upper bound* on the
-    number of non-fill values. Subclasses differ only in
-
-    * which ``p`` values they keep (``ps``), and
-    * how they turn the constraints into an estimate
-      (:meth:`estimate_non_fill_values`).
-
-    The scan and all statistics-propagation logic (in
-    :class:`BoundStatsFactory`) are shared.
+    Subclasses differ only in which ``p`` values they keep (``ps``) and how they
+    turn the constraints into an estimate (:meth:`estimate_non_fill_values`); the
+    scan and all propagation (in :class:`BoundStatsFactory`) are shared.
     """
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...], ps: Iterable[float]):
@@ -94,11 +77,9 @@ class BoundStats(NumericStats):
         self.ps: tuple[float, ...] = tuple(ps)
         self.dcs = self._structure_to_dcs(tensor, fields)
 
-    # For each field ``i`` we record the distinct-value count ``DC(∅, {i})`` and,
-    # for every ``p`` in ``self.ps``, the ``ell_p``-norm of the degree sequence
-    # ``DC({i}, {*fields}, p)``. We also record the full-tensor ``nnz``
-    # ``DC(∅, {*fields})``. The ``∅``-conditioned records are length-1 degree
-    # sequences, so their norm is ``p``-independent and stored once.
+    # Per field: the distinct-value count DC(∅, {i}) and, for each p, the ell_p
+    # norm DC({i}, {*fields}, p); plus the full-tensor nnz DC(∅, {*fields}). The
+    # ∅-conditioned records are length-1 sequences (p-independent), so kept once.
     def _structure_to_dcs(self, arr: Tensor, fields: Iterable[Field]) -> set[DC]:
         fields = list(fields)
         if arr.ndim == 0:
@@ -142,11 +123,9 @@ _Key = tuple[frozenset[Field], frozenset[Field], float]
 
 class BoundStatsFactory(BaseTensorStatsFactory[TS], Generic[TS]):
     """
-    Shared statistics-propagation for :class:`BoundStats` subclasses.
-
-    Every method here is identical across subclasses; the only per-subclass
-    knob is ``ps`` (which ``p`` norms to keep when scanning a base tensor).
-    Degree constraints are combined keyed by ``(from_indices, to_indices, p)``.
+    Shared statistics propagation for :class:`BoundStats` subclasses, combining
+    degree constraints keyed by ``(from_indices, to_indices, p)``. The only
+    per-subclass knob is ``ps``.
     """
 
     def __init__(self, stats_cls: type[TS], ps: Iterable[float]):
@@ -253,30 +232,17 @@ class BoundStatsFactory(BaseTensorStatsFactory[TS], Generic[TS]):
 
 class DCStats(BoundStats):
     """
-    Structural statistics derived from a tensor using degree constraints (DCs).
-
-    DCStats keeps classic degree constraints (distinct counts and maximum
-    degrees, i.e. the ``p = inf`` norm) and estimates the number of non-fill
-    values with a best-first product search: it grows coverage over the target
-    indices by multiplying degree constraints and takes the smallest covering
-    product, clamped by the tensor's dense capacity.
+    Classic degree constraints -- max degrees (``p = inf``) and distinct counts.
+    Estimates size with a best-first product search over the constraints,
+    clamped by the tensor's dense capacity.
     """
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...], ps=(math.inf,)):
         super().__init__(tensor, fields, ps)
 
     def estimate_non_fill_values(self) -> float:
-        """
-        Estimate the number of non-fill values using DCs.
-
-        This uses the stored degree constraints (DCs) as multiplicative factors
-        to grow coverage over the target indices and finds the smallest product
-        that covers all target indices. The result is clamped by the tensor's
-        dense capacity (the product of the target dimensions).
-
-        Returns:
-            the estimated number of non-fill entries in the tensor.
-        """
+        """Smallest degree-constraint product covering all indices, clamped by
+        dense capacity."""
         idx: frozenset[Field] = frozenset(self.dim_sizes.keys())
         if len(idx) == 0:
             return 1.0
@@ -324,15 +290,11 @@ class DCStatsFactory(BoundStatsFactory["DCStats"]):
 
 def _flow_bound(dcs: list[DC], target_vars: list[Field]) -> float | None:
     """
-    Compute ``log2`` of the LP (flow) upper bound on the joint size of
-    ``target_vars`` given the degree constraints ``dcs``.
+    ``log2`` of the LPflow upper bound on the joint size of ``target_vars``.
 
-    This is a faithful port of the ``LPflow`` network-flow LP from the LpBound
-    reference implementation (``fdbresearch/LpBound``, ``LpFlow/flow_bound.cpp``).
-    A single set of per-constraint coefficients ``a_i >= 0`` must simultaneously
-    route one unit of flow from the sink (the empty set) to every target
-    variable; the bound is ``min sum_i a_i * log2(value_i)``.
-
+    A faithful port of ``LpFlow/flow_bound.cpp`` from the LpBound reference
+    (``fdbresearch/LpBound``): coefficients ``a_i >= 0`` route one unit of flow
+    to every target simultaneously, minimizing ``sum_i a_i * log2(value_i)``.
     Returns ``None`` if the LP is infeasible or the solver fails.
     """
     if not target_vars or not dcs:
@@ -462,13 +424,9 @@ def _flow_bound(dcs: list[DC], target_vars: list[Field]) -> float | None:
 
 class LPStats(BoundStats):
     """
-    Structural statistics implementing the LP (LpBound) upper-bound framework.
-
-    Like :class:`DCStats`, ``LPStats`` scans a tensor into degree constraints,
-    but keeps ``ell_p``-norms of degree sequences for a configurable set of
-    ``p`` values rather than only the max-degree endpoint. The size upper bound
-    is computed by solving the ``LPflow`` network-flow linear program over those
-    constraints (see :func:`_flow_bound`).
+    LpBound statistics: keeps ``ell_p``-norms of degree sequences for a
+    configurable set of ``p`` (not just max degree), and bounds size via the
+    ``LPflow`` network-flow LP (:func:`_flow_bound`).
     """
 
     def __init__(self, tensor: Any, fields: tuple[Field, ...], ps=DEFAULT_PS):
