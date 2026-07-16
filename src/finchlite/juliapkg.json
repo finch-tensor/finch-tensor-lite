@@ -3,7 +3,7 @@
   "packages": {
     "Finch": {
       "uuid": "9177782c-1635-4eb9-9bfb-d9dfa25e6bce",
-      "version": "1.2.10"
+      "version": "1.4.0"
     },
     "HDF5": {
       "uuid": "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f",
