@@ -33,15 +33,15 @@ from finchlite.finch_logic import (
 )
 
 
-def _overwrite_def(stat, td: BaseTensorStats):
+def _overwrite_def(stat, base: BaseTensorStats):
     """Overwrite a stat's BaseTensorStats state in place.
 
-    Stats now inherit from :class:`BaseTensorStats`, so there is no ``tensordef``
-    member to replace; instead we copy ``td``'s state onto the stat directly.
+    Stats now inherit from :class:`BaseTensorStats`, so we copy ``base``'s state
+    onto the stat directly.
     """
-    stat.index_order = td.index_order
-    stat.dim_sizes = td.dim_sizes
-    stat.fill_value = td.fill_value
+    stat.index_order = base.index_order
+    stat.dim_sizes = base.dim_sizes
+    stat.fill_value = base.fill_value
     return stat
 
 
@@ -826,20 +826,22 @@ def test_embeddings():
     fields = (Field("i"), Field("j"))
 
     print("\n" + "=" * 80)
-    ds = DenseStats(arr, fields)
+    ds = DenseStatsFactory()(arr, fields)
     ds_emb = ds.get_embedding()
     print(f"DenseStats Embeddings : {ds_emb}")
 
-    us = UniformStats(arr, fields)
+    us = UniformStatsFactory()(arr, fields)
     us_emb = us.get_embedding()
     print(f"UniformStats Embeddings : {us_emb}")
 
-    dc_stats = DCStats(arr, fields)
+    dc_stats = DCStatsFactory()(arr, fields)
     dc_emb = dc_stats.get_embedding()
     print(f"DCStats Embeddings: {dc_emb}")
 
     blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(arr, fields, blocks_per_dim, UniformStatsFactory())
+    bs = BlockedStatsFactory(
+        UniformStatsFactory(), blocks_per_dim=blocks_per_dim
+    )(arr, fields)
     bs_emb = bs.get_embedding()
     print(f"BlockedStats Embeddings: {bs_emb}")
 
@@ -1059,13 +1061,12 @@ def test_blocked_stats_reorder_drop_one_index():
 
     i, j, k = Field("i"), Field("j"), Field("k")
     blocks_per_dim = {i: 2, j: 1, k: 3}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), (i, j, k), blocks_per_dim, UniformStatsFactory()
+    bs_factory = BlockedStatsFactory(
+        UniformStatsFactory(), blocks_per_dim=blocks_per_dim
     )
+    bs = bs_factory(fl.asarray(data), (i, j, k))
 
-    reordered = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
-        bs, (k, i)
-    )
+    reordered = bs_factory.reorder(bs, (k, i))
 
     assert reordered.index_order == (k, i)
     assert reordered.blocks.shape == (3, 2)
@@ -1077,12 +1078,11 @@ def test_blocked_stats_reorder_drop_two_index():
 
     i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
     blocks_per_dim = {i: 2, j: 1, k: 3, m: 1}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), (i, j, k, m), blocks_per_dim, UniformStatsFactory()
+    bs_factory = BlockedStatsFactory(
+        UniformStatsFactory(), blocks_per_dim=blocks_per_dim
     )
-    reordered = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
-        bs, (k, i)
-    )
+    bs = bs_factory(fl.asarray(data), (i, j, k, m))
+    reordered = bs_factory.reorder(bs, (k, i))
 
     assert reordered.index_order == (k, i)
     assert reordered.blocks.shape == (3, 2)
@@ -1237,7 +1237,7 @@ def test_reorder_def(orig_axes, new_axes):
         ),
     ],
 )
-def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
+def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
     objs = [BaseTensorStats.from_fields(ax, dims, fv) for (ax, dims, fv) in defs]
     out = BaseTensorStatsFactory._mapjoin_defs(func, *objs)
     assert out.index_order == expected_axes
@@ -1325,7 +1325,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
     ],
 )
-def test_tensordef_aggregate(
+def test_base_aggregate(
     op_func,
     index_order,
     dim_sizes,
@@ -1335,10 +1335,10 @@ def test_tensordef_aggregate(
     expected_dims,
     expected_fill,
 ):
-    d = BaseTensorStats.from_fields(
+    base = BaseTensorStats.from_fields(
         index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value
     )
-    out = BaseTensorStatsFactory.aggregate_def(op_func, None, reduce_fields, d)
+    out = BaseTensorStatsFactory.aggregate_def(op_func, None, reduce_fields, base)
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
@@ -2147,7 +2147,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         field_dims = {k: new_dims[k] for k in idx_set}
 
         td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
-        stats_objs.append(DCStats.from_base_stats(td, dcs=set(dcs)))
+        stats_objs.append(DCStats(td, dcs=set(dcs)))
 
     out = DCStatsFactory().mapjoin(ffuncs.add, *stats_objs)
 

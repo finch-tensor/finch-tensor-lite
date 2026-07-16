@@ -12,7 +12,7 @@ from finchlite import finch_notation as ntn
 from finchlite.algebra import Tensor, ffuncs, ftype, int64
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.compile import make_extent
-from finchlite.finch_logic import Field
+from finchlite.finch_logic import Field, StatsFactory
 from finchlite.tensor import BufferizedNDArray
 
 from .numeric_stats import NumericStats
@@ -44,22 +44,27 @@ def _int_tuple_ftype(size: int):
     return ftype(tuple(np.int64(0) for _ in range(size)))
 
 
-class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
+class DCStatsFactory(BaseTensorStatsFactory["DCStats"], StatsFactory["DCStats"]):
     def __init__(self):
         super().__init__(DCStats)
 
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> DCStats:
+        base = super().__call__(tensor, fields)
+        dcs = DCStats.structure_to_dcs(tensor, fields, base.fill_value)
+        return DCStats(base, dcs=dcs)
+
     def _mapjoin_union(self, op: FinchOperator, *union_args: DCStats) -> DCStats:
-        base_stats = super()._mapjoin_defs(op, *union_args)
+        base = super()._mapjoin_defs(op, *union_args)
 
         if len(union_args) == 1:
-            return DCStats.from_base_stats(union_args[0], dcs=set(union_args[0].dcs))
+            return DCStats(union_args[0], dcs=set(union_args[0].dcs))
 
         dc_keys: Counter[tuple[frozenset[Field], frozenset[Field]]] = Counter()
         stats_dcs: list[dict[tuple[frozenset[Field], frozenset[Field]], float]] = []
         for stats in union_args:
             dcs: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
-            Z = tuple(x for x in base_stats.index_order if x not in stats.index_order)
-            Z_dim_size = base_stats.get_dim_space_size(Z)
+            Z = tuple(x for x in base.index_order if x not in stats.index_order)
+            Z_dim_size = base.get_dim_space_size(Z)
             for dc in stats.dcs:
                 new_key = (dc.from_indices, dc.to_indices)
                 dcs[new_key] = dc.value
@@ -77,18 +82,18 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
             if count == len(union_args):
                 total = sum(d.get(key, 0.0) for d in stats_dcs)
                 X, Y = key
-                if Y.issubset(base_stats.index_order):
-                    total = min(total, base_stats.get_dim_space_size(Y))
+                if Y.issubset(base.index_order):
+                    total = min(total, base.get_dim_space_size(Y))
                 new_dcs[key] = min(float(2**64), total)
 
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dcs.items()}
-        return DCStats.from_base_stats(base_stats, dcs=new_stats)
+        return DCStats(base, dcs=new_stats)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: DCStats) -> DCStats:
-        base_stats = super()._mapjoin_defs(op, *join_args)
+        base = super()._mapjoin_defs(op, *join_args)
 
         if len(join_args) == 1:
-            return DCStats.from_base_stats(base_stats, dcs=set(join_args[0].dcs))
+            return DCStats(base, dcs=set(join_args[0].dcs))
 
         new_dc: dict[tuple[frozenset[Field], frozenset[Field]], float] = {}
         for stats in join_args:
@@ -99,7 +104,7 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
                     new_dc[dc_key] = dc.value
 
         new_stats = {DC(X, Y, d) for (X, Y), d in new_dc.items()}
-        return DCStats.from_base_stats(base_stats, dcs=new_stats)
+        return DCStats(base, dcs=new_stats)
 
     def aggregate(
         self,
@@ -109,24 +114,24 @@ class DCStatsFactory(BaseTensorStatsFactory["DCStats"]):
         stats: DCStats,
     ) -> DCStats:
         fields = reduce_indices
-        base_stats: BaseTensorStats
+        base: BaseTensorStats
         if len(fields) == 0:
-            base_stats = stats.copy()
+            base = stats.copy()
         else:
-            base_stats = self.aggregate_def(op, init, fields, stats)
+            base = self.aggregate_def(op, init, fields, stats)
 
         dcs = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_base_stats(base_stats, dcs=dcs)
+        return DCStats(base, dcs=dcs)
 
     def relabel(self, stats: DCStats, relabel_indices: tuple[Field, ...]) -> DCStats:
-        base_stats = self.relabel_def(stats, relabel_indices)
+        base = self.relabel_def(stats, relabel_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_base_stats(base_stats, dcs=dcs)
+        return DCStats(base, dcs=dcs)
 
     def reorder(self, stats: DCStats, reorder_indices: tuple[Field, ...]) -> DCStats:
-        base_stats = self.reorder_def(stats, reorder_indices)
+        base = self.reorder_def(stats, reorder_indices)
         dcs: set[DC] = set(stats.dcs) if isinstance(stats, DCStats) else set()
-        return DCStats.from_base_stats(base_stats, dcs=dcs)
+        return DCStats(base, dcs=dcs)
 
 
 class DCStats(NumericStats):
@@ -138,15 +143,22 @@ class DCStats(NumericStats):
     number of non-fill values without materializing sparse coordinates.
     """
 
-    def __init__(self, tensor: Any, fields: tuple[Field, ...]):
+    def __init__(
+        self,
+        base: BaseTensorStats,
+        dcs: set[DC],
+    ):
         """
         Initialize DCStats from a tensor and its axis names, build the BaseTensorStats,
         and compute degree constraint (DC) records from the tensor’s structure.
         """
-        super().__init__(tensor, fields)
-        self.dcs = self._structure_to_dcs(tensor, fields)
+        super().__init__(base)
+        self.dcs = dcs
 
-    def _structure_to_dcs(self, arr: Tensor, fields: Iterable[Field]) -> set[DC]:
+    @staticmethod
+    def structure_to_dcs(
+        arr: Tensor, fields: Iterable[Field], fill_value: Any
+    ) -> set[DC]:
         """
         Dispatch DC extraction based on tensor dimensionality.
 
@@ -166,12 +178,13 @@ class DCStats(NumericStats):
         if ndim == 0:
             return {DC(frozenset(), frozenset(), 1.0)}
 
-        return self._array_to_dcs(arr, fields)
+        return DCStats._array_to_dcs(arr, fields, fill_value)
 
     # Given an arbitrary n-dimensional tensor, we produce 2n+1 degree constraints.
     # For each field i, we compute DC({}, {i}) and DC({i}, {*fields}).
     # Additionally, we compute the nnz for the full tensor DC({}, {*fields}).
-    def _array_to_dcs(self, arr: Any, fields: Iterable[Field]) -> set[DC]:
+    @staticmethod
+    def _array_to_dcs(arr: Any, fields: Iterable[Field], fill_value: Any) -> set[DC]:
         fields = list(fields)
         ndims = len(fields)
         dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
@@ -236,7 +249,7 @@ class DCStats(NumericStats):
                     ntn.Literal(ffuncs.ne),
                     (
                         A_access,
-                        ntn.Literal(self.fill_value),
+                        ntn.Literal(fill_value),
                     ),
                 ),
             )
@@ -255,7 +268,7 @@ class DCStats(NumericStats):
                                 ntn.Literal(ffuncs.ne),
                                 (
                                     A_access,
-                                    ntn.Literal(self.fill_value),
+                                    ntn.Literal(fill_value),
                                 ),
                             ),
                         ),

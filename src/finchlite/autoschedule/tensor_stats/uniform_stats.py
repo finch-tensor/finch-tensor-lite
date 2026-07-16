@@ -6,27 +6,47 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra.algebra import FinchOperator, is_annihilator, is_identity
-from finchlite.finch_logic import Field
+from finchlite.finch_logic import Field, StatsFactory
 
+from .dc_stats import DCStats
 from .numeric_stats import NumericStats
-from .tensor_stats import BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
-class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
+class UniformStatsFactory(
+    BaseTensorStatsFactory["UniformStats"], StatsFactory["UniformStats"]
+):
     def __init__(self):
         super().__init__(UniformStats)
+
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> UniformStats:
+        base = super().__call__(tensor, fields)
+
+        if tensor.ndim == 0:
+            nnz = float(tensor.item() != base.fill_value)
+        else:
+            dcs = DCStats.structure_to_dcs(tensor, fields, base.fill_value)
+            nnz = 0.0
+            for dc in dcs:
+                if dc.from_indices == frozenset() and dc.to_indices == frozenset(
+                    fields
+                ):
+                    nnz = dc.value
+                    break
+
+        return UniformStats(base, nnz=nnz)
 
     def _mapjoin_union(
         self,
         op: FinchOperator,
         *union_args: UniformStats,
     ) -> UniformStats:
-        base_stats = super()._mapjoin_defs(op, *union_args)
+        base = super()._mapjoin_defs(op, *union_args)
 
-        new_vol = base_stats.get_dim_space_size(base_stats.index_order)
+        new_vol = base.get_dim_space_size(base.index_order)
 
         if new_vol == 0.0:
-            return UniformStats.from_base_stats(base_stats, nnz=0.0)
+            return UniformStats(base, nnz=0.0)
 
         inv_p = 1.0
 
@@ -40,16 +60,16 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
 
         res_p = 1 - inv_p
 
-        return UniformStats.from_base_stats(base_stats, nnz=res_p * new_vol)
+        return UniformStats(base, nnz=res_p * new_vol)
 
     def _mapjoin_join(
         self, op: FinchOperator, *join_args: UniformStats
     ) -> UniformStats:
-        base_stats = super()._mapjoin_defs(op, *join_args)
-        new_vol = base_stats.get_dim_space_size(base_stats.index_order)
+        base = super()._mapjoin_defs(op, *join_args)
+        new_vol = base.get_dim_space_size(base.index_order)
 
         if new_vol == 0.0:
-            return UniformStats.from_base_stats(base_stats, nnz=0.0)
+            return UniformStats(base, nnz=0.0)
 
         res_p = 1.0
 
@@ -61,7 +81,7 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
             else:
                 raise TypeError("Stats Class must be inherit from NumericStats")
 
-        return UniformStats.from_base_stats(base_stats, nnz=res_p * new_vol)
+        return UniformStats(base, nnz=res_p * new_vol)
 
     def aggregate(
         self,
@@ -70,8 +90,8 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
         reduce_indices: tuple[Field, ...],
         stats: UniformStats,
     ) -> UniformStats:
-        base_stats = self.aggregate_def(op, init, reduce_indices, stats)
-        res_vol = base_stats.get_dim_space_size(base_stats.index_order)
+        base = self.aggregate_def(op, init, reduce_indices, stats)
+        res_vol = base.get_dim_space_size(base.index_order)
         red_set = set(reduce_indices) & set(stats.index_order)
         k = math.prod(int(stats.dim_sizes[x]) for x in red_set)
         old_vol = stats.get_dim_space_size(stats.index_order)
@@ -86,46 +106,35 @@ class UniformStatsFactory(BaseTensorStatsFactory["UniformStats"]):
         else:
             res_p = 1.0
 
-        return UniformStats.from_base_stats(base_stats, nnz=res_p * res_vol)
+        return UniformStats(base, nnz=res_p * res_vol)
 
     def relabel(
         self, stats: UniformStats, relabel_indices: tuple[Field, ...]
     ) -> UniformStats:
-        base_stats = self.relabel_def(stats, relabel_indices)
+        base = self.relabel_def(stats, relabel_indices)
         if isinstance(stats, NumericStats):
-            return UniformStats.from_base_stats(
-                base_stats, nnz=stats.estimate_non_fill_values()
-            )
+            return UniformStats(base, nnz=stats.estimate_non_fill_values())
         raise TypeError("Stats Class must be inherit from NumericStats")
 
     def reorder(
         self, stats: UniformStats, reorder_indices: tuple[Field, ...]
     ) -> UniformStats:
-        base_stats = self.reorder_def(stats, reorder_indices)
+        base = self.reorder_def(stats, reorder_indices)
         if isinstance(stats, NumericStats):
-            return UniformStats.from_base_stats(
-                base_stats, nnz=stats.estimate_non_fill_values()
-            )
+            return UniformStats(base, nnz=stats.estimate_non_fill_values())
         raise TypeError("Stats Class must be inherit from NumericStats")
 
 
 class UniformStats(NumericStats):
     nnz: float
 
-    def __init__(self, tensor: Any, fields: tuple[Field, ...]):
-        super().__init__(tensor, fields)
-        val = tensor
-
-        if hasattr(val, "tns"):
-            val = val.tns.val
-        if hasattr(val, "val") and not hasattr(val, "to_numpy"):
-            val = val.val
-
-        if hasattr(val, "to_numpy"):
-            arr = val.to_numpy()
-            self.nnz = float(np.sum(arr != self.fill_value))
-        else:
-            self.nnz = float(self.get_dim_space_size(self.index_order))
+    def __init__(
+        self,
+        base: BaseTensorStats,
+        nnz: float,
+    ):
+        super().__init__(base)
+        self.nnz = float(nnz)
 
     def estimate_non_fill_values(self) -> float:
         return self.nnz

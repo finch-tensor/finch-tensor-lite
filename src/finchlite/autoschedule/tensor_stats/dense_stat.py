@@ -5,23 +5,26 @@ from typing import Any
 import numpy as np
 
 from finchlite.algebra import FinchOperator
-from finchlite.finch_logic import Field
+from finchlite.finch_logic import Field, StatsFactory
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStatsFactory
 
 
-class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
+class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"], StatsFactory["DenseStats"]):
     def __init__(self):
         super().__init__(DenseStats)
 
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> DenseStats:
+        return DenseStats(super().__call__(tensor, fields))
+
     def _mapjoin_union(self, op: FinchOperator, *union_args: DenseStats) -> DenseStats:
-        base_stats = super()._mapjoin_defs(op, *union_args)
-        return DenseStats.from_base_stats(base_stats)
+        base = super()._mapjoin_defs(op, *union_args)
+        return DenseStats(base)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: DenseStats) -> DenseStats:
-        base_stats = super()._mapjoin_defs(op, *join_args)
-        return DenseStats.from_base_stats(base_stats)
+        base = super()._mapjoin_defs(op, *join_args)
+        return DenseStats(base)
 
     def aggregate(
         self,
@@ -30,20 +33,20 @@ class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"]):
         reduce_indices: tuple[Field, ...],
         stats: DenseStats,
     ) -> DenseStats:
-        base_stats = self.aggregate_def(op, init, reduce_indices, stats)
-        return DenseStats.from_base_stats(base_stats)
+        base = self.aggregate_def(op, init, reduce_indices, stats)
+        return DenseStats(base)
 
     def relabel(
         self, stats: DenseStats, relabel_indices: tuple[Field, ...]
     ) -> DenseStats:
-        base_stats = self.relabel_def(stats, relabel_indices)
-        return DenseStats.from_base_stats(base_stats)
+        base = self.relabel_def(stats, relabel_indices)
+        return DenseStats(base)
 
     def reorder(
         self, stats: DenseStats, reorder_indices: tuple[Field, ...]
     ) -> DenseStats:
-        base_stats = self.reorder_def(stats, reorder_indices)
-        return DenseStats.from_base_stats(base_stats)
+        base = self.reorder_def(stats, reorder_indices)
+        return DenseStats(base)
 
 
 class DenseStats(NumericStats):

@@ -10,9 +10,6 @@ from .nodes import Field
 
 
 class TensorStats(ABC):
-    @abstractmethod
-    def __init__(self, tensor: Any, fields: tuple[Field, ...]): ...
-
     @property
     @abstractmethod
     def idxs(self) -> tuple[Field, ...]: ...
