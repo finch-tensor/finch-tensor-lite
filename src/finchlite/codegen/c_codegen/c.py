@@ -5,10 +5,9 @@ import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from collections.abc import Hashable
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
 import numpy as np
 
@@ -26,7 +25,7 @@ from finchlite.algebra import (
     ftype,
 )
 from finchlite.algebra.algebra import FinchOperator
-from finchlite.finch_assembly import BufferFType, DictFType
+from finchlite.finch_assembly import BufferFType
 from finchlite.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finchlite.util import config, file_cache
 from finchlite.util.logging import LOG_BACKEND_C
@@ -34,6 +33,14 @@ from finchlite.util.logging import LOG_BACKEND_C
 from .stages import CCode, CLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_C)
+
+PROLOGUE = """
+#ifdef _WIN32
+    #define FINCH_EXPORT __declspec( dllexport )
+#else
+    #define FINCH_EXPORT
+#endif
+"""
 
 
 class COperator(ABC):
@@ -68,9 +75,6 @@ class CUnaryOperator(COperator):
 
     def c_function_call(self, ctx: Any, *args: Any) -> Any:
         return c_unary_function_call(self.c_symbol, ctx, *args)
-
-
-common_h = Path(__file__).parents[1] / "stc" / "include" / "stc" / "common.h"
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
@@ -111,7 +115,6 @@ def create_shared_lib(filename, c_code, cc, cflags):
                 "Compilation failed with command:\n"
                 f"    {compile_command}\n"
                 f"on the following code:\n{c_code}"
-                f"\nError message: {e}"
             )
             raise RuntimeError("C Compilation failed") from e
         assert shared_lib_path.exists(), f"Compilation failed: {compile_command}"
@@ -127,8 +130,8 @@ def load_shared_lib(c_code, cc=None, cflags=None):
         cc = config.get("cc")
     if cflags is None:
         cflags = (
-            *config.get("cflags").split(),
             *config.get("shared_cflags").split(),
+            *config.get("cflags").split(),
         )
 
     shared_lib_path = create_shared_lib(
@@ -522,7 +525,7 @@ class CContext(Context):
         self.fptr = fptr
         self.types = types
         self.slots = slots
-        self.datastructures: dict[Hashable, Any] = {}
+        self.buffer_methods: dict[Any, Any] = {}
 
     def add_header(self, header):
         if header not in self._headerset:
@@ -533,7 +536,7 @@ class CContext(Context):
         """
         Emit the headers for the C code.
         """
-        return "\n".join([*self.headers, self.emit()])
+        return "\n".join([PROLOGUE, *self.headers, self.emit()])
 
     def ctype_name(self, t: type) -> str:
         # Mapping from ctypes types to their C type names
@@ -611,21 +614,18 @@ class CContext(Context):
 
     def resolve(self, node):
         match node:
-            case asm.Slot(var_n, var_t):
+            case asm.Slot(var_n, _):
                 if var_n in self.slots:
-                    var_o = self.slots[var_n]
-                    return asm.Stack(var_o, var_t)
+                    return self.slots[var_n]
                 raise KeyError(f"Slot {var_n} not found in context")
-            case asm.Stack(_, _):
-                return node
             case _:
-                raise ValueError(f"Expected Slot or Stack, got: {type(node)}")
+                raise ValueError(f"Expected Slot, got: {type(node)}")
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def cache(self, name, val):
-        if isinstance(val, asm.Literal | asm.Variable | asm.Stack):
+        if isinstance(val, asm.Literal | asm.Variable):
             return val
         var_n = self.freshen(name)
         var_t = val.result_type
@@ -679,10 +679,6 @@ class CContext(Context):
                 return None
             case asm.Call(f, args):
                 return c_function_call(f.val, self, *args)
-            # case asm.Slot(var_n, var_t) as ref:
-            #    return self(self.deref(ref))
-            # case asm.Stack(obj, var_t) as ref:
-            #    return var_t.c_lower(self, obj)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:
@@ -712,47 +708,25 @@ class CContext(Context):
                 var_t.c_repack(self, var_n, obj)
                 return None
             case asm.Load(buf, idx):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_load(self, buf, idx)
+                return buf_t.c_load(self, self.resolve(buf), idx)
             case asm.Store(buf, idx, val):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_store(self, buf, idx, val)
+                return buf_t.c_store(self, self.resolve(buf), idx, val)
             case asm.Resize(buf, len):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_resize(self, buf, len)
+                return buf_t.c_resize(self, self.resolve(buf), len)
             case asm.Length(buf):
-                buf = self.resolve(buf)
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_length(self, buf)
-            case asm.LoadDict(map, idx):
-                map = self.resolve(map)
-                map_t = map.result_type
-                if not isinstance(map_t, CDictFType):
-                    raise TypeError(f"Expected C dict type, got: {map_t}")
-                return map_t.c_loaddict(self, map, idx)
-            case asm.ExistsDict(map, idx):
-                map = self.resolve(map)
-                map_t = map.result_type
-                if not isinstance(map_t, CDictFType):
-                    raise TypeError(f"Expected C dict type, got: {map_t}")
-                return map_t.c_existsdict(self, map, idx)
-            case asm.StoreDict(map, idx, val):
-                map = self.resolve(map)
-                map_t = map.result_type
-                if not isinstance(map_t, CDictFType):
-                    raise TypeError(f"Expected C dict type, got: {map_t}")
-                return map_t.c_storedict(self, map, idx, val)
+                return buf_t.c_length(self, self.resolve(buf))
             case asm.Block(bodies):
                 ctx_2 = self.block()
                 for body in bodies:
@@ -849,9 +823,10 @@ class CContext(Context):
                 return_t_name = self.ctype_name(c_type(return_t))
                 feed = self.feed
                 self.exec(
-                    f"{feed}{return_t_name} {func_name}({', '.join(arg_decls)}) {{\n"
+                    f"{feed}FINCH_EXPORT {return_t_name} "
+                    f"{func_name}({', '.join(arg_decls)}) {{\n"
                     f"{body_code}\n"
-                    f"{feed}}}"
+                    f"{feed}}}\n"
                 )
                 return None
             case asm.Return(value):
@@ -875,16 +850,16 @@ class CContext(Context):
                 )
 
 
-class CStackFType(ABC):
+class CUnpackableFType(ABC):
     """
-    Abstract base class for symbolic formats in C. Stack formats must also
-    support other functions with symbolic inputs in addition to variable ones.
+    Abstract base class for unpackable formats in C. Unpackable formats must also
+    support other functions with unpacked inputs in addition to variable ones.
     """
 
     @abstractmethod
     def c_unpack(self, ctx, lhs, rhs):
         """
-        Convert a value to a symbolic representation in C. Returns a NamedTuple
+        Convert a value to an unpacked representation in C. Returns a NamedTuple
         of unpacked variable names, etc. The `lhs` is the variable namespace to
         assign to.
         """
@@ -893,8 +868,8 @@ class CStackFType(ABC):
     @abstractmethod
     def c_repack(self, ctx, lhs, rhs):
         """
-        Update an object based on a symbolic representation. The `rhs` is the
-        symbolic representation to update from, and `lhs` is a variable name referring
+        Update an object based on an unpacked representation. The `rhs` is the
+        unpacked representation to update from, and `lhs` is a variable name referring
         to the original object to update.
         """
         ...
@@ -1071,177 +1046,10 @@ def tuple_construct_from_c(fmt: TupleFType, c_struct):
     return tuple(args)
 
 
-class CHashableFType(FType):
-    @abstractmethod
-    def c_hash(self, ctx: CContext) -> str:
-        """
-        Emit code from CContext that takes an expression and returns the NAME
-        of a macro that performs our hashing with STC functions.
-
-        Please reference finch_assembly/struct.py for reference.
-
-        The macro should take one argument (type of fmt*, so there is one layer
-        of indirection) and expand to an expression that returns a size_t of
-        the final hash.
-
-        The main idea for implementing this is for unpacked structs where you
-        want the unused bytes to be set to zero.
-
-        This is important to note for immutable structs because you need to do
-        something like &var_n->property if you want to do recursive hashing.
-        """
-        ...
-
-    @abstractmethod
-    def c_eq(self, ctx: CContext) -> str:
-        """
-        Emit code from CContext that takes an expression and returns the NAME
-        of a macro that can be used to check.
-
-        The macro should take two arguments (each a type of fmt*, so there is
-        one layer of indirection) and expand to an expression that checks
-        equality.
-
-        The main idea for implementing this is for unpacked structs where you
-        want the unused bytes to be set to zero.
-
-        This is important to note for immutable structs because you need to do
-        something like &var_n->property if you want to do recursive hashing.
-        """
-
-
-def c_hash(fmt: FType, ctx: "CContext"):
-    """
-    Expand to the name of a macro that c hash can use for hashing fmt.
-
-    Args:
-        ctx: CContext object
-        var_n: name to be supplied. It is a placeholder for a variable with
-        type fmt* (so indirection)
-    """
-    match fmt:
-        case CHashableFType():
-            return fmt.c_hash(ctx)
-        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.float_:
-            return c_hash_default(fmt, ctx)
-        case ImmutableStructFType() | TupleFType():
-            return c_hash_struct(fmt, ctx)
-        case _:
-            raise NotImplementedError(f"No C hash mapping for {fmt}")
-
-
-def c_hash_default(fmt: FType, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_hash"
-
-
-class CHashableProperties(TypedDict):
-    eq: str | None
-    hash: str | None
-
-
-def c_hash_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("hash") is not None:
-            return properties["hash"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_hash(fmt2, ctx) for fmt2 in fmt.struct_fieldtypes]
-    name = ctx.freshen("hash")
-    ctx.datastructures[fmt]["hash"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var_n = ctx.freshen("var")
-    args = ",".join(
-        f"{macro}(&({var_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var_n}) c_hash_mix({args})")
-    return name
-
-
-def c_eq(fmt: FType, ctx: "CContext"):
-    """
-    Expand to the name of a macro that c eq can use for checking equivalence of fmt.
-
-    Args:
-        ctx: CContext object
-        var_n: name to be supplied. It is a placeholder for a variable with
-        type fmt* (so indirection)
-    """
-    match fmt:
-        case CHashableFType():
-            return fmt.c_eq(ctx)
-        case algebra.ftypes.FDTypeNumpy() | algebra.int_ | algebra.float_:
-            return c_eq_default(fmt, ctx)
-        case ImmutableStructFType() | TupleFType():
-            return c_eq_struct(fmt, ctx)
-        case _:
-            raise NotImplementedError(f"No C equality mapping for {fmt}")
-
-
-def c_eq_default(fmt: FType, ctx: "CContext"):
-    ctx.add_header(f'#include "{common_h}"')
-    return "c_default_eq"
-
-
-def c_eq_struct(fmt: ImmutableStructFType, ctx: "CContext"):
-    if fmt in ctx.datastructures:
-        properties: CHashableProperties = ctx.datastructures[fmt]
-        if properties.get("eq") is not None:
-            return properties["eq"]
-    else:
-        ctx.datastructures[fmt] = {}
-
-    macros = [c_eq(fmt, ctx) for fmt in fmt.struct_fieldtypes]
-    name = ctx.freshen("eq")
-    ctx.datastructures[fmt]["eq"] = name
-
-    # implement recursion with &{var_n}->{struct_field}
-    var1_n = ctx.freshen("var")
-    var2_n = ctx.freshen("var")
-    args = " && ".join(
-        f"{macro}(&({var1_n})->{field}, &({var2_n})->{field})"
-        for macro, field in zip(macros, fmt.struct_fieldnames, strict=False)
-    )
-    ctx.add_header(f"#define {name}({var1_n}, {var2_n}) ({args})")
-    return name
-
-
-class CDictFType(DictFType, CArgumentFType, ABC):
-    """
-    Abstract base class for the ftype of dictionaries. The ftype defines how
-    the data in a Map is organized and accessed.
-    """
-
-    @abstractmethod
-    def c_existsdict(self, ctx, map, idx):
-        """
-        Return C code which checks whether a given key exists in a map.
-        """
-        ...
-
-    @abstractmethod
-    def c_loaddict(self, ctx, map, idx):
-        """
-        Return C code which gets a value corresponding to a certain key.
-        """
-        ...
-
-    @abstractmethod
-    def c_storedict(self, ctx, buffer, idx, value):
-        """
-        Return C code which stores a certain value given a certain integer tuple key.
-        """
-        ...
-
-
 class CBufferFType(BufferFType, CArgumentFType, ABC):
     """
-    Abstract base class for the ftype of datastructures. The ftype defines how
-    the data in an Buffer is organized and accessed.
+    Abstract base class for the ftype of buffers. The ftype defines how the
+    data in a Buffer is organized and accessed.
     """
 
     @abstractmethod

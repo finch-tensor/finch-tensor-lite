@@ -137,19 +137,34 @@ class TensorView(Tensor):
         """
         return TensorView(idxs=self.idxs + idxs, tns=self.tns, op=op)
 
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.unwrap()
+
+    def to_numpy(self):
+        return np.asarray(self.tns.to_numpy())[self.idxs]
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
+
     def unwrap(self):
         """
-        Unwrap the tensor view to get the underlying tensor.
-        This returns the original tensor from which the view was created.
+        Unwrap the tensor view to get a scalar.
         """
-        return self.tns[*self.idxs]
+        val = self.tns[*self.idxs]
+        assert isinstance(val, Tensor) and val.ndim == 0
+        return val.item()
 
     def increment(self, val):
         """
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        self.tns[*self.idxs] = self.op(self.tns[*self.idxs], val)
+        lhs = self.tns[*self.idxs]
+        assert isinstance(lhs, Tensor) and lhs.ndim == 0
+        lhs = lhs.item()
+        self.tns[*self.idxs] = self.op(lhs, val)
         return
 
 
@@ -420,20 +435,14 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
-                try:
-                    match mode:
-                        case ntn.Read():
-                            return access(tns_e, idxs_e)
-                        case ntn.Update(op):
-                            op_e = self(op)
-                            return access(tns_e, idxs_e, op=op_e)
-                        case _:
-                            raise NotImplementedError(
-                                f"Unrecognized access mode: {mode}"
-                            )
-                except Exception as e:
-                    print(f"Error during tensor access {prgm}")
-                    raise e
+                match mode:
+                    case ntn.Read():
+                        return access(tns_e, idxs_e)
+                    case ntn.Update(op):
+                        op_e = self(op)
+                        return access(tns_e, idxs_e, op=op_e)
+                    case _:
+                        raise NotImplementedError(f"Unrecognized access mode: {mode}")
 
             case ntn.Dimension(tns, r):
                 assert isinstance(tns, ntn.Slot)
@@ -444,11 +453,7 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)
-                try:
-                    increment(tns_e, val_e)
-                except Exception as e:
-                    print(f"Error during tensor increment {prgm}")
-                    raise e
+                increment(tns_e, val_e)
                 return None
             case ntn.Block(bodies):
                 for body in bodies:
@@ -541,10 +546,6 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                                 f"Unrecognized function definition: {func}"
                             )
                 return NotationInterpreterLibrary(self, kernels)
-            case ntn.Stack(val):
-                raise NotImplementedError(
-                    "NotationInterpreter does not support stacks."
-                )
             case _:
                 raise NotImplementedError(
                     f"Unrecognized notation node type: {type(prgm)}"

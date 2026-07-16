@@ -4,7 +4,11 @@ from contextlib import contextmanager
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.codegen import NumbaCompiler
 from finchlite.compile import NotationCompiler
-from finchlite.finch_assembly import AssemblyInterpreter, AssemblySimplify
+from finchlite.finch_assembly import (
+    AssemblyInterpreter,
+    AssemblySimplify,
+    LowerPackedStructSlots,
+)
 from finchlite.finch_logic import (
     LogicInterpreter,
     MockLogicLoader,
@@ -54,7 +58,31 @@ COMPILE_NUMBA = LogicNormalizer(
                 DefaultLogicFormatter(
                     LogicCompiler(
                         NotationCompiler(
-                            NumbaCompiler(), ctx_transforms=(AssemblySimplify(),)
+                            NumbaCompiler(),
+                            ctx_transforms=(
+                                LowerPackedStructSlots(),
+                                AssemblySimplify(),
+                            ),
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+COMPILE_NUMBA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicalOptimizer(
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            NumbaCompiler(),
+                            ctx_transforms=(
+                                LowerPackedStructSlots(),
+                                AssemblySimplify(),
+                            ),
                         )
                     )
                 )

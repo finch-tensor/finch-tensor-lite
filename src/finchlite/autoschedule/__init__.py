@@ -19,6 +19,7 @@ from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_NUMBA,
+    COMPILE_NUMBA_GALLEY,
     INTERPRET_ASSEMBLY,
     INTERPRET_LOGIC,
     INTERPRET_NOTATION,
@@ -52,11 +53,11 @@ from .representation import (
     SparseData,
 )
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
-from .standardize import LogicStandardizer
 from .suitable_rep import SmartLogicFormatter, SuitableRep, toposort
 
 __all__ = [
     "COMPILE_NUMBA",
+    "COMPILE_NUMBA_GALLEY",
     "INTERPRET_ASSEMBLY",
     "INTERPRET_LOGIC",
     "INTERPRET_NOTATION",
@@ -81,7 +82,6 @@ __all__ = [
     "LogicFormatter",
     "LogicNormalizer",
     "LogicNotationLowerer",
-    "LogicStandardizer",
     "MapJoin",
     "NotationGenerator",
     "Plan",
