@@ -81,6 +81,10 @@ tests:
 pixi run test
 # or to test with the mininum supported Python version:
 pixi run --environment=mindeps test
+# or to test the C backend:
+pixi run test-c
+# or to test the Julia backend:
+pixi run test-julia
 ```
 
 - Tests are located in the `tests/` directory at the project root.

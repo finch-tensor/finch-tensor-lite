@@ -8,9 +8,9 @@ import numpy as np
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_logic import Field
 
-from .dc_stats import DCStats
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStatsFactory
+from .util import degree_count_scan
 
 
 class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
@@ -175,26 +175,22 @@ class DatabaseStatsFactory(BaseTensorStatsFactory["DatabaseStats"]):
 class DatabaseStats(NumericStats):
     def __init__(self, tensor: Any, fields: tuple[Field, ...]):
         super().__init__(tensor, fields)
-        val = tensor
+        fields = tuple(fields)
 
-        if hasattr(val, "tns"):
-            val = val.tns.val
-        if hasattr(val, "val") and not hasattr(val, "to_numpy"):
-            val = val.val
+        # Scalar tensor: a single non-fill value and no per-dimension domains.
+        if tensor.ndim == 0:
+            self.nnz = 1.0
+            self.V: dict[Field, float] = {}
+            return
 
-        dc = DCStats(tensor, fields)
-
-        self.nnz = 0.0
-        for d in dc.dcs:
-            if d.from_indices == frozenset() and d.to_indices == frozenset(fields):
-                self.nnz = d.value
-                break
-
-        self.V: dict[Field, float] = dict.fromkeys(fields, 0.0)
-        for idx in fields:
-            for d in dc.dcs:
-                if d.from_indices == frozenset() and d.to_indices == frozenset({idx}):
-                    self.V[idx] = d.value
+        # ``counts[i][v]`` is the number of non-fill entries with index ``v`` in
+        # dimension ``i``; ``nnz`` is the total. The number of distinct values
+        # (domain size) of dimension ``i`` is the count of nonzero degrees.
+        counts, nnz = degree_count_scan(tensor, fields, self.fill_value)
+        self.nnz = float(nnz)
+        self.V = {
+            field: float(np.count_nonzero(counts[i])) for i, field in enumerate(fields)
+        }
 
     def estimate_non_fill_values(self) -> float:
         return self.nnz

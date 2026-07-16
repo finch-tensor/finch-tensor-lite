@@ -34,7 +34,6 @@ from .formatter import DefaultLogicFormatter, LogicFormatter
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
-from .standardize import LogicStandardizer
 
 __all__ = [
     "COMPILE_NUMBA",
@@ -58,7 +57,6 @@ __all__ = [
     "LogicFormatter",
     "LogicNormalizer",
     "LogicNotationLowerer",
-    "LogicStandardizer",
     "MapJoin",
     "NotationGenerator",
     "Plan",
