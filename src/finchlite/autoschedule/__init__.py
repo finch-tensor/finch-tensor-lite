@@ -34,26 +34,8 @@ from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicF
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
-from .rep_operations import (
-    aggregate_rep,
-    data_rep,
-    dropdims_rep,
-    eltype,
-    expanddims_rep,
-    fill_value,
-    map_rep,
-    permutedims_rep,
-)
-from .representation import (
-    DenseData,
-    ElementData,
-    ExtrudeData,
-    HollowData,
-    RepeatData,
-    SparseData,
-)
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
-from .suitable_rep import SmartLogicFormatter, SuitableRep, toposort
+from .suitable_rep import SmartLogicFormatter
 
 __all__ = [
     "COMPILE_NUMBA",
@@ -69,11 +51,7 @@ __all__ = [
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
     "DefaultLoopOrderer",
-    "DenseData",
-    "ElementData",
-    "ExtrudeData",
     "Field",
-    "HollowData",
     "Literal",
     "LogicCapture",
     "LogicCompiler",
@@ -92,23 +70,11 @@ __all__ = [
     "Query",
     "Relabel",
     "Reorder",
-    "RepeatData",
     "SmartLogicFormatter",
-    "SparseData",
-    "SuitableRep",
     "Table",
     "Value",
-    "aggregate_rep",
-    "data_rep",
-    "dropdims_rep",
-    "eltype",
-    "expanddims_rep",
-    "fill_value",
     "get_default_scheduler",
-    "map_rep",
     "normalize_names",
-    "permutedims_rep",
     "set_default_scheduler",
-    "toposort",
     "with_default_scheduler",
 ]
