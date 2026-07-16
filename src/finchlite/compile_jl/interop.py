@@ -4,6 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 
+from finchlite.algebra import TupleFType
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import Buffer
 from finchlite.tensor import (
@@ -13,7 +14,9 @@ from finchlite.tensor import (
     FiberTensor,
     Level,
     Scalar,
+    SparseByteMapLevel,
     SparseCOOLevel,
+    SparseHashLevel,
     SparseListLevel,
 )
 from finchlite.tensor.np_wrapper import NumPyWrapper
@@ -32,15 +35,17 @@ def _as_julia_scalar(val):
     return val
 
 
-def _buffer_to_jl(buffer: Buffer | np.ndarray):
+def _buffer_to_jl(buffer: Buffer):
     if isinstance(buffer, NumpyBuffer):
+        if isinstance(buffer.ftype.element_type, TupleFType):
+            data = jl.PythonCall.PyArray(jl.PythonCall.Py(buffer.arr))
+            tuple_type = jl.Tuple[jl.fieldtypes(jl.eltype(data))]
+            return jl.reinterpret(tuple_type, data)
         return jl.Vector(buffer.arr)
-    if isinstance(buffer, np.ndarray):
-        return jl.Vector(buffer)
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
 
-def _plus_one_buffer_to_jl(buffer: Buffer | np.ndarray):
+def _plus_one_buffer_to_jl(buffer: Buffer):
     return jl.Finch.PlusOneVector(_buffer_to_jl(buffer))
 
 
@@ -59,8 +64,22 @@ def level_to_jl(level: Level):
             return jl.SparseListLevel(
                 level_to_jl(lvl),
                 int(dimension),
-                _plus_one_buffer_to_jl(cast(Buffer | np.ndarray, ptr)),
-                _plus_one_buffer_to_jl(cast(Buffer | np.ndarray, idx)),
+                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                _plus_one_buffer_to_jl(cast(Buffer, idx)),
+            )
+        case SparseByteMapLevel(
+            lvl=lvl, dimension=dimension, ptr=ptr, tbl=tbl, srt=srt
+        ):
+            if ptr is None or tbl is None or srt is None:
+                raise ValueError(
+                    "SparseByteMapLevel must have ptr, tbl, and srt buffers"
+                )
+            return jl.SparseByteMapLevel(
+                level_to_jl(lvl),
+                int(dimension),
+                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                _buffer_to_jl(cast(Buffer, tbl)),
+                _plus_one_buffer_to_jl(cast(Buffer, srt)),
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
             return jl.SparseCOOLevel(
@@ -68,6 +87,40 @@ def level_to_jl(level: Level):
                 tuple(int(dim) for dim in coo_shape),
                 _plus_one_buffer_to_jl(ptr),
                 tuple(_plus_one_buffer_to_jl(idx) for idx in tbl),
+            )
+        case SparseHashLevel(
+            lvl=lvl,
+            dimension=dimension,
+            ptr=ptr,
+            tbl_ctrl=tbl_ctrl,
+            tbl=tbl,
+            pool=pool,
+            perm=perm,
+            subtables=subtables,
+            single_writer=single_writer,
+        ):
+            if (
+                ptr is None
+                or tbl_ctrl is None
+                or tbl is None
+                or pool is None
+                or perm is None
+            ):
+                raise ValueError(
+                    "SparseHashLevel must have ptr, tbl_ctrl, tbl, pool, and perm "
+                    "buffers"
+                )
+            dimension = _as_julia_scalar(np.asarray(dimension).item())
+            constructor = jl.SparseHashLevel[(jl.typeof(dimension), single_writer)]
+            return constructor(
+                level_to_jl(lvl),
+                dimension,
+                int(subtables),
+                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                _buffer_to_jl(cast(Buffer, tbl_ctrl)),
+                _plus_one_buffer_to_jl(cast(Buffer, tbl)),
+                _plus_one_buffer_to_jl(cast(Buffer, pool)),
+                _plus_one_buffer_to_jl(cast(Buffer, perm)),
             )
         case _:
             raise ValueError(f"Unsupported Finch level type: {type(level)}")
