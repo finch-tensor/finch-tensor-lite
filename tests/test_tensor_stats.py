@@ -20,7 +20,6 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
-    LpDC,
     LPStats,
     LPStatsFactory,
     UniformStats,
@@ -2935,8 +2934,8 @@ def test_lp_relabel_and_reorder():
     assert relabeled.index_order == (k, j)
     # renaming must remap the field names inside the degree records, so the
     # bound is unchanged and no record still references the old field `i`.
-    assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.lpdcs)
-    assert all((dc.from_indices | dc.to_indices) <= {k, j} for dc in relabeled.lpdcs)
+    assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.dcs)
+    assert all((dc.from_indices | dc.to_indices) <= {k, j} for dc in relabeled.dcs)
     assert relabeled.estimate_non_fill_values() == pytest.approx(
         stats.estimate_non_fill_values()
     )
@@ -2976,7 +2975,7 @@ def test_lp_embedding_shape():
     A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
     stats = _lp_stats(A, (i, j))
     emb = stats.get_embedding()
-    assert emb.shape[0] == len(stats.index_order) + len(stats.lpdcs)
+    assert emb.shape[0] == len(stats.index_order) + len(stats.dcs)
     assert np.all(np.isfinite(emb))
 
 
@@ -2986,7 +2985,7 @@ def test_lp_norm_endpoints():
     A = np.array([[1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
     stats = _lp_stats(A, (i, j), ps=(1.0, math.inf))
     by_p = {}
-    for dc in stats.lpdcs:
+    for dc in stats.dcs:
         if dc.from_indices == frozenset({i}):
             by_p[dc.p] = dc.value
     # row 0 has degree 3, row 1 has degree 1: l1 = 4 (== nnz), linf = 3
@@ -2995,5 +2994,5 @@ def test_lp_norm_endpoints():
 
 
 def test_lpdc_is_hashable_frozen():
-    dc = LpDC(frozenset(), frozenset({Field("i")}), 2.0, 3.0)
+    dc = DC(frozenset(), frozenset({Field("i")}), 3.0, 2.0)
     assert dc in {dc}
