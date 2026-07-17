@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Any
 
@@ -19,7 +19,7 @@ from .tensor_stats import StatsInterpreter
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class SmartFormatter(LogicFormatter):
+class SmartFormatter(LoopOrderedForm, LogicLoader, ABC):
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__(loader or MockLogicLoader())
 
@@ -30,11 +30,6 @@ class SmartFormatter(LogicFormatter):
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> TensorFType: ...
-
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
-        raise NotImplementedError(
-            "SmartFormatter subclasses should implement get_output_tns_type."
-        )
 
     def lower(
         self,

@@ -20,7 +20,7 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicFormatter(LoopOrderedForm, LogicLoader):
+class DefaultLogicFormatter(LoopOrderedForm, LogicLoader, ABC):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -87,7 +87,7 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 
-class DefaultLogicFormatter(LogicFormatter):
+class BufferizedNDArrayLogicFormatter(LogicFormatter):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -104,7 +104,3 @@ class DefaultLogicFormatter(LogicFormatter):
             dimension_type=TupleFType.from_tuple(shape_type),
             fill_value=fill_value,
         )
-
-
-class BufferizedNDArrayFormatter(DefaultLogicFormatter):
-    pass
