@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any
 
 from finchlite.algebra import Tensor
+
 
 class AccessCapability:
     pass
@@ -45,8 +44,9 @@ class Extruded(FormatProperty):
 class Hollow(FormatProperty):
     pass
 
+
 class AxiomaticTensor(Tensor, ABC):
     @property
     @abstractmethod
-    def format_properties(self):
+    def format_properties(self) -> list[tuple[type[FormatProperty], ...]]:
         ...
