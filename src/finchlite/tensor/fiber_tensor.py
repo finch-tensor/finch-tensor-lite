@@ -150,8 +150,13 @@ class LevelFType(FType, ABC):
     @abstractmethod
     def level_data_property(self, n):
         """
-        The data property for this level at depth n
+        Return the format properties contributed by this level.
+
+        ``n`` is the outer dimension index represented by this level. Nested
+        levels use increasing indices, so the returned properties can describe how
+        this dimension constrains dimensions further inside the fiber tree.
         """
+        ...
 
 
 
