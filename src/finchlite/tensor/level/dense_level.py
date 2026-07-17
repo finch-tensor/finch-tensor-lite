@@ -14,6 +14,7 @@ from finchlite.tensor.fiber_tensor import (
     Level,
     LevelFType,
 )
+from finchlite.tensor.traits import Dense
 
 
 @dataclass(unsafe_hash=True)
@@ -120,6 +121,9 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     @property
     def lvl_t(self):
         return self._lvl_t
+
+    def level_format_properties(self, n):
+        return [Dense(tuple(range(n)), (n,))]
 
     def level_lower_dim(self, ctx, lvl, r):
         if r == 0:

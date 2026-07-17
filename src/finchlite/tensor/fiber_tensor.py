@@ -15,6 +15,7 @@ from finchlite.algebra import (
 from finchlite.compile.lower import FinchTensorFType
 
 from .override_tensor import OverrideTensor
+from .traits import FormatProperty
 
 
 class LevelFType(FType, ABC):
@@ -148,9 +149,9 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_data_property(self, n):
+    def level_format_properties(self, n):
         """
-        Return the format properties contributed by this level.
+        Return the format properties contributed by this level type.
 
         ``n`` is the outer dimension index represented by this level. Nested
         levels use increasing indices, so the returned properties can describe how
@@ -388,6 +389,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     @property
     def buffer_type(self):
         return self.lvl_t.buffer_type
+
+    @property
+    def format_properties(self) -> list[FormatProperty]:
+        return self.lvl_t.level_format_properties(n)
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns)

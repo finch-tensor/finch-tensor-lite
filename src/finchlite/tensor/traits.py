@@ -73,5 +73,5 @@ class Extruded(FormatProperty):
 class AxiomaticTensor(Tensor, ABC):
     @property
     @abstractmethod
-    def format_properties(self) -> list[FormatProperty]:
+    def level_format_properties(self) -> list[FormatProperty]:
         ...

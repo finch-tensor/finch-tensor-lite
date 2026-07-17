@@ -80,6 +80,9 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
 
+    def level_format_properties(self, n):
+        return []
+
     def construct(self, shape, **kwargs) -> "SparseByteMapLevel":
         if kwargs:
             raise TypeError("SparseByteMapLevelFType.construct does not accept kwargs")

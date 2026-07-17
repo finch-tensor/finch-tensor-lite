@@ -94,6 +94,9 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self):
         raise Exception("ElementLevelFType is the leaf level.")
 
+    def level_format_properties(self, n):
+        return []
+
     def from_fields(self, val=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):

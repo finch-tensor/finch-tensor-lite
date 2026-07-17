@@ -21,6 +21,7 @@ from finchlite.tensor import (
     PatternTensor,
     ReshapeMaskTensor,
 )
+from finchlite.tensor.traits import Dense as DenseProperty
 
 
 def test_fiber_tensor_attributes():
@@ -181,6 +182,10 @@ def test_fiber_tensor():
             )
         )
     )
+    assert fmt.level_format_properties == [
+        DenseProperty((), (0,)),
+        DenseProperty((0,), (1,)),
+    ]
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)
 
