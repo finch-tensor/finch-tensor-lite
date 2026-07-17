@@ -17,10 +17,15 @@ class Random(AccessCapability):
     pass
 
 
+@dataclass
 class FormatProperty:
-    pass
+    hypothesis_dims:list[int]
+    conclusion_dim:list[int]
 
-
+"""
+The dense(x -> y) format property says that if there exist indices z such that
+T[x, z] != 0, then T[x, y, z] != 0 for all y.
+"""
 class Dense(FormatProperty):
     pass
 
@@ -40,5 +45,5 @@ class Extruded(FormatProperty):
 class AxiomaticTensor(Tensor, ABC):
     @property
     @abstractmethod
-    def format_properties(self) -> list[tuple[type[FormatProperty], ...]]:
+    def format_properties(self) -> list[FormatProperty]:
         ...
