@@ -147,6 +147,13 @@ class LevelFType(FType, ABC):
         """
         ...
 
+    @abstractmethod
+    def level_data_property(self, n):
+        """
+        The data property for this level at depth n
+        """
+
+
 
 class Level(FTyped, ABC):
     """
