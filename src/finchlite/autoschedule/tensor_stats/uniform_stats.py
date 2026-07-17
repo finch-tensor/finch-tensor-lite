@@ -8,7 +8,7 @@ import numpy as np
 from finchlite.algebra.algebra import FinchOperator, is_annihilator, is_identity
 from finchlite.finch_logic import Field, StatsFactory
 
-from .dc_stats import DCStats
+from .bound_stats import DCStatsFactory
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
@@ -25,7 +25,7 @@ class UniformStatsFactory(
         if tensor.ndim == 0:
             nnz = float(tensor.item() != base.fill_value)
         else:
-            dcs = DCStats.structure_to_dcs(tensor, fields, base.fill_value)
+            dcs = DCStatsFactory.structure_to_dcs(tensor, fields, base.fill_value)
             nnz = 0.0
             for dc in dcs:
                 if dc.from_indices == frozenset() and dc.to_indices == frozenset(

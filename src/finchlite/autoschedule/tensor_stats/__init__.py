@@ -1,13 +1,21 @@
 from finchlite.finch_logic import TensorStats
 
 from .blocked_stats import BlockedStats, BlockedStatsFactory
-from .vp_stats import VPStats, VPStatsFactory
-from .dc_stats import DC, DCStats, DCStatsFactory
+from .bound_stats import (
+    DC,
+    BoundStats,
+    BoundStatsFactory,
+    DCStats,
+    DCStatsFactory,
+    LPStats,
+    LPStatsFactory,
+)
 from .dense_stat import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
 from .stats_interpreter import StatsInterpreter
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 from .uniform_stats import UniformStats, UniformStatsFactory
+from .vp_stats import VPStats, VPStatsFactory
 
 __all__ = [
     "DC",
@@ -15,6 +23,8 @@ __all__ = [
     "BaseTensorStatsFactory",
     "BlockedStats",
     "BlockedStatsFactory",
+    "BoundStats",
+    "BoundStatsFactory",
     "DCStats",
     "DCStatsFactory",
     "VPStats",
@@ -23,6 +33,8 @@ __all__ = [
     "DenseStatsFactory",
     "DummyStats",
     "DummyStatsFactory",
+    "LPStats",
+    "LPStatsFactory",
     "StatsInterpreter",
     "TensorStats",
     "UniformStats",

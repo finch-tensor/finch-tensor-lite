@@ -20,6 +20,8 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
+    LPStats,
+    LPStatsFactory,
     UniformStats,
     UniformStatsFactory,
 )
@@ -1117,6 +1119,7 @@ def test_benchmark_structured_comparison():
         ("UniformStats", UniformStatsFactory()),
         ("DenseStats", DenseStatsFactory()),
         ("DCStats", DCStatsFactory()),
+        ("LPStats", LPStatsFactory()),
     ]
 
     print("\n" + "=" * 85)
@@ -2796,3 +2799,200 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+# ─────────────────────────────── LPStats tests ────────────────────────────────
+
+
+def _lp_table(dense, fields):
+    return Table(Literal(fl.asarray(np.asarray(dense, dtype=np.float64))), fields)
+
+
+def _lp_stats(dense, fields, ps=(1.0, 2.0, math.inf)):
+    return insert_statistics(
+        stats_factory=LPStatsFactory(ps=ps),
+        node=_lp_table(dense, fields),
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+
+def test_lp_base_tensor_matches_nnz():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 0.0, 3.0], [4.0, 0.0, 0.0]])
+    stats = _lp_stats(A, (i, j))
+    assert isinstance(stats, LPStats)
+    assert stats.estimate_non_fill_values() == pytest.approx(float(np.count_nonzero(A)))
+
+
+def test_lp_base_tensor_matches_dc():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    lp = _lp_stats(A, (i, j))
+    dc = insert_statistics(
+        stats_factory=DCStatsFactory(),
+        node=_lp_table(A, (i, j)),
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert lp.estimate_non_fill_values() == pytest.approx(dc.estimate_non_fill_values())
+
+
+def test_lp_empty_tensor_is_zero():
+    i, j = Field("i"), Field("j")
+    A = np.zeros((3, 4))
+    stats = _lp_stats(A, (i, j))
+    assert stats.estimate_non_fill_values() == 0.0
+
+
+def test_lp_scalar_tensor():
+    stats = insert_statistics(
+        stats_factory=LPStatsFactory(),
+        node=Table(Literal(fl.asarray(np.asarray(5.0))), ()),
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == 1.0
+
+
+def test_lp_bound_is_valid_upper_bound_on_join():
+    # Broadcast product R(i,j) * S(j,k) over (i,j,k); the LP bound must be a
+    # valid upper bound on the true number of non-fill output entries.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    R = np.zeros((6, 4))
+    R[:, 0] = 1
+    R[0, 1] = R[1, 2] = R[2, 3] = 1
+    S = np.zeros((4, 6))
+    S[0, :] = 1
+    S[1, 0] = S[2, 1] = S[3, 2] = 1
+    true = sum(
+        1
+        for a in range(6)
+        for b in range(4)
+        for c in range(6)
+        if R[a, b] != 0 and S[b, c] != 0
+    )
+    f = LPStatsFactory()
+    out = f.mapjoin(
+        ffuncs.mul,
+        f(fl.asarray(R), (i, j)),
+        f(fl.asarray(S), (j, k)),
+    )
+    est = out.estimate_non_fill_values()
+    assert est >= true
+    assert est <= 6 * 4 * 6  # never exceeds dense capacity
+
+
+def test_lp_intermediate_p_is_tighter():
+    # With p=2 available the bound on a skewed join is tighter than the
+    # max-degree-only (p=inf) bound, while remaining a valid upper bound.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    R = np.zeros((6, 4))
+    R[:, 0] = 1
+    R[0, 1] = R[1, 2] = R[2, 3] = 1
+    S = np.zeros((4, 6))
+    S[0, :] = 1
+    S[1, 0] = S[2, 1] = S[3, 2] = 1
+    true = sum(
+        1
+        for a in range(6)
+        for b in range(4)
+        for c in range(6)
+        if R[a, b] != 0 and S[b, c] != 0
+    )
+
+    def bound(ps):
+        f = LPStatsFactory(ps=ps)
+        out = f.mapjoin(ffuncs.mul, f(fl.asarray(R), (i, j)), f(fl.asarray(S), (j, k)))
+        return out.estimate_non_fill_values()
+
+    b_inf = bound((1.0, math.inf))
+    b_2 = bound((1.0, 2.0, math.inf))
+    assert b_2 >= true
+    assert b_2 <= b_inf + 1e-6
+
+
+def test_lp_join_keeps_min():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 0.0], [0.0, 0.0, 3.0]])
+    B = np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 3.0]])
+    f = LPStatsFactory()
+    joined = f.mapjoin(ffuncs.mul, f(fl.asarray(A), (i, j)), f(fl.asarray(B), (i, j)))
+    true = float(np.count_nonzero(A * B))
+    assert joined.estimate_non_fill_values() >= true
+
+
+def test_lp_relabel_and_reorder():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    f = LPStatsFactory()
+    stats = f(fl.asarray(A), (i, j))
+    relabeled = f.relabel(stats, (k, j))
+    assert relabeled.index_order == (k, j)
+    # renaming must remap the field names inside the degree records, so the
+    # bound is unchanged and no record still references the old field `i`.
+    assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.dcs)
+    assert all((dc.from_indices | dc.to_indices) <= {k, j} for dc in relabeled.dcs)
+    assert relabeled.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values()
+    )
+    reordered = f.reorder(stats, (j, i))
+    assert reordered.index_order == (j, i)
+    assert reordered.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values()
+    )
+
+
+def test_dc_relabel_remaps_fields():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    f = DCStatsFactory()
+    stats = f(fl.asarray(A), (i, j))
+    relabeled = f.relabel(stats, (k, j))
+    assert relabeled.index_order == (k, j)
+    assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.dcs)
+    assert relabeled.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values()
+    )
+
+
+def test_lp_aggregate_drops_index():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    f = LPStatsFactory()
+    stats = f(fl.asarray(A), (i, j))
+    agg = f.aggregate(ffuncs.add, None, (j,), stats)
+    assert agg.index_order == (i,)
+    # after reducing j, the result has at most as many non-fill values as rows
+    assert agg.estimate_non_fill_values() <= A.shape[0]
+
+
+def test_lp_embedding_shape():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    stats = _lp_stats(A, (i, j))
+    emb = stats.get_embedding()
+    assert emb.shape[0] == len(stats.index_order) + len(stats.dcs)
+    assert np.all(np.isfinite(emb))
+
+
+def test_lp_norm_endpoints():
+    # p=1 -> nnz along the conditioned column; p=inf -> max degree.
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
+    stats = _lp_stats(A, (i, j), ps=(1.0, math.inf))
+    by_p = {}
+    for dc in stats.dcs:
+        if dc.from_indices == frozenset({i}):
+            by_p[dc.p] = dc.value
+    # row 0 has degree 3, row 1 has degree 1: l1 = 4 (== nnz), linf = 3
+    assert by_p[1.0] == pytest.approx(4.0)
+    assert by_p[math.inf] == pytest.approx(3.0)
+
+
+def test_lpdc_is_hashable_frozen():
+    dc = DC(frozenset(), frozenset({Field("i")}), 3.0, 2.0)
+    assert dc in {dc}

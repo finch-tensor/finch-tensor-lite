@@ -8,7 +8,7 @@ import numpy as np
 from finchlite.algebra.algebra import FinchOperator
 from finchlite.finch_logic import Field, StatsFactory
 
-from .dc_stats import DCStats
+from .bound_stats import DCStatsFactory
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
@@ -21,7 +21,7 @@ class VPStatsFactory(
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> VPStats:
         base = super().__call__(tensor, fields)
-        dcs = DCStats.structure_to_dcs(tensor, fields, base.fill_value)
+        dcs = DCStatsFactory.structure_to_dcs(tensor, fields, base.fill_value)
 
         nnz = 0.0
         for dc in dcs:
