@@ -11,6 +11,7 @@ from finchlite import (
     dense,
     element,
     fiber_tensor,
+    sparse_list,
 )
 from finchlite.tensor import (
     BufferizedNDArray,
@@ -185,6 +186,25 @@ def test_fiber_tensor():
     assert fmt.level_format_properties == [
         DenseProperty((), (0,)),
         DenseProperty((0,), (1,)),
+    ]
+    sparse_fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                dense(
+                    element(
+                        np.int64(0),
+                        finchlite.int64,
+                        finchlite.intp,
+                        NumpyBufferFType,
+                    )
+                ),
+                finchlite.intp,
+            )
+        )
+    )
+    assert sparse_fmt.level_format_properties == [
+        DenseProperty((), (0,)),
+        DenseProperty((0, 1), (2,)),
     ]
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)

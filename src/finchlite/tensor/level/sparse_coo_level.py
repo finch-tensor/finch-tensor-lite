@@ -106,7 +106,7 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
         return self.lvl_type
 
     def level_format_properties(self, n):
-        return []
+        return self.lvl_t.level_format_properties(n)
 
     def construct(self, shape: tuple[Any, ...], **kwargs) -> "SparseCOOLevel":
         if kwargs:

@@ -151,7 +151,7 @@ class LevelFType(FType, ABC):
     @abstractmethod
     def level_format_properties(self, n):
         """
-        Return the format properties contributed by this level type.
+        Return the format properties contributed by this level type and children.
 
         ``n`` is the outer dimension index represented by this level. Nested
         levels use increasing indices, so the returned properties can describe how
@@ -391,8 +391,8 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.buffer_type
 
     @property
-    def format_properties(self) -> list[FormatProperty]:
-        return self.lvl_t.level_format_properties(n)
+    def level_format_properties(self) -> list[FormatProperty]:
+        return self.lvl_t.level_format_properties(0)
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns)
