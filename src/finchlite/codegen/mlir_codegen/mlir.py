@@ -275,16 +275,16 @@ def mlir_function_name(op, arg: FType) -> str:
             return "arith.divsi"
         case ffuncs.floordiv:
             if MLIROperator.is_float(arg):
-                return "arith.divf"
+                raise NotImplementedError(
+                    f"MLIR backend does not yet support floordiv on {arg}"
+                )
             if MLIROperator.is_unsigned(arg):
                 return "arith.divui"
             return "arith.floordivsi"
         case ffuncs.mod:
-            if MLIROperator.is_float(arg):
-                return "arith.remf"
             if MLIROperator.is_unsigned(arg):
                 return "arith.remui"
-            return "arith.remsi"
+            raise NotImplementedError(f"MLIR backend does not yet support mod on {arg}")
         case ffuncs.min:
             if MLIROperator.is_float(arg):
                 return "arith.minimumf"
@@ -699,13 +699,6 @@ class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
         """
         ...
 
-    @abstractmethod
-    def mlir_resize(self, ctx: "MLIRContext", buffer, new_length):
-        """
-        Return MLIR code which resizes a named buffer to the given length.
-        """
-        ...
-
 
 class MLIRStackFType(ABC):
     """
@@ -840,11 +833,10 @@ class MLIRContext(Context):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
                 return buf_t.mlir_store(self, self.resolve(buffer), index, value)
 
-            case asm.Resize(buffer, size):
-                buf_t = buffer.result_type
-                if not isinstance(buf_t, MLIRBufferFType):
-                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
-                return buf_t.mlir_resize(self, self.resolve(buffer), size)
+            case asm.Resize(_, _):
+                # memref.realloc frees memory owned by the source numpy array,
+                # and the slot would keep referring to the stale memref
+                raise NotImplementedError("MLIR backend does not yet support Resize")
 
             case asm.GetAttr(obj, attr):
                 attrs = [attr.val]

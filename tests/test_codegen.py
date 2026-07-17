@@ -17,6 +17,7 @@ from finchlite.algebra import ftypes
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
+    MLIRCompiler,
     MLIRGenerator,
     NumbaCompiler,
     NumbaGenerator,
@@ -1186,3 +1187,27 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
     )
     mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
     file_regression.check(mlir_code, extension=".mlir")
+
+
+@pytest.mark.mlir_backend
+def test_mlir_resize_not_supported():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("grow", ftypes.none_),
+                (b_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.Resize(b_slt, asm.Literal(np.intp(6))),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    with pytest.raises(NotImplementedError, match="Resize"):
+        MLIRCompiler()(prgm)

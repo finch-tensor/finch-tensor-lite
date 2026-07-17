@@ -340,14 +340,6 @@ class NumpyBufferFType(
         )
         return
 
-    def mlir_resize(self, ctx: "MLIRContext", buf: MLIRBufferFields, new_len):
-        c0 = ctx.new_ssa()
-        ctx.exec(
-            f"{ctx.feed}{c0} = memref.realloc {buf.buffer}({ctx(new_len)}) "
-            f": {self.mlir_type()} to {self.mlir_type()}"
-        )
-        return MLIRBufferFields(c0)
-
     def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
         return MLIRBufferFields(ctx(val))
 
@@ -363,11 +355,16 @@ class NumpyBufferFType(
         return desc
 
     def deserialize_from_mlir(self, obj, mlir_buffer):
-        from mlir.runtime import ranked_memref_to_numpy
-
-        obj.arr = ranked_memref_to_numpy(ctypes.pointer(mlir_buffer))
+        # NOTE: for now it's a no-op because
+        # MLIR never allocates or resizes buffers; it only reads and writes to them.
+        # Once we support MLIR reallocating buffers, this will need to be updated.
+        pass
 
     def construct_from_mlir(self, mlir_buffer):
         from mlir.runtime import ranked_memref_to_numpy
 
-        return NumpyBuffer(ranked_memref_to_numpy(ctypes.pointer(mlir_buffer)))
+        # TODO: avoid the copy when the descriptor aliases an unmodified
+        # argument buffer — MLIRKernel.__call__ would match the aligned
+        # pointer against argument buffers and return the owning NumpyBuffer
+        # directly.
+        return NumpyBuffer(ranked_memref_to_numpy(ctypes.pointer(mlir_buffer)).copy())

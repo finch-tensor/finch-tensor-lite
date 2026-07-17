@@ -18,9 +18,6 @@ julia = [
     "juliapkg>=0.1.16,<0.2.0",
     "juliacall>=0.9.24,<0.10.0",
 ]
-mlir = [
-    "pyyaml>=6.0.1",
-]
 
 [dependency-groups]
 test = [
@@ -157,8 +154,15 @@ CC = "clang"
 platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
 
 [tool.pixi.feature.mlir.dependencies]
-python = "3.13.*"
-mlir-python-bindings = ">=22.1.0,<23"
+pyyaml = "<=6.0.1"
+
+# NOTE: https://github.com/llvm/eudsl/issues/480
+[tool.pixi.feature.mlir.pypi-options]
+index-url = "https://pypi.org/simple"
+find-links = [{ url = "https://llvm.github.io/eudsl" }]
+
+[tool.pixi.feature.mlir.pypi-dependencies]
+mlir-python-bindings = "*"
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"
