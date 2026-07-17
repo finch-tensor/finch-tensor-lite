@@ -61,10 +61,10 @@ class FDStats(NumericStats):
     ):
         super().__init__(base)
         self.format_properties = tuple(props)
-        self.dense_props: dict[Field, set[set[Field, ...]]] = {}
-        self.blocked_props: dict[Field, set[set[Field, ...]]] = {}
-        self.repeated_props: dict[Field, set[set[Field, ...]]] = {}
-        self.extruded_props: dict[Field, set[set[Field, ...]]] = {}
+        self.dense_props: dict[Field, set[frozenset[Field]]] = {}
+        self.blocked_props: dict[Field, set[frozenset[Field]]] = {}
+        self.repeated_props: dict[Field, set[frozenset[Field]]] = {}
+        self.extruded_props: dict[Field, set[frozenset[Field]]] = {}
 
         for prop in self.format_properties:
             match prop:
@@ -77,17 +77,28 @@ class FDStats(NumericStats):
                 case Extruded():
                     self._add_property(self.extruded_props, prop)
 
-    def chase(self, props):
-        old_props = props
-        new_props = deepcopy(props)
-        while old_props != new_props
-            for (c, hs) in old_props:
-                for h in hs:
-                    for h_head in h:
-                        h_tail = h.setminus(h_head)
-                        for g in old_props[h_head]:
-                            new_props[c].add(h_tail + g)
+        self.dense_props = self.chase(self.dense_props)
+        self.blocked_props = self.chase(self.blocked_props)
+        self.repeated_props = self.chase(self.repeated_props)
+        self.extruded_props = self.chase(self.extruded_props)
 
+    def chase(
+        self,
+        props: dict[Field, set[frozenset[Field]]],
+    ) -> dict[Field, set[frozenset[Field]]]:
+        changed = True
+        while changed:
+            changed = False
+            for hypotheses in tuple(props.values()):
+                for hypothesis in tuple(hypotheses):
+                    for head in hypothesis:
+                        tail = hypothesis - {head}
+                        for replacement in tuple(props.get(head, ())):
+                            chased = tail | replacement
+                            if chased not in hypotheses:
+                                hypotheses.add(chased)
+                                changed = True
+        return props
 
     def _fields_for_dims(self, dims: tuple[int, ...]) -> tuple[Field, ...]:
         try:
@@ -100,12 +111,12 @@ class FDStats(NumericStats):
 
     def _add_property(
         self,
-        props_by_conclusion: dict[Field, list[tuple[Field, ...]]],
+        props_by_conclusion: dict[Field, set[frozenset[Field]]],
         prop: FormatProperty,
     ):
-        hypotheses = self._fields_for_dims(prop.hypothesis_dims)
+        hypotheses = frozenset(self._fields_for_dims(prop.hypothesis_dims))
         for conclusion in self._fields_for_dims(prop.conclusion_dims):
-            props_by_conclusion.setdefault(conclusion, []).append(hypotheses)
+            props_by_conclusion.setdefault(conclusion, set()).add(hypotheses)
 
     def estimate_non_fill_values(self) -> float:
         total = 1.0

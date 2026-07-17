@@ -52,15 +52,27 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     i, j = Field("i"), Field("j")
     stats = FDStatsFactory()(fl.FillTensor((2, 3), 0), (i, j))
 
-    assert stats.dense_props == {i: [()], j: [(i,)]}
-    assert stats.repeated_props == {i: [()], j: [(i,)]}
+    assert stats.dense_props == {
+        i: {frozenset()},
+        j: {frozenset(), frozenset({i})},
+    }
+    assert stats.repeated_props == {
+        i: {frozenset()},
+        j: {frozenset(), frozenset({i})},
+    }
     assert stats.blocked_props == {}
     assert stats.extruded_props == {}
 
     row, col = Field("row"), Field("col")
     relabeled = FDStatsFactory().relabel(stats, (row, col))
-    assert relabeled.dense_props == {row: [()], col: [(row,)]}
-    assert relabeled.repeated_props == {row: [()], col: [(row,)]}
+    assert relabeled.dense_props == {
+        row: {frozenset()},
+        col: {frozenset(), frozenset({row})},
+    }
+    assert relabeled.repeated_props == {
+        row: {frozenset()},
+        col: {frozenset(), frozenset({row})},
+    }
 
 
 def test_fd_stats_constructor_maps_unconditional_dense_properties():
@@ -68,7 +80,7 @@ def test_fd_stats_constructor_maps_unconditional_dense_properties():
     tensor = fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
     stats = FDStatsFactory()(tensor, (i, j))
 
-    assert stats.dense_props == {i: [()], j: [()]}
+    assert stats.dense_props == {i: {frozenset()}, j: {frozenset()}}
     assert stats.repeated_props == {}
 
 
