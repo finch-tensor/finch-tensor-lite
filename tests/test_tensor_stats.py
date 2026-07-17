@@ -7,6 +7,9 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
+from finchlite.algebra import TensorFType, TupleFType, ftype
+from finchlite.autoschedule.capture import LogicCapture
+from finchlite.autoschedule.smart_formatter import SmartFormatter
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.autoschedule.tensor_stats import (
     DC,
@@ -29,9 +32,13 @@ from finchlite.autoschedule.tensor_stats import (
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
+    Alias,
     Field,
     Literal,
     MapJoin,
+    Plan,
+    Produces,
+    Query,
     Table,
 )
 from finchlite.tensor.traits import Dense as DenseProperty
@@ -115,6 +122,53 @@ def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
 
     assert stats.dense_props == {j: {frozenset()}}
     assert stats.repeated_props == {j: {frozenset()}}
+
+
+def test_smart_formatter_passes_propagated_stats_to_output_type():
+    class RecordingSmartFormatter(SmartFormatter):
+        def __init__(self, loader):
+            super().__init__(loader)
+            self.output_stats = []
+
+        def get_output_tns_type(self, fill_value, shape_type, stats) -> TensorFType:
+            self.output_stats.append(stats)
+            fill_ftype = ftype(
+                fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+            )
+            return fl.BufferizedNDArrayFType(
+                buffer_type=fl.NumpyBufferFType(fill_ftype),
+                ndim=len(shape_type),
+                dimension_type=TupleFType.from_tuple(shape_type),
+                fill_value=fill_value,
+            )
+
+    i, j = Field("i"), Field("j")
+    A, B = Alias("A"), Alias("B")
+    tensor = fl.FillTensor((2, 3), 0)
+    stats_factory = FDStatsFactory()
+    stats = {A: stats_factory(tensor, (i, j))}
+    capture = LogicCapture()
+    formatter = RecordingSmartFormatter(capture)
+    prgm = Plan(
+        (
+            Query(
+                B,
+                MapJoin(
+                    Literal(ffuncs.add),
+                    (Table(A, (i, j)), Table(A, (i, j))),
+                ),
+            ),
+            Produces((B,)),
+        )
+    )
+
+    formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
+
+    assert formatter.output_stats[0].dense_props == {
+        i: {frozenset()},
+        j: {frozenset(), frozenset({i})},
+    }
+    assert capture.last_stats[B] is formatter.output_stats[0]
 
 
 def test_fd_stats_chase_ignores_circular_dependencies():

@@ -30,12 +30,12 @@ from .default_schedulers import (
     with_default_scheduler,
 )
 from .executor import LogicExecutor
+from .smart_formatter import SmartFormatter
 from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .optimize import DefaultLogicOptimizer
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
-from .suitable_rep import SmartLogicFormatter
 
 __all__ = [
     "COMPILE_NUMBA",
@@ -70,7 +70,7 @@ __all__ = [
     "Query",
     "Relabel",
     "Reorder",
-    "SmartLogicFormatter",
+    "SmartFormatter",
     "Table",
     "Value",
     "get_default_scheduler",
