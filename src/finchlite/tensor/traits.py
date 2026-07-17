@@ -25,10 +25,6 @@ class Dense(FormatProperty):
     pass
 
 
-class Sparse(FormatProperty):
-    pass
-
-
 class Blocked(FormatProperty):
     pass
 
@@ -38,10 +34,6 @@ class Repeated(FormatProperty):
 
 
 class Extruded(FormatProperty):
-    pass
-
-
-class Hollow(FormatProperty):
     pass
 
 
