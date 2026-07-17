@@ -20,6 +20,7 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
+    FDStatsFactory,
     LPStats,
     LPStatsFactory,
     UniformStats,
@@ -45,6 +46,30 @@ def _overwrite_def(stat, base: BaseTensorStats):
     stat.dim_sizes = base.dim_sizes
     stat.fill_value = base.fill_value
     return stat
+
+
+def test_fd_stats_constructor_maps_hierarchical_format_properties():
+    i, j = Field("i"), Field("j")
+    stats = FDStatsFactory()(fl.FillTensor((2, 3), 0), (i, j))
+
+    assert stats.dense_props == {i: [()], j: [(i,)]}
+    assert stats.repeated_props == {i: [()], j: [(i,)]}
+    assert stats.blocked_props == {}
+    assert stats.extruded_props == {}
+
+    row, col = Field("row"), Field("col")
+    relabeled = FDStatsFactory().relabel(stats, (row, col))
+    assert relabeled.dense_props == {row: [()], col: [(row,)]}
+    assert relabeled.repeated_props == {row: [()], col: [(row,)]}
+
+
+def test_fd_stats_constructor_maps_unconditional_dense_properties():
+    i, j = Field("i"), Field("j")
+    tensor = fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
+    stats = FDStatsFactory()(tensor, (i, j))
+
+    assert stats.dense_props == {i: [()], j: [()]}
+    assert stats.repeated_props == {}
 
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
