@@ -21,6 +21,7 @@ from finchlite.compile.lower import AssemblyContext, FinchTensorFType
 
 from .override_tensor import OverrideTensor
 from .scalar import Scalar
+from .traits import Dense, FormatProperty
 
 
 def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
@@ -351,6 +352,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def shape_type(self) -> tuple:
         return tuple(self.shape_t.struct_fieldtypes)
 
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return [Dense((), (n,)) for n in range(self.ndim)]
+
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
             asm.GetAttr(obj.root, asm.Literal("shape")),
@@ -571,6 +576,10 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     @property
     def element_type(self):
         return self.tns.element_type
+
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return [Dense((), (n,)) for n in range(self.ndim)]
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(

@@ -11,6 +11,12 @@ from finchlite.algebra import FType, TensorFType, ffuncs, ftype
 
 from .override_tensor import OverrideTensor
 from .scalar import Scalar
+from .traits import (
+    Blocked,
+    Dense,
+    FormatProperty,
+    Repeated,
+)
 
 
 def _shape_size(shape: tuple) -> int:
@@ -43,6 +49,10 @@ class IndexTensorFType(TensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return [Dense(tuple(range(n)), (n,)) for n in range(self.ndim)]
 
     def from_numpy(self, arr):
         raise NotImplementedError
@@ -95,6 +105,12 @@ class FillTensorFType(TensorFType):
     @property
     def shape_type(self):
         return self._shape_type
+
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return [
+            Dense(tuple(range(n)), (n,)) for n in range(self.ndim)
+        ] + [Repeated(tuple(range(n)), (n,)) for n in range(self.ndim)]
 
     def from_numpy(self, arr):
         raise NotImplementedError
@@ -266,6 +282,10 @@ class PatternTensorFType(TensorFType):
     def shape_type(self):
         return self._shape_type
 
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return self._tensor_type._level_format_properties(self.ndim)
+
     def from_numpy(self, arr):
         raise NotImplementedError
 
@@ -349,6 +369,10 @@ class PatternTensor(OverrideTensor):
 
     def contains(self, *idxs) -> bool:
         raise NotImplementedError
+
+    @classmethod
+    def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
+        return []
 
     def item(self):
         raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
@@ -446,6 +470,10 @@ class UpperTriangleTensor(PatternTensor):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
 
+    @classmethod
+    def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
+        return [Blocked((0,), (1,)), Blocked((1,), (0,))]
+
     def contains(self, i, j) -> bool:
         return j - i >= self._k
 
@@ -455,6 +483,10 @@ class LowerTriangleTensor(PatternTensor):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
 
+    @classmethod
+    def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
+        return [Blocked((0,), (1,)), Blocked((1,), (0,))]
+
     def contains(self, i, j) -> bool:
         return j - i <= self._k
 
@@ -463,6 +495,10 @@ class PairSumTensor(PatternTensor):
     def __init__(self, shape, *, dtype=None):
         super().__init__(shape, dtype=dtype)
 
+    @classmethod
+    def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
+        return [Blocked((0,), (1,))]
+
     def contains(self, i, j) -> bool:
         return j == i * 2 or j == i * 2 + 1
 
@@ -470,6 +506,10 @@ class PairSumTensor(PatternTensor):
 class PairCarryTensor(PatternTensor):
     def __init__(self, shape, *, dtype=None):
         super().__init__(shape, dtype=dtype)
+
+    @classmethod
+    def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
+        return [Blocked((1,), (0,))]
 
     def contains(self, i, j) -> bool:
         return i > 0 and j == (i - 1) // 2
@@ -497,6 +537,10 @@ class RepeatTensor(PatternTensor):
     def __init__(self, shape, *, k: int = 0, dtype=None):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
+
+    @classmethod
+    def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
+        return [Blocked((1,), (0,)), Repeated((1,), (0,))]
 
     def contains(self, i, j) -> bool:
         return self._k > 0 and j == i // self._k

@@ -18,11 +18,25 @@ from finchlite.tensor import (
     EyeTensor,
     FillTensor,
     IndexTensor,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
     ParityMaskTensor,
     PatternTensor,
+    RepeatTensor,
     ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    UpperTriangleTensor,
 )
-from finchlite.tensor.traits import Dense as DenseProperty
+from finchlite.tensor.traits import (
+    Blocked as BlockedProperty,
+    Dense as DenseProperty,
+    Repeated as RepeatedProperty,
+)
 
 
 def test_fiber_tensor_attributes():
@@ -212,6 +226,59 @@ def test_fiber_tensor():
     cpu_dev = finchlite.cpu("fiber-test", n=2)
     tensor = asarray(np.arange(12).reshape((3, 4)), format=fmt, device=cpu_dev)
     assert tensor.device == cpu_dev
+
+
+def test_bufferized_ndarray_level_format_properties():
+    tensor = BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
+
+    assert tensor.ftype.level_format_properties == [
+        DenseProperty((), (0,)),
+        DenseProperty((), (1,)),
+    ]
+
+
+@pytest.mark.parametrize(
+    "tensor, expected",
+    [
+        (
+            FillTensor((2, 3), 0),
+            [
+                DenseProperty((), (0,)),
+                DenseProperty((0,), (1,)),
+                RepeatedProperty((), (0,)),
+                RepeatedProperty((0,), (1,)),
+            ],
+        ),
+        (
+            IndexTensor((2, 3)),
+            [DenseProperty((), (0,)), DenseProperty((0,), (1,))],
+        ),
+        (ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_), []),
+        (EyeTensor((2, 3)), []),
+        (
+            UpperTriangleTensor((3, 4)),
+            [BlockedProperty((0,), (1,)), BlockedProperty((1,), (0,))],
+        ),
+        (
+            LowerTriangleTensor((3, 4)),
+            [BlockedProperty((0,), (1,)), BlockedProperty((1,), (0,))],
+        ),
+        (PairSumTensor((3, 6)), [BlockedProperty((0,), (1,))]),
+        (PairCarryTensor((6, 3)), [BlockedProperty((1,), (0,))]),
+        (ReverseTensor((3, 3)), []),
+        (RollTensor((3, 3), k=1), []),
+        (
+            RepeatTensor((6, 3), k=2),
+            [BlockedProperty((1,), (0,)), RepeatedProperty((1,), (0,))],
+        ),
+        (OddEvenMergeSortPartnerMaskTensor((8, 8), p=2, k=1), []),
+        (OddEvenMergeSortLowerMaskTensor(8, p=2, k=1), []),
+        (OneHotMaskTensor(5, index=2), []),
+        (ParityMaskTensor(5), []),
+    ],
+)
+def test_symbolic_tensor_level_format_properties(tensor, expected):
+    assert tensor.ftype.level_format_properties == expected
 
 
 @pytest.mark.parametrize(
