@@ -85,6 +85,27 @@ def test_fd_stats_constructor_maps_unconditional_dense_properties():
     assert stats.repeated_props == {}
 
 
+def test_fd_stats_mapjoin_union_preserves_property_maps():
+    i, j = Field("i"), Field("j")
+    factory = FDStatsFactory()
+    fill_stats = factory(fl.FillTensor((2, 3), 0), (i, j))
+    array_stats = factory(
+        fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32)),
+        (i, j),
+    )
+
+    stats = factory.mapjoin(ffuncs.add, fill_stats, array_stats)
+
+    assert stats.dense_props == {
+        i: {frozenset()},
+        j: {frozenset(), frozenset({i})},
+    }
+    assert stats.repeated_props == {
+        i: {frozenset()},
+        j: {frozenset({i})},
+    }
+
+
 def test_fd_stats_chase_ignores_circular_dependencies():
     i, j = Field("i"), Field("j")
 

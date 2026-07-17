@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -39,10 +40,10 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
 
         return FDStats(
             base,
-            self._chase(dense_props),
+            dense_props,
             blocked_props,
             repeated_props,
-            self._chase(extruded_props),
+            extruded_props,
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: FDStats) -> FDStats:
@@ -60,10 +61,10 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
 
         return FDStats(
             base,
-            self._chase(dense_props),
+            dense_props,
             blocked_props,
             repeated_props,
-            self._chase(extruded_props),
+            extruded_props,
         )
 
     @staticmethod
@@ -73,36 +74,44 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
         base = super()._mapjoin_defs(op, *join_args)
-        dense_props: PropertyMap = {}
-        blocked_props: PropertyMap = {}
-        repeated_props: PropertyMap = {}
-        extruded_props: PropertyMap = {}
+        if not join_args:
+            return FDStats(base)
 
-        for arg in join_args:
-            self._join_properties(dense_props, arg.dense_props)
-            self._join_properties(blocked_props, arg.blocked_props)
-            self._join_properties(repeated_props, arg.repeated_props)
-            self._join_properties(extruded_props, arg.extruded_props)
+        dense_props = deepcopy(join_args[0].dense_props)
+        blocked_props = deepcopy(join_args[0].blocked_props)
+        repeated_props = deepcopy(join_args[0].repeated_props)
+        extruded_props = deepcopy(join_args[0].extruded_props)
+
+        for arg in join_args[1:]:
+            dense_props = self._join_properties(dense_props, arg.dense_props)
+            blocked_props = self._join_properties(blocked_props, arg.blocked_props)
+            repeated_props = self._join_properties(
+                repeated_props, arg.repeated_props
+            )
+            extruded_props = self._join_properties(
+                extruded_props, arg.extruded_props
+            )
 
         return FDStats(
             base,
-            self._chase(dense_props),
+            dense_props,
             blocked_props,
             repeated_props,
-            self._chase(extruded_props),
+            extruded_props,
         )
-        return FDStats(base)
 
     @staticmethod
-    def _join_properties(a: PropertyMap, b: PropertyMap):
-        out = Dict{}
-        for conclusion, a_hypotheses in tuple[a.items()]:
-            b_hypotheses = b[conclusion]
-            hs = Set()
+    def _join_properties(a: PropertyMap, b: PropertyMap) -> PropertyMap:
+        out: PropertyMap = {}
+        for conclusion, a_hypotheses in a.items():
+            if conclusion not in b:
+                continue
+            hypotheses: set[frozenset[Field]] = set()
             for a_hypothesis in a_hypotheses:
-                for b_hypothesis in b_hypotheses:
-                    hs.add(a_hypothesis + b_hypothesis)
-            out[conclusion] = hs
+                for b_hypothesis in b[conclusion]:
+                    hypotheses.add(a_hypothesis | b_hypothesis)
+            out[conclusion] = hypotheses
+        return out
 
     def aggregate(
         self,
@@ -131,27 +140,13 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self, stats: FDStats, reorder_indices: tuple[Field, ...]
     ) -> FDStats:
         base = self.reorder_def(stats, reorder_indices)
-        return FDStats(base)
-
-    def _chase(
-        self,
-        props: PropertyMap,
-    ) -> PropertyMap:
-        changed = True
-        while changed:
-            changed = False
-            for conclusion, hypotheses in tuple(props.items()):
-                for hypothesis in tuple(hypotheses):
-                    for head in hypothesis:
-                        tail = hypothesis - {head}
-                        for replacement in tuple(props.get(head, ())):
-                            chased = tail | replacement
-                            if conclusion in chased:
-                                continue
-                            if chased not in hypotheses:
-                                hypotheses.add(chased)
-                                changed = True
-        return props
+        return FDStats(
+            base,
+            stats.dense_props,
+            stats.blocked_props,
+            stats.repeated_props,
+            stats.extruded_props,
+        )
 
     def _fields_for_dims(
         self,
@@ -200,10 +195,32 @@ class FDStats(NumericStats):
         extruded_props: PropertyMap | None = None,
     ):
         super().__init__(base)
-        self.dense_props = dense_props or {}
-        self.blocked_props = blocked_props or {}
-        self.repeated_props = repeated_props or {}
-        self.extruded_props = extruded_props or {}
+        self.dense_props = self._chase(deepcopy(dense_props) if dense_props else {})
+        self.blocked_props = deepcopy(blocked_props) if blocked_props else {}
+        self.repeated_props = deepcopy(repeated_props) if repeated_props else {}
+        self.extruded_props = self._chase(
+            deepcopy(extruded_props) if extruded_props else {}
+        )
+
+    def _chase(
+        self,
+        props: PropertyMap,
+    ) -> PropertyMap:
+        changed = True
+        while changed:
+            changed = False
+            for conclusion, hypotheses in tuple(props.items()):
+                for hypothesis in tuple(hypotheses):
+                    for head in hypothesis:
+                        tail = hypothesis - {head}
+                        for replacement in tuple(props.get(head, ())):
+                            chased = tail | replacement
+                            if conclusion in chased:
+                                continue
+                            if chased not in hypotheses:
+                                hypotheses.add(chased)
+                                changed = True
+        return props
 
     def estimate_non_fill_values(self) -> float:
         total = 1.0
