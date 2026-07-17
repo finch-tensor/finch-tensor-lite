@@ -20,6 +20,7 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
+    ErrorLoggerStatsFactory,
     LPStats,
     LPStatsFactory,
     UniformStats,
@@ -45,6 +46,89 @@ def _overwrite_def(stat, td: BaseTensorStats):
     stat.dim_sizes = td.dim_sizes
     stat.fill_value = td.fill_value
     return stat
+
+
+# ─────────────────────────────- ErrorLoggerStats tests ───────────────────────────────
+
+
+def test_errorlogger_stats_dense():
+
+    a = fl.asarray(np.array([[1, 0], [1, 0]]))
+    b = fl.asarray(np.array([[1, 1], [0, 0]]))
+
+    factory = ErrorLoggerStatsFactory(DenseStatsFactory())
+    a_stats = factory(a, (Field("i"), Field("j")))
+    b_stats = factory(b, (Field("i"), Field("j")))
+    map = factory.mapjoin(ffuncs.mul, a_stats, b_stats)
+    agg = factory.aggregate(ffuncs.add, 0, (Field("j"),), map)
+
+    assert map.exact.estimate_non_fill_values() == 1.0
+    assert map.estimate_non_fill_values() == 4.0
+    assert factory.error_log.samples[f"MapJoin({ffuncs.mul})"] == [(1.0, 4.0)]
+
+    assert agg.exact.estimate_non_fill_values() == 1.0
+    assert agg.estimate_non_fill_values() == 2.0
+    assert factory.error_log.samples[f"Aggregate({ffuncs.add})"] == [(1.0, 2.0)]
+
+
+def test_errorlogger_stats_blocked_dense():
+
+    a = fl.asarray(np.array([[1, 0], [1, 0]]))
+    b = fl.asarray(np.array([[1, 1], [0, 0]]))
+
+    factory = ErrorLoggerStatsFactory(BlockedStatsFactory(DenseStatsFactory()))
+    a_stats = factory(a, (Field("i"), Field("j")))
+    b_stats = factory(b, (Field("i"), Field("j")))
+    mpj = factory.mapjoin(ffuncs.mul, a_stats, b_stats)
+    agg = factory.aggregate(ffuncs.add, 0, (Field("j"),), mpj)
+
+    assert mpj.exact.estimate_non_fill_values() == 1.0
+    assert mpj.estimate_non_fill_values() == 4.0
+    assert factory.error_log.samples[f"MapJoin({ffuncs.mul})"] == [(1.0, 4.0)]
+
+    assert agg.exact.estimate_non_fill_values() == 1.0
+    assert agg.estimate_non_fill_values() == 2.0
+    assert factory.error_log.samples[f"Aggregate({ffuncs.add})"] == [(1.0, 2.0)]
+
+
+def test_errorlogger_stats_dc():
+
+    a = fl.asarray(np.array([[1, 0], [1, 0]]))
+    b = fl.asarray(np.array([[1, 1], [0, 0]]))
+
+    factory = ErrorLoggerStatsFactory(DCStatsFactory())
+    a_stats = factory(a, (Field("i"), Field("j")))
+    b_stats = factory(b, (Field("i"), Field("j")))
+    mpj = factory.mapjoin(ffuncs.mul, a_stats, b_stats)
+    agg = factory.aggregate(ffuncs.add, 0, (Field("j"),), mpj)
+
+    assert mpj.exact.estimate_non_fill_values() == 1.0
+    assert mpj.estimate_non_fill_values() == 1.0
+    assert factory.error_log.samples[f"MapJoin({ffuncs.mul})"] == [(1.0, 1.0)]
+
+    assert agg.exact.estimate_non_fill_values() == 1.0
+    assert agg.estimate_non_fill_values() == 1.0
+    assert factory.error_log.samples[f"Aggregate({ffuncs.add})"] == [(1.0, 1.0)]
+
+
+def test_errorlogger_stats_blocked_dc():
+
+    a = fl.asarray(np.array([[1, 0], [1, 0]]))
+    b = fl.asarray(np.array([[1, 1], [0, 0]]))
+
+    factory = ErrorLoggerStatsFactory(BlockedStatsFactory(DCStatsFactory()))
+    a_stats = factory(a, (Field("i"), Field("j")))
+    b_stats = factory(b, (Field("i"), Field("j")))
+    mpj = factory.mapjoin(ffuncs.mul, a_stats, b_stats)
+    agg = factory.aggregate(ffuncs.add, 0, (Field("j"),), mpj)
+
+    assert mpj.exact.estimate_non_fill_values() == 1.0
+    assert mpj.estimate_non_fill_values() == 1.0
+    assert factory.error_log.samples[f"MapJoin({ffuncs.mul})"] == [(1.0, 1.0)]
+
+    assert agg.exact.estimate_non_fill_values() == 1.0
+    assert agg.estimate_non_fill_values() == 1.0
+    assert factory.error_log.samples[f"Aggregate({ffuncs.add})"] == [(1.0, 1.0)]
 
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────

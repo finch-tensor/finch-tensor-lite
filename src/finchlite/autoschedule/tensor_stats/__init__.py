@@ -13,6 +13,7 @@ from .bound_stats import (
 from .database_stats import DatabaseStats, DatabaseStatsFactory
 from .dense_stat import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
+from .errorlogger_stats import ErrorLoggerStats, ErrorLoggerStatsFactory, ErrorReport
 from .stats_interpreter import StatsInterpreter
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 from .uniform_stats import UniformStats, UniformStatsFactory
@@ -33,6 +34,9 @@ __all__ = [
     "DenseStatsFactory",
     "DummyStats",
     "DummyStatsFactory",
+    "ErrorLoggerStats",
+    "ErrorLoggerStatsFactory",
+    "ErrorReport",
     "LPStats",
     "LPStatsFactory",
     "StatsInterpreter",

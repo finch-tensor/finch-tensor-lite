@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 from finchlite.algebra import FinchOperator
-from finchlite.finch_logic import Field, LogicExpression
+from finchlite.finch_logic import Aggregate, Field, LogicExpression, MapJoin
 from finchlite.finch_logic.tensor_stats import StatsFactory
 
 from .exact_stats import ExactStatsFactory
@@ -28,14 +25,28 @@ class ErrorLoggerStatsFactory(StatsFactory["ErrorLoggerStats"]):
         else:
             self.exact_factory = exact_factory
 
-    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> ErrorLoggerStats: ...
+        if error_log is None:
+            self.error_log = ErrorLog()
+        else:
+            self.error_log = error_log
 
-    def copy(self, stat: ErrorLoggerStats) -> ErrorLoggerStats: ...
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> ErrorLoggerStats:
+        return ErrorLoggerStats(
+            exact=self.exact_factory(tensor, fields),
+            estimate=self.estimate_factory(tensor, fields),
+        )
+
+    def copy(self, stat: ErrorLoggerStats) -> ErrorLoggerStats:
+        return ErrorLoggerStats(
+            exact=self.exact_factory.copy(stat.exact),
+            estimate=self.estimate_factory.copy(stat.estimate),
+        )
 
     def mapjoin(self, op: FinchOperator, *stats: ErrorLoggerStats) -> ErrorLoggerStats:
+        exact = self.exact_factory.mapjoin(op, *(stat.exact for stat in stats))
         estimate = self.estimate_factory.mapjoin(op, *(stat.estimate for stat in stats))
-        exact = self.exact_factory.mapjoin(op, *(stat.estimate for stat in stats))
-        return ErrorLoggerStats(exact=exact, estmate=estimate)
+        self.error_log.record(MapJoin, op, exact, estimate)
+        return ErrorLoggerStats(exact=exact, estimate=estimate)
 
     def aggregate(
         self,
@@ -44,50 +55,45 @@ class ErrorLoggerStatsFactory(StatsFactory["ErrorLoggerStats"]):
         reduce_indices: tuple[Field, ...],
         stats: ErrorLoggerStats,
     ) -> ErrorLoggerStats:
+        exact = self.exact_factory.aggregate(op, init, reduce_indices, stats.exact)
         estimate = self.estimate_factory.aggregate(
-            op, init, reduce_indices, *(stat.estimate for stat in stats)
+            op, init, reduce_indices, stats.estimate
         )
-        exact = self.exact_factory.aggregate(
-            op, init, reduce_indices, *(stat.estimate for stat in stats)
-        )
-        return ErrorLoggerStats(exact=exact, estmate=estimate)
+        self.error_log.record(Aggregate, op, exact, estimate)
+        return ErrorLoggerStats(exact=exact, estimate=estimate)
 
     def relabel(
         self, stats: ErrorLoggerStats, relabel_indices: tuple[Field, ...]
     ) -> ErrorLoggerStats:
-        estimate = self.estimate_factory.relabel(stats, relabel_indices)
-        exact = self.exact_factory.relabel(stats, relabel_indices)
+        estimate = self.estimate_factory.relabel(stats.estimate, relabel_indices)
+        exact = self.exact_factory.relabel(stats.exact, relabel_indices)
         return ErrorLoggerStats(exact=exact, estimate=estimate)
 
     def reorder(
         self, stats: ErrorLoggerStats, reorder_indices: tuple[Field, ...]
     ) -> ErrorLoggerStats:
-        estimate = self.estimate_factory.reorder(stats, reorder_indices)
-        exact = self.exact_factory.reorder(stats, reorder_indices)
-        return ErrorLoggerStats(exact=exact, estiamte=estimate)
+        estimate = self.estimate_factory.reorder(stats.estimate, reorder_indices)
+        exact = self.exact_factory.reorder(stats.exact, reorder_indices)
+        return ErrorLoggerStats(exact=exact, estimate=estimate)
 
 
 class ErrorLoggerStats(NumericStats):
     def __init__(
         self,
-        exact: ExactStatsFactory,
+        exact: NumericStats,
         estimate: NumericStats,
     ):
+        self.index_order = estimate.index_order
+        self.dim_sizes = estimate.dim_sizes
+        self.fill_value = estimate.fill_value
         self.exact = exact
         self.estimate = estimate
 
-    @classmethod
-    def from_tensor(
-        cls,
-        tensor: Any,
-        fields: tuple[Field, ...],
-        blocks_per_dim: Mapping[Field, int],
-        stats_factory: StatsFactory[NumericStats],
-    ) -> ErrorLoggerStats: ...
+    def estimate_non_fill_values(self) -> float:
+        return self.estimate.estimate_non_fill_values()
 
-    def estimate_non_fill_values(self): ...
-
-    def get_embedding(self) -> np.ndarray: ...
+    def get_embedding(self) -> np.ndarray:
+        return self.estimate.get_embedding()
 
 
 class ErrorLog:
@@ -120,6 +126,8 @@ class ErrorReport:
         self.error_log = error_log
 
     def plot(self, filename: str) -> None:
+        import matplotlib.pyplot as plt
+
         labels = []
         errors = []
         for operation, samples in self.error_log.samples.items():
