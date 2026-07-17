@@ -7,56 +7,65 @@ from finchlite.algebra import Tensor
 
 
 class AccessCapability:
-    """How a level can be read or written."""
+    """Marker for a way a level can be read or written."""
 
     pass
 
 
 class Sequential(AccessCapability):
-    """Supports ordered traversal only."""
+    """The level supports ordered traversal."""
 
     pass
 
 
 class Random(AccessCapability):
-    """Supports direct access by index."""
+    """The level supports direct access by index."""
 
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class FormatProperty:
-    """A structural fact relating one group of level dimensions to another."""
+    """
+    A structural rule from known dimensions to implied dimensions.
 
-    hypothesis_dims: list[int]
-    conclusion_dim: list[int]
+    For example, a dense property with hypothesis dims ``x`` and conclusion
+    dims ``y`` says that any non-fill slice at ``x`` contains all ``y`` values.
+    """
+
+    hypothesis_dims: tuple[int, ...]
+    conclusion_dims: tuple[int, ...]
 
 
 class Dense(FormatProperty):
     """
-    If some entry exists for the hypothesis dimensions, every value along the
-    conclusion dimension exists.
+    Every value along the conclusion dimensions exists whenever the hypothesis
+    dimensions identify a non-fill slice.
     """
 
     pass
 
 
 class Blocked(FormatProperty):
-    """Keeping the hypothesis dimensions fixed, adjacent values in the
-    conclusion dimension are likely to occur together."""
+    """
+    Adjacent values in the conclusion dimensions tend to occur together when the
+    hypothesis dimensions are fixed.
+    """
 
     pass
 
 
 class Repeated(FormatProperty):
-    """Keeping the hypothesis dimensions fixed, adjacent values in the
-    conclusion dimension are likely to have the same value."""
+    """
+    Adjacent values in the conclusion dimensions tend to share a value when the
+    hypothesis dimensions are fixed.
+    """
 
     pass
 
 
 class Extruded(FormatProperty):
-    """The conclusion dimensions are represented by a single repeated slice."""
+    """The conclusion dimensions are represented by one repeated slice."""
 
     pass
 
