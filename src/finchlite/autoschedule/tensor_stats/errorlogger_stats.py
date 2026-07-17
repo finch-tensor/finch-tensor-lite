@@ -5,8 +5,10 @@ from typing import Any
 
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 from finchlite.algebra import FinchOperator
-from finchlite.finch_logic import Field
+from finchlite.finch_logic import Field, LogicExpression
 from finchlite.finch_logic.tensor_stats import StatsFactory
 
 from .exact_stats import ExactStatsFactory
@@ -88,7 +90,48 @@ class ErrorLoggerStats(NumericStats):
     def get_embedding(self) -> np.ndarray: ...
 
 
-class ErrorLog: ...
+class ErrorLog:
+    """Record difference between estimated and exact stats."""
+
+    def __init__(self):
+        self.samples = {}
+
+    def record(
+        self,
+        operation: type[LogicExpression],
+        operator: FinchOperator,
+        exact: NumericStats,
+        estimate: NumericStats,
+    ) -> None:
+        label = f"{operation.__name__}({operator})"
+
+        if label not in self.samples:
+            self.samples[label] = []
+
+        self.samples[label].append(
+            (exact.estimate_non_fill_values(), estimate.estimate_non_fill_values())
+        )
 
 
-class ErrorReport: ...
+class ErrorReport:
+    """Create box and whisker plots from errors."""
+
+    def __init__(self, error_log: ErrorLog):
+        self.error_log = error_log
+
+    def plot(self, filename: str) -> None:
+        labels = []
+        errors = []
+        for operation, samples in self.error_log.samples.items():
+            operation_errors = [abs(estimate - exact) for exact, estimate in samples]
+            print(f"{operation}: {operation_errors}")
+            labels.append(operation)
+            errors.append(operation_errors)
+
+        figure, axis = plt.subplots()
+        axis.boxplot(errors, tick_labels=labels, orientation="horizontal")
+        axis.set_xlabel("Absolute NNZ error")
+        axis.set_ylabel("Operation")
+        axis.set_title("NNZ Estimation Error")
+        figure.savefig(filename, bbox_inches="tight")
+        plt.close(figure)
