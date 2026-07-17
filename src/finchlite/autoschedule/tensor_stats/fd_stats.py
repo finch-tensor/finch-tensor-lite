@@ -61,10 +61,10 @@ class FDStats(NumericStats):
     ):
         super().__init__(base)
         self.format_properties = tuple(props)
-        self.dense_props: dict[Field, list[tuple[Field, ...]]] = {}
-        self.blocked_props: dict[Field, list[tuple[Field, ...]]] = {}
-        self.repeated_props: dict[Field, list[tuple[Field, ...]]] = {}
-        self.extruded_props: dict[Field, list[tuple[Field, ...]]] = {}
+        self.dense_props: dict[Field, set[set[Field, ...]]] = {}
+        self.blocked_props: dict[Field, set[set[Field, ...]]] = {}
+        self.repeated_props: dict[Field, set[set[Field, ...]]] = {}
+        self.extruded_props: dict[Field, set[set[Field, ...]]] = {}
 
         for prop in self.format_properties:
             match prop:
@@ -76,6 +76,18 @@ class FDStats(NumericStats):
                     self._add_property(self.repeated_props, prop)
                 case Extruded():
                     self._add_property(self.extruded_props, prop)
+
+    def chase(self, props):
+        old_props = props
+        new_props = deepcopy(props)
+        while old_props != new_props
+            for (c, hs) in old_props:
+                for h in hs:
+                    for h_head in h:
+                        h_tail = h.setminus(h_head)
+                        for g in old_props[h_head]:
+                            new_props[c].add(h_tail + g)
+
 
     def _fields_for_dims(self, dims: tuple[int, ...]) -> tuple[Field, ...]:
         try:
