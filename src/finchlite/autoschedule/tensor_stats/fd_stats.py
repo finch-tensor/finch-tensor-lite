@@ -47,11 +47,62 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: FDStats) -> FDStats:
         base = super()._mapjoin_defs(op, *union_args)
-        return FDStats(base)
+        dense_props: PropertyMap = {}
+        blocked_props: PropertyMap = {}
+        repeated_props: PropertyMap = {}
+        extruded_props: PropertyMap = {}
+
+        for arg in union_args:
+            self._union_properties(dense_props, arg.dense_props)
+            self._union_properties(blocked_props, arg.blocked_props)
+            self._union_properties(repeated_props, arg.repeated_props)
+            self._union_properties(extruded_props, arg.extruded_props)
+
+        return FDStats(
+            base,
+            self._chase(dense_props),
+            blocked_props,
+            repeated_props,
+            self._chase(extruded_props),
+        )
+
+    @staticmethod
+    def _union_properties(a: PropertyMap, b: PropertyMap):
+        for conclusion, hypotheses in b.items():
+            a.setdefault(conclusion, set()).update(hypotheses)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
         base = super()._mapjoin_defs(op, *join_args)
+        dense_props: PropertyMap = {}
+        blocked_props: PropertyMap = {}
+        repeated_props: PropertyMap = {}
+        extruded_props: PropertyMap = {}
+
+        for arg in join_args:
+            self._join_properties(dense_props, arg.dense_props)
+            self._join_properties(blocked_props, arg.blocked_props)
+            self._join_properties(repeated_props, arg.repeated_props)
+            self._join_properties(extruded_props, arg.extruded_props)
+
+        return FDStats(
+            base,
+            self._chase(dense_props),
+            blocked_props,
+            repeated_props,
+            self._chase(extruded_props),
+        )
         return FDStats(base)
+
+    @staticmethod
+    def _join_properties(a: PropertyMap, b: PropertyMap):
+        out = Dict{}
+        for conclusion, a_hypotheses in tuple[a.items()]:
+            b_hypotheses = b[conclusion]
+            hs = Set()
+            for a_hypothesis in a_hypotheses:
+                for b_hypothesis in b_hypotheses:
+                    hs.add(a_hypothesis + b_hypothesis)
+            out[conclusion] = hs
 
     def aggregate(
         self,
