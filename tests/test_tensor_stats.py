@@ -20,6 +20,7 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
+    FDStats,
     FDStatsFactory,
     LPStats,
     LPStatsFactory,
@@ -34,6 +35,7 @@ from finchlite.finch_logic import (
     MapJoin,
     Table,
 )
+from finchlite.tensor.traits import Dense as DenseProperty
 
 
 def _overwrite_def(stat, base: BaseTensorStats):
@@ -82,6 +84,17 @@ def test_fd_stats_constructor_maps_unconditional_dense_properties():
 
     assert stats.dense_props == {i: {frozenset()}, j: {frozenset()}}
     assert stats.repeated_props == {}
+
+
+def test_fd_stats_chase_ignores_circular_dependencies():
+    i, j = Field("i"), Field("j")
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    stats = FDStats(base, [DenseProperty((0,), (1,)), DenseProperty((1,), (0,))])
+
+    assert stats.dense_props == {
+        i: {frozenset({j})},
+        j: {frozenset({i})},
+    }
 
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────

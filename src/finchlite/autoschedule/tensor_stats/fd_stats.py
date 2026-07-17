@@ -89,12 +89,14 @@ class FDStats(NumericStats):
         changed = True
         while changed:
             changed = False
-            for hypotheses in tuple(props.values()):
+            for conclusion, hypotheses in tuple(props.items()):
                 for hypothesis in tuple(hypotheses):
                     for head in hypothesis:
                         tail = hypothesis - {head}
                         for replacement in tuple(props.get(head, ())):
                             chased = tail | replacement
+                            if conclusion in chased:
+                                continue
                             if chased not in hypotheses:
                                 hypotheses.add(chased)
                                 changed = True
