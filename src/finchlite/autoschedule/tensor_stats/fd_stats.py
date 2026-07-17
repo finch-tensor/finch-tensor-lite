@@ -78,8 +78,8 @@ class FDStats(NumericStats):
                     self._add_property(self.extruded_props, prop)
 
         self.dense_props = self.chase(self.dense_props)
-        self.blocked_props = self.chase(self.blocked_props)
-        self.repeated_props = self.chase(self.repeated_props)
+        self.blocked_props = self.blocked_props
+        self.repeated_props = self.repeated_props
         self.extruded_props = self.chase(self.extruded_props)
 
     def chase(
