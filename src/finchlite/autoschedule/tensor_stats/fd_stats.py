@@ -113,6 +113,17 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             out[conclusion] = hypotheses
         return out
 
+    @staticmethod
+    def _drop_property_indices(
+        props: PropertyMap,
+        dropped_indices: frozenset[Field],
+    ) -> PropertyMap:
+        return {
+            conclusion: {hypothesis - dropped_indices for hypothesis in hypotheses}
+            for conclusion, hypotheses in props.items()
+            if conclusion not in dropped_indices
+        }
+
     def aggregate(
         self,
         op: FinchOperator,
@@ -121,7 +132,14 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         stats: FDStats,
     ) -> FDStats:
         base = self.aggregate_def(op, init, reduce_indices, stats)
-        return FDStats(base)
+        dropped_indices = frozenset(reduce_indices)
+        return FDStats(
+            base,
+            self._drop_property_indices(stats.dense_props, dropped_indices),
+            self._drop_property_indices(stats.blocked_props, dropped_indices),
+            self._drop_property_indices(stats.repeated_props, dropped_indices),
+            self._drop_property_indices(stats.extruded_props, dropped_indices),
+        )
 
     def relabel(
         self, stats: FDStats, relabel_indices: tuple[Field, ...]

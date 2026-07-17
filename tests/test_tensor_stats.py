@@ -106,6 +106,17 @@ def test_fd_stats_mapjoin_union_preserves_property_maps():
     }
 
 
+def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
+    i, j = Field("i"), Field("j")
+    factory = FDStatsFactory()
+    stats = factory(fl.FillTensor((2, 3), 0), (i, j))
+
+    stats = factory.aggregate(ffuncs.add, None, (i,), stats)
+
+    assert stats.dense_props == {j: {frozenset()}}
+    assert stats.repeated_props == {j: {frozenset()}}
+
+
 def test_fd_stats_chase_ignores_circular_dependencies():
     i, j = Field("i"), Field("j")
 
