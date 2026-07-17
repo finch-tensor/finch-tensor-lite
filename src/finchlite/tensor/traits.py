@@ -6,7 +6,6 @@ from typing import Any
 
 from finchlite.algebra import Tensor
 
-
 class AccessCapability:
     pass
 
@@ -19,30 +18,35 @@ class Random(AccessCapability):
     pass
 
 
-class DataProperty:
+class FormatProperty:
     pass
 
 
-class Dense(DataProperty):
+class Dense(FormatProperty):
     pass
 
 
-class Sparse(DataProperty):
+class Sparse(FormatProperty):
     pass
 
 
-class Blocked(DataProperty):
+class Blocked(FormatProperty):
     pass
 
 
-class Repeated(DataProperty):
+class Repeated(FormatProperty):
     pass
 
 
-class Extruded(DataProperty):
+class Extruded(FormatProperty):
     pass
 
 
-class Hollow(DataProperty):
+class Hollow(FormatProperty):
     pass
 
+class AxiomaticTensor(Tensor, ABC):
+    @property
+    @abstractmethod
+    def format_properties(self):
+        ...
