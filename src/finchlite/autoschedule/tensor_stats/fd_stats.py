@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -12,6 +11,8 @@ from finchlite.tensor.traits import Blocked, Dense, Extruded, FormatProperty, Re
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
+PropertyMap = dict[Field, set[frozenset[Field]]]
+
 
 class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"]):
     def __init__(self):
@@ -20,7 +21,29 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> FDStats:
         base = super().__call__(tensor, fields)
         props = getattr(tensor.ftype, "level_format_properties", ())
-        return FDStats(base, props)
+        dense_props: PropertyMap = {}
+        blocked_props: PropertyMap = {}
+        repeated_props: PropertyMap = {}
+        extruded_props: PropertyMap = {}
+
+        for prop in props:
+            match prop:
+                case Dense():
+                    self._add_property(base, dense_props, prop)
+                case Blocked():
+                    self._add_property(base, blocked_props, prop)
+                case Repeated():
+                    self._add_property(base, repeated_props, prop)
+                case Extruded():
+                    self._add_property(base, extruded_props, prop)
+
+        return FDStats(
+            base,
+            self._chase(dense_props),
+            blocked_props,
+            repeated_props,
+            self._chase(extruded_props),
+        )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: FDStats) -> FDStats:
         base = super()._mapjoin_defs(op, *union_args)
@@ -44,7 +67,14 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self, stats: FDStats, relabel_indices: tuple[Field, ...]
     ) -> FDStats:
         base = self.relabel_def(stats, relabel_indices)
-        return FDStats(base, stats.format_properties)
+        relabel_map = dict(zip(stats.index_order, relabel_indices, strict=True))
+        return FDStats(
+            base,
+            self._relabel_property_map(stats.dense_props, relabel_map),
+            self._relabel_property_map(stats.blocked_props, relabel_map),
+            self._relabel_property_map(stats.repeated_props, relabel_map),
+            self._relabel_property_map(stats.extruded_props, relabel_map),
+        )
 
     def reorder(
         self, stats: FDStats, reorder_indices: tuple[Field, ...]
@@ -52,40 +82,10 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         base = self.reorder_def(stats, reorder_indices)
         return FDStats(base)
 
-
-class FDStats(NumericStats):
-    def __init__(
+    def _chase(
         self,
-        base: BaseTensorStats,
-        props: Iterable[FormatProperty] = (),
-    ):
-        super().__init__(base)
-        self.format_properties = tuple(props)
-        self.dense_props: dict[Field, set[frozenset[Field]]] = {}
-        self.blocked_props: dict[Field, set[frozenset[Field]]] = {}
-        self.repeated_props: dict[Field, set[frozenset[Field]]] = {}
-        self.extruded_props: dict[Field, set[frozenset[Field]]] = {}
-
-        for prop in self.format_properties:
-            match prop:
-                case Dense():
-                    self._add_property(self.dense_props, prop)
-                case Blocked():
-                    self._add_property(self.blocked_props, prop)
-                case Repeated():
-                    self._add_property(self.repeated_props, prop)
-                case Extruded():
-                    self._add_property(self.extruded_props, prop)
-
-        self.dense_props = self.chase(self.dense_props)
-        self.blocked_props = self.blocked_props
-        self.repeated_props = self.repeated_props
-        self.extruded_props = self.chase(self.extruded_props)
-
-    def chase(
-        self,
-        props: dict[Field, set[frozenset[Field]]],
-    ) -> dict[Field, set[frozenset[Field]]]:
+        props: PropertyMap,
+    ) -> PropertyMap:
         changed = True
         while changed:
             changed = False
@@ -102,23 +102,57 @@ class FDStats(NumericStats):
                                 changed = True
         return props
 
-    def _fields_for_dims(self, dims: tuple[int, ...]) -> tuple[Field, ...]:
+    def _fields_for_dims(
+        self,
+        base: BaseTensorStats,
+        dims: tuple[int, ...],
+    ) -> tuple[Field, ...]:
         try:
-            return tuple(self.index_order[dim] for dim in dims)
+            return tuple(base.index_order[dim] for dim in dims)
         except IndexError as exc:
             raise ValueError(
                 f"Format property dimensions {dims} do not fit tensor "
-                f"with {len(self.index_order)} dimensions."
+                f"with {len(base.index_order)} dimensions."
             ) from exc
 
     def _add_property(
         self,
-        props_by_conclusion: dict[Field, set[frozenset[Field]]],
+        base: BaseTensorStats,
+        props_by_conclusion: PropertyMap,
         prop: FormatProperty,
     ):
-        hypotheses = frozenset(self._fields_for_dims(prop.hypothesis_dims))
-        for conclusion in self._fields_for_dims(prop.conclusion_dims):
+        hypotheses = frozenset(self._fields_for_dims(base, prop.hypothesis_dims))
+        for conclusion in self._fields_for_dims(base, prop.conclusion_dims):
             props_by_conclusion.setdefault(conclusion, set()).add(hypotheses)
+
+    def _relabel_property_map(
+        self,
+        props: PropertyMap,
+        relabel_map: dict[Field, Field],
+    ) -> PropertyMap:
+        return {
+            relabel_map[conclusion]: {
+                frozenset(relabel_map[field] for field in hypothesis)
+                for hypothesis in hypotheses
+            }
+            for conclusion, hypotheses in props.items()
+        }
+
+
+class FDStats(NumericStats):
+    def __init__(
+        self,
+        base: BaseTensorStats,
+        dense_props: PropertyMap | None = None,
+        blocked_props: PropertyMap | None = None,
+        repeated_props: PropertyMap | None = None,
+        extruded_props: PropertyMap | None = None,
+    ):
+        super().__init__(base)
+        self.dense_props = dense_props or {}
+        self.blocked_props = blocked_props or {}
+        self.repeated_props = repeated_props or {}
+        self.extruded_props = extruded_props or {}
 
     def estimate_non_fill_values(self) -> float:
         total = 1.0

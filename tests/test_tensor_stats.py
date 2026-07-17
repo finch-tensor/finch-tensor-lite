@@ -20,7 +20,6 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
-    FDStats,
     FDStatsFactory,
     LPStats,
     LPStatsFactory,
@@ -60,7 +59,7 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     }
     assert stats.repeated_props == {
         i: {frozenset()},
-        j: {frozenset(), frozenset({i})},
+        j: {frozenset({i})},
     }
     assert stats.blocked_props == {}
     assert stats.extruded_props == {}
@@ -73,7 +72,7 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     }
     assert relabeled.repeated_props == {
         row: {frozenset()},
-        col: {frozenset(), frozenset({row})},
+        col: {frozenset({row})},
     }
 
 
@@ -88,8 +87,19 @@ def test_fd_stats_constructor_maps_unconditional_dense_properties():
 
 def test_fd_stats_chase_ignores_circular_dependencies():
     i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
-    stats = FDStats(base, [DenseProperty((0,), (1,)), DenseProperty((1,), (0,))])
+
+    class TensorFType:
+        level_format_properties = [
+            DenseProperty((0,), (1,)),
+            DenseProperty((1,), (0,)),
+        ]
+
+    class Tensor:
+        shape = (2, 3)
+        fill_value = 0
+        ftype = TensorFType()
+
+    stats = FDStatsFactory()(Tensor(), (i, j))
 
     assert stats.dense_props == {
         i: {frozenset({j})},
