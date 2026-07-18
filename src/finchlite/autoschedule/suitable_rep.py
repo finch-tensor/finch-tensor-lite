@@ -33,7 +33,7 @@ class SmartLogicFormatter(LogicFormatter):
         self.loader = loader
 
     @abstractmethod
-    def get_output_tns_type(
+    def get_tensor_ftype(
         self, fill_value: Any, shape_type: tuple[Any, ...], rep: Representation
     ): ...
 
@@ -71,7 +71,7 @@ class SmartLogicFormatter(LogicFormatter):
                             dim if dim is not None else np.intp
                             for dim in shape_types[lhs]
                         )
-                        tns = self.get_output_tns_type(
+                        tns = self.get_tensor_ftype(
                             fill_values[lhs], shape_type, rep
                         )
 

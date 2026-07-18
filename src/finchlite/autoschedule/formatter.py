@@ -1,5 +1,5 @@
 import logging
-from abc import abstractmethod
+from abc import ABC
 from typing import Any
 
 import numpy as np
@@ -20,7 +20,7 @@ from finchlite.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class DefaultLogicFormatter(LoopOrderedForm, LogicLoader, ABC):
+class LogicFormatter(LoopOrderedForm, LogicLoader, ABC):
     def __init__(
         self,
         loader: LogicLoader | None = None,
@@ -30,13 +30,22 @@ class DefaultLogicFormatter(LoopOrderedForm, LogicLoader, ABC):
             loader = MockLogicLoader()
         self.ctx = loader
 
-    @abstractmethod
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
+
+class DefaultLogicFormatter(LogicFormatter):
+    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.
         """
-        ...
+        fill_ftype = ftype(
+            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        )
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(fill_ftype),
+            ndim=len(shape_type),
+            dimension_type=TupleFType.from_tuple(shape_type),
+            fill_value=fill_value,
+        )
 
     def lower(
         self,
@@ -65,7 +74,7 @@ class DefaultLogicFormatter(LoopOrderedForm, LogicLoader, ABC):
                             for dim in shape_types[lhs]
                         )
 
-                        tns = self.get_output_tns_ftype(fill_values[lhs], shape_type)
+                        tns = self.get_tensor_ftype(fill_values[lhs], shape_type)
 
                         bindings[lhs] = tns
                     match rhs:
@@ -87,20 +96,9 @@ class DefaultLogicFormatter(LoopOrderedForm, LogicLoader, ABC):
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 
-class BufferizedNDArrayLogicFormatter(LogicFormatter):
-    def __init__(
-        self,
-        loader: LogicLoader | None = None,
-    ):
-        super().__init__(loader)
+class BufferizedNDArrayFormatter(DefaultLogicFormatter):
+    pass
 
-    def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
-        fill_ftype = ftype(
-            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-        )
-        return BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(fill_ftype),
-            ndim=len(shape_type),
-            dimension_type=TupleFType.from_tuple(shape_type),
-            fill_value=fill_value,
-        )
+
+class BufferizedNDArrayLogicFormatter(BufferizedNDArrayFormatter):
+    pass

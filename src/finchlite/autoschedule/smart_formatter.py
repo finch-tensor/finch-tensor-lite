@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections import OrderedDict
 from typing import Any
 
@@ -9,7 +9,7 @@ import numpy as np
 
 from finchlite import finch_logic as lgc
 from finchlite.algebra import FType, TensorFType, ftype
-from finchlite.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
+from finchlite.finch_logic import LogicLoader, StatsFactory
 from finchlite.finch_logic.tensor_stats import TensorStats
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
@@ -19,12 +19,12 @@ from .tensor_stats import StatsInterpreter
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class SmartFormatter(LoopOrderedForm, LogicLoader, ABC):
+class SmartFormatter(LogicFormatter):
     def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader or MockLogicLoader())
+        super().__init__(loader)
 
     @abstractmethod
-    def get_output_tns_type(
+    def get_tensor_ftype(
         self,
         fill_value: Any,
         shape_type: tuple[FType, ...],
@@ -63,7 +63,7 @@ class SmartFormatter(LoopOrderedForm, LogicLoader, ABC):
                             ftype(dim) if dim is not None else ftype(np.intp)
                             for dim in shape_types[lhs]
                         )
-                        bindings[lhs] = self.get_output_tns_type(
+                        bindings[lhs] = self.get_tensor_ftype(
                             fill_values[lhs],
                             shape_type,
                             rhs_stats,
@@ -86,3 +86,26 @@ class SmartFormatter(LoopOrderedForm, LogicLoader, ABC):
         logger.debug(prgm)
 
         return self.ctx(prgm, bindings, stats_bindings, stats_factory)
+
+class FDFormatter(SmartFormatter):
+    def get_tensor_ftype(
+        self,
+        fill_value: Any,
+        shape_type: tuple[FType, ...],
+        stats: TensorStats,
+    ) -> TensorFType:
+        assert isinstance(stats, FDStats)
+        lvl = ElementLevel(fill_value)
+        fields = stats.fields
+        while fields:
+            c = fields.poplast()
+            dense = False
+            for h in stats.dense_properties[c]:
+                if h.subset(set(fields)):
+                    dense = True
+                    break
+            if dense:
+                lvl = DenseLevel(lvl)
+            else:
+                lvl = SparseHashLevel(lvl)
+        return FiberTensor(lvl)

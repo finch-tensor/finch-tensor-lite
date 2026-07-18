@@ -124,13 +124,13 @@ def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
     assert stats.repeated_props == {j: {frozenset()}}
 
 
-def test_smart_formatter_passes_propagated_stats_to_output_type():
+def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
     class RecordingSmartFormatter(SmartFormatter):
         def __init__(self, loader):
             super().__init__(loader)
             self.output_stats = []
 
-        def get_output_tns_type(self, fill_value, shape_type, stats) -> TensorFType:
+        def get_tensor_ftype(self, fill_value, shape_type, stats) -> TensorFType:
             self.output_stats.append(stats)
             fill_ftype = ftype(
                 fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
