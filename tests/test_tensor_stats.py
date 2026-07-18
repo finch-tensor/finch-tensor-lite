@@ -9,7 +9,7 @@ import finchlite as fl
 from finchlite import ffuncs
 from finchlite.algebra import TensorFType, TupleFType, ftype
 from finchlite.autoschedule.capture import LogicCapture
-from finchlite.autoschedule.smart_formatter import SmartFormatter
+from finchlite.autoschedule.smart_formatter import FDFormatter, SmartFormatter
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.autoschedule.tensor_stats import (
     DC,
@@ -23,6 +23,7 @@ from finchlite.autoschedule.tensor_stats import (
     DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
+    FDStats,
     FDStatsFactory,
     LPStats,
     LPStatsFactory,
@@ -169,6 +170,53 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
         j: {frozenset(), frozenset({i})},
     }
     assert capture.last_stats[B] is formatter.output_stats[0]
+
+
+def test_fd_formatter_uses_dense_levels_for_dense_properties():
+    i, j = Field("i"), Field("j")
+    A, B = Alias("A"), Alias("B")
+    tensor = fl.FillTensor((2, 3), 0)
+    stats_factory = FDStatsFactory()
+    stats = {A: stats_factory(tensor, (i, j))}
+    capture = LogicCapture()
+    formatter = FDFormatter(capture)
+    prgm = Plan(
+        (
+            Query(
+                B,
+                MapJoin(
+                    Literal(ffuncs.add),
+                    (Table(A, (i, j)), Table(A, (i, j))),
+                ),
+            ),
+            Produces((B,)),
+        )
+    )
+
+    formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
+
+    ftype = capture.last_bindings[B]
+    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+
+
+def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
+    i, j = Field("i"), Field("j")
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    stats = FDStats(base, dense_props={i: {frozenset()}})
+
+    ftype = FDFormatter().get_tensor_ftype(
+        0,
+        (fl.ftype(np.intp), fl.ftype(np.intp)),
+        stats,
+    )
+
+    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
 
 
 def test_fd_stats_chase_ignores_circular_dependencies():

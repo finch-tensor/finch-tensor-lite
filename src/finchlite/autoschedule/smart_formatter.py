@@ -11,10 +11,11 @@ from finchlite import finch_logic as lgc
 from finchlite.algebra import FType, TensorFType, ftype
 from finchlite.finch_logic import LogicLoader, StatsFactory
 from finchlite.finch_logic.tensor_stats import TensorStats
+from finchlite.tensor import dense, element, fiber_tensor, sparse_hash
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
-from .tensor_stats import StatsInterpreter
+from .tensor_stats import FDStats, StatsInterpreter
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -94,18 +95,25 @@ class FDFormatter(SmartFormatter):
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> TensorFType:
-        assert isinstance(stats, FDStats)
-        lvl = ElementLevel(fill_value)
-        fields = stats.fields
-        while fields:
-            c = fields.poplast()
-            dense = False
-            for h in stats.dense_properties[c]:
-                if h.subset(set(fields)):
-                    dense = True
-                    break
-            if dense:
-                lvl = DenseLevel(lvl)
+        if not isinstance(stats, FDStats):
+            raise TypeError("FDFormatter requires FDStats.")
+        if len(shape_type) != len(stats.index_order):
+            raise ValueError(
+                f"Got {len(shape_type)} shape dimensions for "
+                f"{len(stats.index_order)} stats dimensions."
+            )
+
+        lvl = element(fill_value, ftype(fill_value))
+        for dim in reversed(range(len(stats.index_order))):
+            field = stats.index_order[dim]
+            outer_fields = frozenset(stats.index_order[:dim])
+            is_dense = any(
+                hypothesis.issubset(outer_fields)
+                for hypothesis in stats.dense_props.get(field, ())
+            )
+            if is_dense:
+                lvl = dense(lvl, shape_type[dim])
             else:
-                lvl = SparseHashLevel(lvl)
-        return FiberTensor(lvl)
+                lvl = sparse_hash(lvl, shape_type[dim])
+
+        return fiber_tensor(lvl)

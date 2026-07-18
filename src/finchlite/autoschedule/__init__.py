@@ -30,7 +30,7 @@ from .default_schedulers import (
     with_default_scheduler,
 )
 from .executor import LogicExecutor
-from .smart_formatter import SmartFormatter
+from .smart_formatter import FDFormatter, SmartFormatter
 from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
@@ -51,6 +51,7 @@ __all__ = [
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
     "DefaultLoopOrderer",
+    "FDFormatter",
     "Field",
     "Literal",
     "LogicCapture",
