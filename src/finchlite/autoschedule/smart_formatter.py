@@ -5,10 +5,8 @@ from abc import abstractmethod
 from collections import OrderedDict
 from typing import Any
 
-import numpy as np
-
 from finchlite import finch_logic as lgc
-from finchlite.algebra import FType, TensorFType, ftype
+from finchlite.algebra import FType, TensorFType, ftype, ftypes
 from finchlite.finch_logic import LogicLoader, StatsFactory
 from finchlite.finch_logic.tensor_stats import TensorStats
 from finchlite.tensor import dense, element, fiber_tensor, sparse_hash
@@ -61,7 +59,7 @@ class SmartFormatter(LogicFormatter):
 
                     if lhs not in bindings:
                         shape_type = tuple(
-                            ftype(dim) if dim is not None else ftype(np.intp)
+                            ftype(dim) if dim is not None else ftypes.intp
                             for dim in shape_types[lhs]
                         )
                         bindings[lhs] = self.get_tensor_ftype(
@@ -88,6 +86,7 @@ class SmartFormatter(LogicFormatter):
 
         return self.ctx(prgm, bindings, stats_bindings, stats_factory)
 
+
 class FDFormatter(SmartFormatter):
     def get_tensor_ftype(
         self,
@@ -103,7 +102,8 @@ class FDFormatter(SmartFormatter):
                 f"{len(stats.index_order)} stats dimensions."
             )
 
-        lvl = element(fill_value, ftype(fill_value))
+        fill_ftype = ftype(fill_value)
+        lvl = element(fill_value, fill_ftype)
         for dim in reversed(range(len(stats.index_order))):
             field = stats.index_order[dim]
             outer_fields = frozenset(stats.index_order[:dim])
