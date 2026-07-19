@@ -351,7 +351,7 @@ def mlir_function_name(op, arg: FType) -> str:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
-def mlir_nary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+def mlir_nary_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> str:
     t = mlir_type(args[0].result_type)
     acc = ctx(args[0])
     for a in args[1:]:
@@ -362,7 +362,7 @@ def mlir_nary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
     return acc
 
 
-def mlir_binary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+def mlir_binary_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> str:
     a, b = args
     av, bv = ctx(a), ctx(b)
     res = ctx.new_ssa()
@@ -370,7 +370,7 @@ def mlir_binary_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
     return res
 
 
-def mlir_new_function_call(mlir_name: str, ctx: Any, *args: Any) -> str:
+def mlir_new_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> str:
     name, const = mlir_name.split()
     (a,) = args
     av = ctx(a)
