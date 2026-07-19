@@ -18,7 +18,16 @@ from finchlite import (
     element,
     ftype,
 )
-from finchlite.autoschedule import with_default_scheduler
+from finchlite.autoschedule import (
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    FDFormatter,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
+    with_default_scheduler,
+)
+from finchlite.autoschedule.tensor_stats import FDStatsFactory
 
 DTYPE = np.int64
 ROWS = np.intp(3)
@@ -49,6 +58,15 @@ def _compute_sparse_axis_sum(level):
 
     with with_default_scheduler(COMPILE_JULIA):
         return fl.compute(expr)
+
+
+def _compile_julia_fd(formatter):
+    return LogicNormalizer(
+        LogicExecutor(
+            DefaultLogicOptimizer(DefaultLoopOrderer(formatter)),
+            stats_factory=FDStatsFactory(),
+        )
+    )
 
 
 def test_compile_julia_sums_sparse_list_level():
@@ -125,3 +143,35 @@ def test_compile_julia_sums_sparse_hash_level():
     result = _compute_sparse_axis_sum(level)
 
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
+
+
+def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
+    _requires_julia_backend()
+    from finchlite.compile_jl.compiler import FinchJLCompiler
+
+    class RecordingFDFormatter(FDFormatter):
+        def __init__(self, loader):
+            super().__init__(loader)
+            self.output_ftypes = []
+
+        def get_tensor_ftype(self, fill_value, shape_type, stats):
+            tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats)
+            self.output_ftypes.append(tensor_ftype)
+            return tensor_ftype
+
+    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    scheduler = _compile_julia_fd(formatter)
+    data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
+    arg = fl.asarray(data)
+    expr = fl.lazy(arg) + fl.lazy(arg)
+
+    with with_default_scheduler(scheduler):
+        result = fl.compute(expr)
+
+    np.testing.assert_array_equal(result.to_numpy(), data + data)
+    assert formatter.output_ftypes
+    output_ftype = formatter.output_ftypes[-1]
+    assert isinstance(output_ftype, fl.FiberTensorFType)
+    assert isinstance(output_ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(output_ftype.lvl_t.lvl_t, fl.DenseLevelFType)
+    assert isinstance(output_ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)

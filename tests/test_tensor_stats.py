@@ -201,6 +201,9 @@ def test_fd_formatter_uses_dense_levels_for_dense_properties():
     assert isinstance(ftype.lvl_t.lvl_t, fl.DenseLevelFType)
     assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
 
+    constructed = ftype.construct((2, 3))
+    np.testing.assert_array_equal(constructed.to_numpy(), np.zeros((2, 3)))
+
 
 def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     i, j = Field("i"), Field("j")

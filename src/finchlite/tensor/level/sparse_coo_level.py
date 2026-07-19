@@ -108,17 +108,23 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n)
 
-    def construct(self, shape: tuple[Any, ...], **kwargs) -> "SparseCOOLevel":
-        if kwargs:
-            raise TypeError("SparseCOOLevelFType.construct does not accept kwargs")
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseCOOLevel":
         if len(shape) < self.coo_ndim:
             raise ValueError(
                 "SparseCOOLevelFType shape must include all COO dimensions"
             )
         lvl_shape = shape[: -self.coo_ndim]
         coo_shape = shape[-self.coo_ndim :]
-        lvl = self.lvl_t.construct(shape=lvl_shape)
-        return SparseCOOLevel(lvl, self.coo_shape_type(coo_shape))
+        lvl = self.lvl_t.construct(shape=lvl_shape, pos=0)
+        tbl = tuple(
+            buffer_type(0) for buffer_type in self.tbl_tuple_type.struct_fieldtypes
+        )
+        return SparseCOOLevel(
+            lvl,
+            self.coo_shape_type(coo_shape),
+            self.ptr_type(int(pos) + 1),
+            tbl,
+        )
 
     def from_numpy(self, shape, val):
         raise NotImplementedError("SparseCOOLevelFType has no from_numpy yet.")
@@ -197,10 +203,10 @@ class SparseCOOLevel(Level):
             raise ValueError("SparseCOOLevel requires at least one COO dimension")
         dimension_type = ftype(self.coo_shape[0])
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
+            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.tbl is None:
             self.tbl = tuple(
-                self.lvl.buffer_factory(dimension_type)(len=0) for _ in self.coo_shape
+                self.lvl.buffer_factory(dimension_type)(0) for _ in self.coo_shape
             )
         elif not isinstance(self.tbl, tuple):
             raise TypeError("SparseCOOLevel tbl must be a tuple")

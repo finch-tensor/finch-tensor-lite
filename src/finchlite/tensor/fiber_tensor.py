@@ -134,7 +134,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def construct(self, shape, **kwargs):
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "Level":
         """
         Construct a level instance with the given shape.
         """
@@ -332,12 +332,12 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", bool_),
         ]
 
-    def construct(self, shape: tuple[int, ...]):
+    def construct(self, shape: tuple[int, ...]) -> FiberTensor:
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
         return FiberTensor(
-            self.lvl_t.construct(shape=shape),
+            self.lvl_t.construct(shape=shape, pos=1),
             self.position_type(0),
             _device=self.device,
         )
