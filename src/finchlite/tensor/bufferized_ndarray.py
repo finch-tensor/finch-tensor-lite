@@ -354,7 +354,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     @property
     def level_format_properties(self) -> list[FormatProperty]:
-        return [Dense((), (n,)) for n in range(self.ndim)]
+        return [Dense(tuple(range(n)), (n,)) for n in range(self.ndim)]
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
@@ -579,7 +579,7 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
 
     @property
     def level_format_properties(self) -> list[FormatProperty]:
-        return [Dense((), (n,)) for n in range(self.ndim)]
+        return [Dense(tuple(range(n)), (n,)) for n in range(self.ndim)]
 
     def lower_dim(self, ctx, obj, r):
         return asm.GetAttr(

@@ -108,7 +108,7 @@ class FDFormatter(SmartFormatter):
             field = stats.index_order[dim]
             outer_fields = frozenset(stats.index_order[:dim])
             is_dense = any(
-                hypothesis.issubset(outer_fields)
+                outer_fields.issubset(hypothesis)
                 for hypothesis in stats.dense_props.get(field, ())
             )
             if is_dense:

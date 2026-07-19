@@ -84,12 +84,15 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     }
 
 
-def test_fd_stats_constructor_maps_unconditional_dense_properties():
+def test_fd_stats_constructor_maps_hierarchical_array_dense_properties():
     i, j = Field("i"), Field("j")
     tensor = fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
     stats = FDStatsFactory()(tensor, (i, j))
 
-    assert stats.dense_props == {i: {frozenset()}, j: {frozenset()}}
+    assert stats.dense_props == {
+        i: {frozenset()},
+        j: {frozenset(), frozenset({i})},
+    }
     assert stats.repeated_props == {}
 
 
@@ -220,6 +223,94 @@ def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
     assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
     assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+
+
+def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
+    i, j = Field("i"), Field("j")
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    stats = FDStats(
+        base,
+        dense_props={
+            i: {frozenset()},
+            j: {frozenset()},
+        },
+    )
+
+    ftype = FDFormatter().get_tensor_ftype(
+        0,
+        (fl.ftype(np.intp), fl.ftype(np.intp)),
+        stats,
+    )
+
+    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+
+
+def _format_stats(levels, shape, fields):
+    lvl = fl.element(0, fl.int64, fl.intp, fl.NumpyBufferFType)
+    for level in reversed(levels):
+        match level:
+            case "dense":
+                lvl = fl.dense(lvl, fl.intp)
+            case "sparse":
+                lvl = fl.sparse_list(lvl, fl.intp)
+            case _:
+                raise ValueError(f"Unknown test level: {level}")
+    return FDStatsFactory()(fl.fiber_tensor(lvl).construct(shape), fields)
+
+
+def _fd_output_pattern(stats):
+    ftype = FDFormatter().get_tensor_ftype(
+        stats.fill_value,
+        tuple(fl.intp for _ in stats.index_order),
+        stats,
+    )
+    lvl = ftype.lvl_t
+    pattern = []
+    while not isinstance(lvl, fl.ElementLevelFType):
+        match lvl:
+            case fl.DenseLevelFType():
+                pattern.append("dense")
+            case fl.SparseHashLevelFType():
+                pattern.append("sparse")
+            case _:
+                raise AssertionError(f"Unexpected FD output level: {lvl}")
+        lvl = lvl.lvl_t
+    return tuple(pattern)
+
+
+def test_fd_formatter_csr_dcsr_format_algebra():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = FDStatsFactory()
+
+    csr_ij = _format_stats(("dense", "sparse"), (2, 3), (i, j))
+    csr_jk = _format_stats(("dense", "sparse"), (3, 4), (j, k))
+    dcsr_ij = _format_stats(("sparse", "sparse"), (2, 3), (i, j))
+    dcsr_jk = _format_stats(("sparse", "sparse"), (3, 4), (j, k))
+
+    csr_plus_csr = factory.mapjoin(ffuncs.add, csr_ij, csr_ij)
+    assert _fd_output_pattern(csr_plus_csr) == ("dense", "sparse")
+
+    csr_times_dcsr = factory.mapjoin(ffuncs.mul, csr_ij, dcsr_ij)
+    assert _fd_output_pattern(csr_times_dcsr) == ("sparse", "sparse")
+
+    dcsr_matmul_dcsr = factory.aggregate(
+        ffuncs.add,
+        0,
+        (j,),
+        factory.mapjoin(ffuncs.mul, dcsr_ij, dcsr_jk),
+    )
+    assert _fd_output_pattern(dcsr_matmul_dcsr) == ("sparse", "sparse")
+
+    csr_matmul_csr = factory.aggregate(
+        ffuncs.add,
+        0,
+        (j,),
+        factory.mapjoin(ffuncs.mul, csr_ij, csr_jk),
+    )
+    assert _fd_output_pattern(csr_matmul_csr) == ("sparse", "sparse")
 
 
 def test_fd_stats_chase_ignores_circular_dependencies():

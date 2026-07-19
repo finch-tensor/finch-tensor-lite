@@ -268,7 +268,7 @@ def test_bufferized_ndarray_level_format_properties():
 
     assert tensor.ftype.level_format_properties == [
         DenseProperty((), (0,)),
-        DenseProperty((), (1,)),
+        DenseProperty((0,), (1,)),
     ]
 
 
