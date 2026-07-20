@@ -31,21 +31,10 @@ class LogicFormatter(LoopOrderedForm, LogicLoader, ABC):
         self.ctx = loader
 
 
-class DefaultLogicFormatter(LogicFormatter):
+class MonoLogicFormatter(LogicFormatter):
+    @abstractmethod
     def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
-        """
-        Return the FType of the output tensor produced within the
-        autoscheduler.
-        """
-        fill_ftype = ftype(
-            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-        )
-        return BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(fill_ftype),
-            ndim=len(shape_type),
-            dimension_type=TupleFType.from_tuple(shape_type),
-            fill_value=fill_value,
-        )
+    ...
 
     def lower(
         self,
@@ -96,9 +85,21 @@ class DefaultLogicFormatter(LogicFormatter):
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 
-class BufferizedNDArrayFormatter(DefaultLogicFormatter):
-    pass
+class BufferizedNDArrayFormatter(MonoLogicFormatter):
+    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
+        """
+        Return the FType of the output tensor produced within the
+        autoscheduler.
+        """
+        fill_ftype = ftype(
+            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        )
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(fill_ftype),
+            ndim=len(shape_type),
+            dimension_type=TupleFType.from_tuple(shape_type),
+            fill_value=fill_value,
+        )
 
-
-class BufferizedNDArrayLogicFormatter(BufferizedNDArrayFormatter):
+class DefaultLogicFormatter(BufferizedNDArrayFormatter):
     pass
