@@ -35,12 +35,32 @@ def _as_julia_scalar(val):
     return val
 
 
+def _tuple_buffer_to_jl(buffer: NumpyBuffer, *, offset: int = 0):
+    tuple_ftype = buffer.ftype.element_type
+    tuple_type = jl.Tuple[
+        tuple(
+            jl_dtypes.to_jl_type(field_type)
+            for field_type in tuple_ftype.struct_fieldtypes
+        )
+    ]
+    data = [
+        tuple(
+            _as_julia_scalar(field_type(row[field_name] + offset))
+            for field_name, field_type in zip(
+                tuple_ftype.struct_fieldnames,
+                tuple_ftype.struct_fieldtypes,
+                strict=True,
+            )
+        )
+        for row in buffer.arr
+    ]
+    return jc.convert(jl.Vector[tuple_type], data)
+
+
 def _buffer_to_jl(buffer: Buffer):
     if isinstance(buffer, NumpyBuffer):
         if isinstance(buffer.ftype.element_type, TupleFType):
-            data = jl.PythonCall.PyArray(jl.PythonCall.Py(buffer.arr))
-            tuple_type = jl.Tuple[jl.fieldtypes(jl.eltype(data))]
-            return jl.reinterpret(tuple_type, data)
+            return _tuple_buffer_to_jl(buffer)
         return jl.Vector(buffer.arr)
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
@@ -118,8 +138,8 @@ def level_to_jl(level: Level):
                 int(subtables),
                 _plus_one_buffer_to_jl(cast(Buffer, ptr)),
                 _buffer_to_jl(cast(Buffer, tbl_ctrl)),
-                _plus_one_buffer_to_jl(cast(Buffer, tbl)),
-                _plus_one_buffer_to_jl(cast(Buffer, pool)),
+                _tuple_buffer_to_jl(cast(NumpyBuffer, tbl), offset=1),
+                _buffer_to_jl(cast(Buffer, pool)),
                 _plus_one_buffer_to_jl(cast(Buffer, perm)),
             )
         case _:

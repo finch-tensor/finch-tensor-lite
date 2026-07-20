@@ -52,7 +52,14 @@ def _jl_dtype_to_fl() -> dict[Any, FType]:
 
 @lru_cache
 def _fl_dtype_to_jl() -> dict[FType, Any]:
-    return {v: k for k, v in _jl_dtype_to_fl().items()}
+    jl = get_jl()
+    return {
+        **{v: k for k, v in _jl_dtype_to_fl().items()},
+        fl.bool_: jl.Bool,
+        fl.int_: jl.Int,
+        fl.float_: jl.Float64,
+        fl.complex_: jl.ComplexF64,
+    }
 
 
 def to_fl_dtype(x) -> FType:
