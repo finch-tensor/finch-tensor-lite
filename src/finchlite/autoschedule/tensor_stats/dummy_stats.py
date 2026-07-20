@@ -9,7 +9,8 @@ from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
 class DummyStatsFactory(
-    BaseTensorStatsFactory["DummyStats"], StatsFactory["DummyStats"]
+    BaseTensorStatsFactory["DummyStats"],
+    StatsFactory["DummyStats"],
 ):
     def __init__(self):
         super().__init__(DummyStats)

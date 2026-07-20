@@ -12,7 +12,8 @@ from .tensor_stats import BaseTensorStatsFactory
 
 
 class DenseStatsFactory(
-    BaseTensorStatsFactory["DenseStats"], StatsFactory["DenseStats"]
+    BaseTensorStatsFactory["DenseStats"],
+    StatsFactory["DenseStats"],
 ):
     def __init__(self):
         super().__init__(DenseStats)

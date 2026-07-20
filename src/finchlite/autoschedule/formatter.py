@@ -1,5 +1,5 @@
 import logging
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
@@ -33,8 +33,7 @@ class LogicFormatter(LoopOrderedForm, LogicLoader, ABC):
 
 class MonoLogicFormatter(LogicFormatter):
     @abstractmethod
-    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
-    ...
+    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]): ...
 
     def lower(
         self,
@@ -100,6 +99,7 @@ class BufferizedNDArrayFormatter(MonoLogicFormatter):
             dimension_type=TupleFType.from_tuple(shape_type),
             fill_value=fill_value,
         )
+
 
 class DefaultLogicFormatter(BufferizedNDArrayFormatter):
     pass

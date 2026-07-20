@@ -1,4 +1,3 @@
-from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
