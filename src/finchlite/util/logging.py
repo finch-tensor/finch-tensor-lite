@@ -58,6 +58,7 @@ LOG_ASSEMBLY = _make_dict("root.assembly")
 LOG_GALLEY = _make_dict("root.galley")
 LOG_BACKEND_C = _make_dict("root.codegen.c-backend")
 LOG_BACKEND_NUMBA = _make_dict("root.codegen.numba-backend")
+LOG_BACKEND_MLIR = _make_dict("root.codegen.mlir-backend")
 
 FORMAT = "\x1b[7;30;42m%(asctime)s [%(compilation_stage)s]:\x1b[0m\n\n%(message)s"
 

@@ -18,6 +18,7 @@ from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk
 from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
+    COMPILE_MLIR,
     COMPILE_NUMBA,
     COMPILE_NUMBA_GALLEY,
     INTERPRET_ASSEMBLY,
@@ -36,6 +37,7 @@ from .normalize import LogicNormalizer, normalize_names
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
+    "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "COMPILE_NUMBA_GALLEY",
     "INTERPRET_ASSEMBLY",
