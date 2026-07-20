@@ -48,7 +48,13 @@ module-name = "finchlite"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64", "linux-ppc64le", "osx-arm64", "win-64"]
+platforms = [
+    { name = "linux-amd64", platform = "linux-64", glibc = "2.34" },
+    { name = "linux-arm64", platform = "linux-aarch64", glibc = "2.34" },
+    { name = "linux-ppc64", platform = "linux-ppc64le", glibc = "2.34" },
+    { name = "macos-arm64", platform = "osx-arm64", macos = "15.0" },
+    { name = "win-amd64", platform = "win-64" },
+]
 preview = ["pixi-build"]
 requires-pixi = ">=0.71.0"
 
@@ -66,9 +72,11 @@ ignore-pypi-mapping = false
 [tool.pixi.environments]
 test = { features = ["test"], solve-group = "default" }
 test-c = { features = ["test", "c"], solve-group = "default" }
+test-mlir = { features = ["test", "mlir"], solve-group = "mlir" }
 mindeps = { features = ["test", "mindeps"], solve-group = "mindeps" }
 benchmark = { features = ["test", "benchmark"], solve-group = "default" }
 c = { features = ["c"], solve-group = "default" }
+mlir = { features = ["mlir"], solve-group = "mlir" }
 c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
@@ -87,7 +95,7 @@ finch-tensor-lite.path = "."
 compile = "python -c 'import finchlite'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend'"
+cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
 depends-on = ["compile"]
 default-environment = "test"
 
@@ -95,6 +103,11 @@ default-environment = "test"
 cmd = "python -m pytest -m c_backend"
 depends-on = ["compile"]
 default-environment = "test-c"
+
+[tool.pixi.feature.test.tasks.test-mlir]
+cmd = "python -m pytest -m mlir_backend"
+depends-on = ["compile"]
+default-environment = "test-mlir"
 
 [tool.pixi.feature.julia.tasks.test-julia]
 cmd = "python -m pytest tests/test_julia_backend.py"
@@ -114,13 +127,13 @@ default-environment = "test"
 python = "3.11.*"
 
 [tool.pixi.feature.benchmark]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
 
 [tool.pixi.feature.benchmark.dependencies]
 pytest-codspeed = "*"
 
 [tool.pixi.feature.julia]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
 
 [tool.pixi.feature.c.dependencies]
 c-compiler = "*"
@@ -136,6 +149,20 @@ clang = "*"
 
 [tool.pixi.feature.c-clang.activation.env]
 CC = "clang"
+
+[tool.pixi.feature.mlir]
+platforms = ["linux-amd64", "linux-arm64", "macos-arm64", "win-amd64"]
+
+[tool.pixi.feature.mlir.dependencies]
+pyyaml = "<=6.0.1"
+
+# NOTE: https://github.com/llvm/eudsl/issues/480
+[tool.pixi.feature.mlir.pypi-options]
+index-url = "https://pypi.org/simple"
+find-links = [{ url = "https://llvm.github.io/eudsl" }]
+
+[tool.pixi.feature.mlir.pypi-dependencies]
+mlir-python-bindings = "*"
 
 [tool.pixi.feature.pre-commit.dependencies]
 pre-commit = "*"
