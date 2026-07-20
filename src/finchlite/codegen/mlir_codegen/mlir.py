@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ctypes
 import logging
 from abc import ABC, abstractmethod
@@ -351,7 +353,7 @@ def mlir_function_name(op, arg: FType) -> str:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
-def mlir_nary_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> str:
+def mlir_nary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
     t = mlir_type(args[0].result_type)
     acc = ctx(args[0])
     for a in args[1:]:
@@ -362,7 +364,7 @@ def mlir_nary_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> s
     return acc
 
 
-def mlir_binary_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> str:
+def mlir_binary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
     a, b = args
     av, bv = ctx(a), ctx(b)
     res = ctx.new_ssa()
@@ -370,7 +372,7 @@ def mlir_binary_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) ->
     return res
 
 
-def mlir_new_function_call(mlir_name: str, ctx: "MLIRContext", *args: Any) -> str:
+def mlir_new_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
     name, const = mlir_name.split()
     (a,) = args
     av = ctx(a)
@@ -679,21 +681,21 @@ class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
     """
 
     @abstractmethod
-    def mlir_length(self, ctx: "MLIRContext", buffer):
+    def mlir_length(self, ctx: MLIRContext, buffer):
         """
         Return MLIR code which loads a named buffer at the given index.
         """
         ...
 
     @abstractmethod
-    def mlir_load(self, ctx: "MLIRContext", buffer, index):
+    def mlir_load(self, ctx: MLIRContext, buffer, index):
         """
         Return MLIR code which loads a named buffer at the given index.
         """
         ...
 
     @abstractmethod
-    def mlir_store(self, ctx: "MLIRContext", buffer, index, value=None):
+    def mlir_store(self, ctx: MLIRContext, buffer, index, value=None):
         """
         Return MLIR code which stores a named buffer to the given index.
         """
@@ -775,7 +777,7 @@ class MLIRContext(Context):
     def emit_global(self):
         return f"module {{\n{self.emit()}\n}}\n"
 
-    def block(self) -> "MLIRContext":
+    def block(self) -> MLIRContext:
         blk = super().block()
         blk.tab = self.tab
         blk.indent = self.indent
