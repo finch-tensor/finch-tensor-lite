@@ -13,9 +13,7 @@ from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
-class VPStatsFactory(
-    BaseTensorStatsFactory["VPStats"], StatsFactory["VPStats"]
-):
+class VPStatsFactory(BaseTensorStatsFactory["VPStats"], StatsFactory["VPStats"]):
     def __init__(self):
         super().__init__(VPStats)
 
@@ -32,9 +30,7 @@ class VPStatsFactory(
         V = dict.fromkeys(fields, 0.0)
         for idx in fields:
             for dc in dcs:
-                if dc.from_indices == frozenset() and dc.to_indices == frozenset(
-                    {idx}
-                ):
+                if dc.from_indices == frozenset() and dc.to_indices == frozenset({idx}):
                     V[idx] = dc.value
 
         return VPStats(base, nnz=nnz, V=V)
@@ -168,9 +164,7 @@ class VPStatsFactory(
 
         return VPStats(base, nnz=new_nnz, V=new_V)
 
-    def relabel(
-        self, stats: VPStats, relabel_indices: tuple[Field, ...]
-    ) -> VPStats:
+    def relabel(self, stats: VPStats, relabel_indices: tuple[Field, ...]) -> VPStats:
         if not isinstance(stats, VPStats):
             raise TypeError("VPStats expected for relabel")
         base = self.relabel_def(stats, relabel_indices)
@@ -179,9 +173,7 @@ class VPStatsFactory(
             V[new] = stats.V[old]
         return VPStats(base, nnz=stats.nnz, V=V)
 
-    def reorder(
-        self, stats: VPStats, reorder_indices: tuple[Field, ...]
-    ) -> VPStats:
+    def reorder(self, stats: VPStats, reorder_indices: tuple[Field, ...]) -> VPStats:
         if not isinstance(stats, VPStats):
             raise TypeError("VPStats expected for reorder")
         base = self.reorder_def(stats, reorder_indices)

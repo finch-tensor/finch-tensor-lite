@@ -63,6 +63,7 @@ from finchlite.symbolic import gensym
 
 from .lazy import LazyTensor, asarray, lazy
 
+
 def compute(arg, ctx=None):
     """
     Executes a fused operation represented by LazyTensors. This function evaluates the

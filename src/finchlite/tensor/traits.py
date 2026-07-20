@@ -9,19 +9,13 @@ from finchlite.algebra import Tensor
 class AccessCapability:
     """Marker for a way a level can be read or written."""
 
-    pass
-
 
 class Sequential(AccessCapability):
     """The level supports ordered traversal."""
 
-    pass
-
 
 class Random(AccessCapability):
     """The level supports direct access by index."""
-
-    pass
 
 
 @dataclass(frozen=True)
@@ -43,16 +37,12 @@ class Dense(FormatProperty):
     dimensions identify a non-fill slice.
     """
 
-    pass
-
 
 class Blocked(FormatProperty):
     """
     Adjacent values in the conclusion dimensions tend to occur together when the
     hypothesis dimensions are fixed.
     """
-
-    pass
 
 
 class Repeated(FormatProperty):
@@ -61,17 +51,12 @@ class Repeated(FormatProperty):
     hypothesis dimensions are fixed.
     """
 
-    pass
-
 
 class Extruded(FormatProperty):
     """The conclusion dimensions are represented by one repeated slice."""
-
-    pass
 
 
 class AxiomaticTensor(Tensor, ABC):
     @property
     @abstractmethod
-    def level_format_properties(self) -> list[FormatProperty]:
-        ...
+    def level_format_properties(self) -> list[FormatProperty]: ...

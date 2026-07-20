@@ -108,9 +108,9 @@ class FillTensorFType(TensorFType):
 
     @property
     def level_format_properties(self) -> list[FormatProperty]:
-        return [
-            Dense(tuple(range(n)), (n,)) for n in range(self.ndim)
-        ] + [Repeated(tuple(range(n)), (n,)) for n in range(self.ndim)]
+        return [Dense(tuple(range(n)), (n,)) for n in range(self.ndim)] + [
+            Repeated(tuple(range(n)), (n,)) for n in range(self.ndim)
+        ]
 
     def from_numpy(self, arr):
         raise NotImplementedError

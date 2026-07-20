@@ -9,26 +9,23 @@ import finchlite as fl
 from finchlite import ffuncs
 from finchlite.algebra import TensorFType, TupleFType, ftype
 from finchlite.autoschedule.capture import LogicCapture
-from finchlite.autoschedule.smart_formatter import FDFormatter, SmartFormatter
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
+from finchlite.autoschedule.smart_formatter import FDFormatter, SmartFormatter
 from finchlite.autoschedule.tensor_stats import (
     DC,
     BaseTensorStats,
     BaseTensorStatsFactory,
-    BlockedStats,
     BlockedStatsFactory,
-    VPStatsFactory,
     DCStats,
     DCStatsFactory,
-    DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
     FDStats,
     FDStatsFactory,
     LPStats,
     LPStatsFactory,
-    UniformStats,
     UniformStatsFactory,
+    VPStatsFactory,
 )
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
@@ -1129,9 +1126,9 @@ def test_embeddings():
     print(f"DCStats Embeddings: {dc_emb}")
 
     blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStatsFactory(
-        UniformStatsFactory(), blocks_per_dim=blocks_per_dim
-    )(arr, fields)
+    bs = BlockedStatsFactory(UniformStatsFactory(), blocks_per_dim=blocks_per_dim)(
+        arr, fields
+    )
     bs_emb = bs.get_embedding()
     print(f"BlockedStats Embeddings: {bs_emb}")
 

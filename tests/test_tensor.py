@@ -34,7 +34,11 @@ from finchlite.tensor import (
 )
 from finchlite.tensor.traits import (
     Blocked as BlockedProperty,
+)
+from finchlite.tensor.traits import (
     Dense as DenseProperty,
+)
+from finchlite.tensor.traits import (
     Repeated as RepeatedProperty,
 )
 
@@ -244,9 +248,7 @@ def test_sparse_level_construct_initializes_empty_storage():
     assert hash_level.perm.length() == 0
     assert hash_level.lvl.val.length() == 0
 
-    coo_level = finchlite.sparse_coo(elem_t, 2, finchlite.intp).construct(
-        (4, 5), pos=3
-    )
+    coo_level = finchlite.sparse_coo(elem_t, 2, finchlite.intp).construct((4, 5), pos=3)
     np.testing.assert_array_equal(coo_level.ptr.arr, np.zeros(4, dtype=np.intp))
     assert len(coo_level.tbl) == 2
     assert all(idx.length() == 0 for idx in coo_level.tbl)
@@ -256,9 +258,7 @@ def test_sparse_level_construct_initializes_empty_storage():
         (4,), pos=3
     )
     np.testing.assert_array_equal(bytemap_level.ptr.arr, np.zeros(4, dtype=np.intp))
-    np.testing.assert_array_equal(
-        bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_)
-    )
+    np.testing.assert_array_equal(bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_))
     assert bytemap_level.srt.length() == 0
     assert bytemap_level.lvl.val.length() == 12
 

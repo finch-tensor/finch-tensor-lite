@@ -160,7 +160,6 @@ class LevelFType(FType, ABC):
         ...
 
 
-
 class Level(FTyped, ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in

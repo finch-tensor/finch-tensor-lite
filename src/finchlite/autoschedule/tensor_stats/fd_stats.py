@@ -85,12 +85,8 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         for arg in join_args[1:]:
             dense_props = self._join_properties(dense_props, arg.dense_props)
             blocked_props = self._join_properties(blocked_props, arg.blocked_props)
-            repeated_props = self._join_properties(
-                repeated_props, arg.repeated_props
-            )
-            extruded_props = self._join_properties(
-                extruded_props, arg.extruded_props
-            )
+            repeated_props = self._join_properties(repeated_props, arg.repeated_props)
+            extruded_props = self._join_properties(extruded_props, arg.extruded_props)
 
         return FDStats(
             base,
@@ -141,9 +137,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             self._drop_property_indices(stats.extruded_props, dropped_indices),
         )
 
-    def relabel(
-        self, stats: FDStats, relabel_indices: tuple[Field, ...]
-    ) -> FDStats:
+    def relabel(self, stats: FDStats, relabel_indices: tuple[Field, ...]) -> FDStats:
         base = self.relabel_def(stats, relabel_indices)
         relabel_map = dict(zip(stats.index_order, relabel_indices, strict=True))
         return FDStats(
@@ -154,9 +148,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             self._relabel_property_map(stats.extruded_props, relabel_map),
         )
 
-    def reorder(
-        self, stats: FDStats, reorder_indices: tuple[Field, ...]
-    ) -> FDStats:
+    def reorder(self, stats: FDStats, reorder_indices: tuple[Field, ...]) -> FDStats:
         base = self.reorder_def(stats, reorder_indices)
         return FDStats(
             base,

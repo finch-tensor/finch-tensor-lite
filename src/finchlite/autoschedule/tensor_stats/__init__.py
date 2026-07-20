@@ -28,8 +28,6 @@ __all__ = [
     "BoundStatsFactory",
     "DCStats",
     "DCStatsFactory",
-    "VPStats",
-    "VPStatsFactory",
     "DenseStats",
     "DenseStatsFactory",
     "DummyStats",
@@ -42,4 +40,6 @@ __all__ = [
     "TensorStats",
     "UniformStats",
     "UniformStatsFactory",
+    "VPStats",
+    "VPStatsFactory",
 ]
