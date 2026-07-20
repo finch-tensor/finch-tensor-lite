@@ -79,24 +79,16 @@ def _ref_cost(A, B, order, sf, expr, bindings):
     cost = 0.0
     for j in range(1, len(order) + 1):
         prefix = order[:j]
-        prefix_set = set(prefix)
         lookups = get_loop_lookups(prefix, conjunct_stats, disjunct_stats, sf)
         cost += lookups * _prefix_lookup_factor(A, B, prefix)
 
-        seen = []
-        for stat in conjunct_stats + disjunct_stats:
-            if not prefix_set.intersection(stat.index_order):
-                continue
-            if any(stat is s for s in seen):
-                continue
-            seen.append(stat)
-
-        prev = prefix[:-1]
-        for stat in seen:
-            if needs_reformat(stat, prefix) and not (
-                prev and needs_reformat(stat, prev)
-            ):
-                cost += cost_of_reformat(stat)
+    seen = []
+    for stat in conjunct_stats + disjunct_stats:
+        if any(stat is s for s in seen):
+            continue
+        seen.append(stat)
+        if needs_reformat(stat, order):
+            cost += cost_of_reformat(stat)
     return cost
 
 

@@ -228,14 +228,7 @@ def get_prefix_cost(
     else:
         lookup_factor += SEQ_WRITE_COST
 
-    prev = new_prefix[:-1]
-    transpose_cost = 0.0
-    for stat in seen:
-        if needs_reformat(stat, new_prefix) and not (
-            prev and needs_reformat(stat, prev)
-        ):
-            transpose_cost += cost_of_reformat(stat)
-    return lookups * lookup_factor + transpose_cost
+    return lookups * lookup_factor
 
 
 def loop_order_cost(
@@ -259,4 +252,14 @@ def loop_order_cost(
             stats_factory,
             output_vars,
         )
+
+    seen: list[TensorStats] = []
+    for stat in conjunct_stats + disjunct_stats:
+        if any(stat is s for s in seen):
+            continue
+        seen.append(stat)
+
+    for stat in seen:
+        if needs_reformat(stat, loop_order):
+            cost += cost_of_reformat(stat)
     return cost
