@@ -1,12 +1,13 @@
+from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any
 
 import numpy as np
 
 import finchlite as fl
-from finchlite.algebra.ftypes import FDTypeNumpy, FType
+from finchlite.algebra.ftypes import FDTypeNumpy, FType, TupleFType
 
-from .julia import get_jl
+from .julia import get_jl, jc
 
 int8: FDTypeNumpy = fl.int8
 int16: FDTypeNumpy = fl.int16
@@ -27,6 +28,29 @@ bool: FDTypeNumpy = fl.bool
 
 finfo = fl.finfo
 iinfo = fl.iinfo
+
+
+class JuliaElementFType(ABC):
+    @abstractmethod
+    def julia_type(self):
+        """
+        Return the Julia type used for elements with this ftype.
+        """
+        ...
+
+    @abstractmethod
+    def julia_value(self, value: Any, *, offset: int = 0):
+        """
+        Convert a Python value with this ftype into a Julia element value.
+        """
+        ...
+
+    def julia_vector(self, values, *, offset: int = 0):
+        jl = get_jl()
+        return jc.convert(
+            jl.Vector[self.julia_type()],
+            [self.julia_value(value, offset=offset) for value in values],
+        )
 
 
 @lru_cache
@@ -52,7 +76,14 @@ def _jl_dtype_to_fl() -> dict[Any, FType]:
 
 @lru_cache
 def _fl_dtype_to_jl() -> dict[FType, Any]:
-    return {v: k for k, v in _jl_dtype_to_fl().items()}
+    jl = get_jl()
+    return {
+        **{v: k for k, v in _jl_dtype_to_fl().items()},
+        fl.bool_: jl.Bool,
+        fl.int_: jl.Int,
+        fl.float_: jl.Float64,
+        fl.complex_: jl.ComplexF64,
+    }
 
 
 def to_fl_dtype(x) -> FType:
@@ -72,7 +103,55 @@ def to_fl_dtype(x) -> FType:
 
 def to_jl_type(T):
     T = to_fl_dtype(T)
+    if isinstance(T, JuliaElementFType):
+        return T.julia_type()
+    if isinstance(T, TupleFType):
+        jl = get_jl()
+        return jl.Tuple[tuple(to_jl_type(field) for field in T.struct_fieldtypes)]
     try:
         return _fl_dtype_to_jl()[T]
     except KeyError:
         raise NotImplementedError(f"Cannot convert {T!r} to a Julia dtype") from None
+
+
+def _as_julia_scalar(value):
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def _tuple_field(value, index: int, name: str):
+    if isinstance(value, np.void) and value.dtype.fields is not None:
+        return value[name]
+    return value[index]
+
+
+def to_jl_value(T, value, *, offset: int = 0):
+    T = to_fl_dtype(T)
+    if isinstance(T, JuliaElementFType):
+        return T.julia_value(value, offset=offset)
+    if isinstance(T, TupleFType):
+        return tuple(
+            to_jl_value(
+                field_type,
+                _tuple_field(value, index, field_name),
+                offset=offset,
+            )
+            for index, (field_name, field_type) in enumerate(T.struct_fields)
+        )
+    if offset:
+        value = value + offset
+    return _as_julia_scalar(T(value))
+
+
+def to_jl_vector(T, values, *, offset: int = 0):
+    T = to_fl_dtype(T)
+    if isinstance(T, JuliaElementFType):
+        return T.julia_vector(values, offset=offset)
+    if isinstance(T, TupleFType) or offset:
+        jl = get_jl()
+        return jc.convert(
+            jl.Vector[to_jl_type(T)],
+            [to_jl_value(T, value, offset=offset) for value in values],
+        )
+    return get_jl().Vector(values)

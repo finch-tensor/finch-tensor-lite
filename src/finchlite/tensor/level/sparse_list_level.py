@@ -38,8 +38,8 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             ("lvl", self.lvl_t),
             ("dimension", self.dimension_type),
             ("stride", self.dimension_type),
-            ("ptr", self.buffer_factory(self.dimension_type)),
-            ("idx", self.buffer_factory(self.dimension_type)),
+            ("ptr", self.ptr_type),
+            ("idx", self.idx_type),
         ]
 
     def __str__(self):
@@ -87,13 +87,13 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
 
     @property
     def ptr_type(self):
-        return self.buffer_factory(self.dimension_type)
+        return self.buffer_factory(self.position_type)
 
     @property
     def idx_type(self):
         return self.buffer_factory(self.dimension_type)
 
-    def construct(self, *, shape):
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseListLevel":
         """
         Creates an instance of SparseListLevel.
 
@@ -102,8 +102,13 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         Returns:
             An instance of DenseLevel.
         """
-        lvl = self.lvl_t.construct(shape=shape[1:])
-        return SparseListLevel(lvl, self.dimension_type(shape[0]))
+        lvl = self.lvl_t.construct(shape=shape[1:], pos=0)
+        return SparseListLevel(
+            lvl,
+            self.dimension_type(shape[0]),
+            self.ptr_type(int(pos) + 1),
+            self.idx_type(0),
+        )
 
     def __call__(self, val: Any) -> "SparseListLevel":
         """
@@ -121,6 +126,9 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     @property
     def lvl_t(self):
         return self._lvl_t
+
+    def level_format_properties(self, n):
+        return self.lvl_t.level_format_properties(n + 1)
 
     def from_numpy(self, shape, val):
         raise NotImplementedError("sparse list level doesn't support from_numpy")
@@ -302,9 +310,9 @@ class SparseListLevel(Level):
 
     def __post_init__(self):
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
+            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.idx is None:
-            self.idx = self.lvl.buffer_type(len=0, dtype=self.lvl.position_type)
+            self.idx = self.lvl.buffer_factory(ftype(self.dimension))(0)
 
     @property
     def stride(self) -> np.integer:

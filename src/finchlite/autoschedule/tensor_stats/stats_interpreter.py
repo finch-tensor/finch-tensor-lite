@@ -96,12 +96,12 @@ class StatsMachine:
                 if isinstance(tns, Literal):
                     tensor = self.stats_factory(tns.val, idxs)
                 elif isinstance(tns, Alias):
-                    base_stats = self.bindings.get(tns)
-                    if base_stats is None:
+                    base = self.bindings.get(tns)
+                    if base is None:
                         raise ValueError(f"No TensorStats bound to alias {node.tns}")
 
                     new_indices = tuple(f for f in node.idxs)
-                    tensor = self.stats_factory.relabel(base_stats, new_indices)
+                    tensor = self.stats_factory.relabel(base, new_indices)
                 return tensor
 
             case MapJoin():
@@ -126,9 +126,9 @@ class StatsMachine:
                 return self(node.arg)
 
             case Relabel():
-                base_stats = self(node.arg)
+                base = self(node.arg)
                 new_indices = tuple(f for f in node.idxs)
-                return self.stats_factory.relabel(base_stats, new_indices)
+                return self.stats_factory.relabel(base, new_indices)
 
             case Produces(args):
                 return tuple(self(arg) for arg in args)

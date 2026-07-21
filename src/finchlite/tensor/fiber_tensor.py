@@ -15,6 +15,7 @@ from finchlite.algebra import (
 from finchlite.compile.lower import FinchTensorFType
 
 from .override_tensor import OverrideTensor
+from .traits import FormatProperty
 
 
 class LevelFType(FType, ABC):
@@ -133,7 +134,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def construct(self, shape, **kwargs):
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "Level":
         """
         Construct a level instance with the given shape.
         """
@@ -144,6 +145,17 @@ class LevelFType(FType, ABC):
         """
         Construct level from numpy array
         (TODO not strictly safe, only works for dense, replace later)
+        """
+        ...
+
+    @abstractmethod
+    def level_format_properties(self, n):
+        """
+        Return the format properties contributed by this level type and children.
+
+        ``n`` is the outer dimension index represented by this level. Nested
+        levels use increasing indices, so the returned properties can describe how
+        this dimension constrains dimensions further inside the fiber tree.
         """
         ...
 
@@ -319,12 +331,12 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", bool_),
         ]
 
-    def construct(self, shape: tuple[int, ...]):
+    def construct(self, shape: tuple[int, ...]) -> FiberTensor:
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
         return FiberTensor(
-            self.lvl_t.construct(shape=shape),
+            self.lvl_t.construct(shape=shape, pos=1),
             self.position_type(0),
             _device=self.device,
         )
@@ -376,6 +388,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     @property
     def buffer_type(self):
         return self.lvl_t.buffer_type
+
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return self.lvl_t.level_format_properties(0)
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns)

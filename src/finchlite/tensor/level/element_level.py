@@ -47,23 +47,18 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def construct(self, shape, *, val=None):
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "ElementLevel":
         """
         Creates an instance of ElementLevel with the given ftype.
 
         Args:
             shape: Should be always `()`, used for validation.
-            val: The value to store in the ElementLevel instance.
         Returns:
             An instance of ElementLevel.
         """
-        # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
-        if val is not None and isinstance(val, np.ndarray):
-            from finchlite.codegen import NumpyBuffer
-
-            val = NumpyBuffer(np.asarray(val).reshape(-1))
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
+        val = self.buffer_type(len=pos)
         return ElementLevel(self, val)
 
     def __call__(self, val: Any) -> "ElementLevel":
@@ -93,6 +88,9 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     @property
     def lvl_t(self):
         raise Exception("ElementLevelFType is the leaf level.")
+
+    def level_format_properties(self, n):
+        return []
 
     def from_fields(self, val=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
@@ -143,7 +141,9 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def from_numpy(self, shape, val):
-        return self.construct(shape, val=val)
+        if len(shape) != 0:
+            raise ValueError("ElementLevelFType must be called with an empty shape.")
+        return self.from_fields(val)
 
 
 def element(
@@ -186,9 +186,7 @@ class ElementLevel(Level):
 
     def __post_init__(self):
         if self._val is None:
-            self._val = self._format.buffer_type(
-                len=0, dtype=self._format.element_type()
-            )
+            self._val = self._format.buffer_type(len=0)
 
     @property
     def shape(self) -> tuple:

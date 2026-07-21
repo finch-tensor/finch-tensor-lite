@@ -98,13 +98,19 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
 
-    def construct(self, shape, **kwargs) -> "SparseHashLevel":
-        if kwargs:
-            raise TypeError("SparseHashLevelFType.construct does not accept kwargs")
-        lvl = self.lvl_t.construct(shape=shape[1:])
+    def level_format_properties(self, n):
+        return self.lvl_t.level_format_properties(n + 1)
+
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseHashLevel":
+        lvl = self.lvl_t.construct(shape=shape[1:], pos=0)
         return SparseHashLevel(
             lvl,
             self.dimension_type(shape[0]),
+            self.ptr_type(int(pos) + 1),
+            self.tbl_ctrl_type(0),
+            self.tbl_type(0),
+            self.pool_type(0),
+            self.perm_type(0),
             single_writer=self.single_writer,
         )
 
@@ -207,18 +213,18 @@ class SparseHashLevel(Level):
                 "SparseHashLevel subtables must be a positive power of two"
             )
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
+            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.tbl_ctrl is None:
-            self.tbl_ctrl = self.lvl.buffer_factory(ftypes.uint8)(len=0)
+            self.tbl_ctrl = self.lvl.buffer_factory(ftypes.uint8)(0)
         if self.tbl is None:
             tbl_entry_type = TupleFType.from_tuple(
                 (self.lvl.position_type, ftype(self.dimension), self.lvl.position_type)
             )
-            self.tbl = self.lvl.buffer_factory(tbl_entry_type)(len=0)
+            self.tbl = self.lvl.buffer_factory(tbl_entry_type)(0)
         if self.pool is None:
-            self.pool = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
+            self.pool = self.lvl.buffer_factory(self.lvl.position_type)(0)
         if self.perm is None:
-            self.perm = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
+            self.perm = self.lvl.buffer_factory(self.lvl.position_type)(0)
 
     @property
     def shape(self) -> tuple:
