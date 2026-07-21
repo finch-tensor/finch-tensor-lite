@@ -37,6 +37,11 @@ benchmark = [
     "pytest-codspeed>=5",
     {include-group = "test"},
 ]
+docs = [
+    "mkdocs-material>=9.7.7,<10",
+    "mkdocstrings[python]>=1.0.6",
+    "mkdocs-autoapi>=0.4.1",
+]
 
 
 [build-system]
@@ -81,6 +86,7 @@ c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
+docs = { features = ["docs"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 # default feature definition
@@ -122,6 +128,14 @@ default-environment = "benchmark"
 [tool.pixi.feature.test.tasks.type-check]
 cmd = "python -m mypy"
 default-environment = "test"
+
+[tool.pixi.feature.docs.tasks.serve-docs]
+cmd = "mkdocs serve"
+default-environment = "docs"
+
+[tool.pixi.feature.docs.tasks.build-docs]
+cmd = "mkdocs build"
+default-environment = "docs"
 
 [tool.pixi.feature.mindeps.dependencies]
 python = "3.11.*"
