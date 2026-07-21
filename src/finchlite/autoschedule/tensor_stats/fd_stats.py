@@ -54,7 +54,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self._union_properties(dense_props, b.dense_props)
         self._union_properties(blocked_props, b.blocked_props)
         repeated_props = deepcopy(a.repeated_props)
-        self._join_properties(repeated_props, b.repeated_props)
+        self._join_properties(repeated_props, a.index_order, b.repeated_props, b.index_order)
         return FDStats(base, dense_props, blocked_props, repeated_props)
 
     @staticmethod
@@ -72,13 +72,13 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self, op: FinchOperator, a: FDStats, b: FDStats
     ) -> FDStats:
         base = super()._mapjoin_defs(op, a, b)
-        dense_props = self._join_properties(a.dense_props, b.dense_props)
-        blocked_props = self._join_properties(a.blocked_props, b.blocked_props)
-        repeated_props = self._join_properties(a.repeated_props, b.repeated_props)
+        dense_props = self._join_properties(a.dense_props, a.index_order, b.dense_props, b.index_order)
+        blocked_props = self._join_properties(a.blocked_props, a.index_order, b.blocked_props, b.index_order)
+        repeated_props = self._join_properties(a.repeated_props, a.index_order, b.repeated_props, b.index_order)
         return FDStats(base, dense_props, blocked_props, repeated_props)
 
     @staticmethod
-    def _join_properties(a: PropertyMap, b: PropertyMap) -> PropertyMap:
+    def _join_properties(a: PropertyMap, a_idxs, b: PropertyMap, b_idxs) -> PropertyMap:
         out: PropertyMap = {}
         for conclusion, a_hypotheses in a.items():
             if conclusion not in b:
@@ -86,7 +86,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             hypotheses: set[frozenset[Field]] = set()
             for a_hypothesis in a_hypotheses:
                 for b_hypothesis in b[conclusion]:
-                    hypotheses.add(a_hypothesis & b_hypothesis)
+                    hypotheses.add(a_hypothesis.union(b_idxs - a_idxs) & b_hypothesis.union(a_idxs - b_idxs))
             out[conclusion] = hypotheses
         return out
 
