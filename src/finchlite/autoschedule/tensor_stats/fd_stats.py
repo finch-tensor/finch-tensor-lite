@@ -80,13 +80,21 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
         base = super()._mapjoin_defs(op, *join_args)
         output_fields = frozenset(base.index_order)
-        if len(join_args) == 1:
-            dense_props = set(join_args[0].dense_props)
-        elif all(
-            any(frozenset(arg.index_order).issubset(dims) for dims in arg.dense_props)
+        sparse_args = [
+            arg
             for arg in join_args
-        ):
+            if not any(
+                frozenset(arg.index_order).issubset(dims) for dims in arg.dense_props
+            )
+        ]
+        if not sparse_args:
             dense_props = {output_fields}
+        elif len(sparse_args) == 1:
+            sparse_arg = sparse_args[0]
+            dense_props = {
+                dims | (output_fields - frozenset(sparse_arg.index_order))
+                for dims in sparse_arg.dense_props
+            }
         else:
             dense_props = set()
 

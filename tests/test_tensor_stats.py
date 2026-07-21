@@ -97,7 +97,7 @@ def test_fd_stats_mapjoin_union_preserves_property_maps():
 
     stats = factory.mapjoin(ffuncs.add, fill_stats, array_stats)
 
-    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
+    assert stats.dense_props == {frozenset({i, j})}
     assert stats.repeated_props == {}
 
 
@@ -292,6 +292,21 @@ def test_fd_formatter_csr_dcsr_format_algebra():
         factory.mapjoin(ffuncs.mul, csr_ij, csr_jk),
     )
     assert _fd_output_pattern(csr_matmul_csr) == ("sparse", "sparse")
+
+
+def test_fd_stats_join_dense_properties():
+    i, j = Field("i"), Field("j")
+    factory = FDStatsFactory()
+
+    dense = _format_stats(("dense", "dense"), (2, 3), (i, j))
+    csr = _format_stats(("dense", "sparse"), (2, 3), (i, j))
+    sparse = _format_stats(("sparse", "sparse"), (2, 3), (i, j))
+
+    assert factory.mapjoin(ffuncs.mul, dense, csr).dense_props == csr.dense_props
+    assert factory.mapjoin(ffuncs.mul, dense, dense, csr).dense_props == (
+        csr.dense_props
+    )
+    assert factory.mapjoin(ffuncs.mul, csr, sparse).dense_props == set()
 
 
 def test_fd_stats_records_dense_projections_without_chasing():
