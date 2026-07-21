@@ -50,31 +50,30 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             for dims in arg.dense_props
         }
 
-        blocked_props: PropertyMap = {}
-        for arg in union_args:
-            for conclusion, hypotheses in arg.blocked_props.items():
-                blocked_props.setdefault(conclusion, set()).update(hypotheses)
-
-        repeated_maps = tuple(
-            (arg.repeated_props, arg.index_order) for arg in union_args
-        )
-        repeated_props: PropertyMap = {}
-        conclusions = set.intersection(*(set(prop) for prop, _ in repeated_maps))
-        for conclusion in conclusions:
-            repeated_props[conclusion] = {
-                frozenset.intersection(
-                    *(
-                        hypothesis | (output_fields - frozenset(fields))
-                        for hypothesis, (_, fields) in zip(
-                            hypotheses, repeated_maps, strict=True
+        unioned_props: list[PropertyMap] = []
+        for attr in ("blocked_props", "repeated_props"):
+            properties = tuple(
+                (getattr(arg, attr), arg.index_order) for arg in union_args
+            )
+            conclusions = set.intersection(*(set(prop) for prop, _ in properties))
+            out: PropertyMap = {}
+            for conclusion in conclusions:
+                out[conclusion] = {
+                    frozenset().union(
+                        *(
+                            hypothesis | (output_fields - frozenset(fields))
+                            for hypothesis, (_, fields) in zip(
+                                hypotheses, properties, strict=True
+                            )
                         )
                     )
-                )
-                for hypotheses in product(
-                    *(prop[conclusion] for prop, _ in repeated_maps)
-                )
-            }
+                    for hypotheses in product(
+                        *(prop[conclusion] for prop, _ in properties)
+                    )
+                }
+            unioned_props.append(out)
 
+        blocked_props, repeated_props = unioned_props
         return FDStats(base, dense_props, blocked_props, repeated_props)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
@@ -107,7 +106,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             out: PropertyMap = {}
             for conclusion in conclusions:
                 out[conclusion] = {
-                    frozenset.intersection(
+                    frozenset().union(
                         *(
                             hypothesis | (output_fields - frozenset(fields))
                             for hypothesis, (_, fields) in zip(

@@ -101,6 +101,27 @@ def test_fd_stats_mapjoin_union_preserves_property_maps():
     assert stats.repeated_props == {}
 
 
+def test_fd_stats_mapjoin_unions_property_hypotheses():
+    i, j, c = Field("i"), Field("j"), Field("c")
+    factory = FDStatsFactory()
+    left = FDStats(
+        BaseTensorStats((i, c), {i: 2.0, c: 2.0}, 0),
+        blocked_props={c: {frozenset({i})}},
+        repeated_props={c: {frozenset({i})}},
+    )
+    right = FDStats(
+        BaseTensorStats((j, c), {j: 2.0, c: 2.0}, 0),
+        blocked_props={c: {frozenset({j})}},
+        repeated_props={c: {frozenset({j})}},
+    )
+
+    expected = {c: {frozenset({i, j})}}
+    for op in (ffuncs.add, ffuncs.mul):
+        stats = factory.mapjoin(op, left, right)
+        assert stats.blocked_props == expected
+        assert stats.repeated_props == expected
+
+
 def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
     i, j = Field("i"), Field("j")
     factory = FDStatsFactory()
