@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from itertools import product
 from typing import Any
 
 from finchlite.algebra import FinchOperator
@@ -41,99 +42,79 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: FDStats) -> FDStats:
-        result = union_args[0]
-        for arg in union_args[1:]:
-            result = self._mapjoin_union_binary(op, result, arg)
-        return result
-
-    def _mapjoin_union_binary(
-        self, op: FinchOperator, a: FDStats, b: FDStats
-    ) -> FDStats:
-        base = super()._mapjoin_defs(op, a, b)
-        dense_props = self._union_dense_properties(base, a, b)
-        blocked_props = deepcopy(a.blocked_props)
-        self._union_properties(blocked_props, b.blocked_props)
-        repeated_props = self._join_properties(
-            a.repeated_props, a.index_order, b.repeated_props, b.index_order
-        )
-        return FDStats(base, dense_props, blocked_props, repeated_props)
-
-    @staticmethod
-    def _union_dense_properties(
-        base: BaseTensorStats, a: FDStats, b: FDStats
-    ) -> DensePropertySet:
+        base = super()._mapjoin_defs(op, *union_args)
         output_fields = frozenset(base.index_order)
-        a_broadcast = output_fields - frozenset(a.index_order)
-        b_broadcast = output_fields - frozenset(b.index_order)
-        return {
-            *(dims | a_broadcast for dims in a.dense_props),
-            *(dims | b_broadcast for dims in b.dense_props),
+        dense_props = {
+            dims | (output_fields - frozenset(arg.index_order))
+            for arg in union_args
+            for dims in arg.dense_props
         }
 
-    @staticmethod
-    def _union_properties(a: PropertyMap, b: PropertyMap):
-        for conclusion, hypotheses in b.items():
-            a.setdefault(conclusion, set()).update(hypotheses)
+        blocked_props: PropertyMap = {}
+        for arg in union_args:
+            for conclusion, hypotheses in arg.blocked_props.items():
+                blocked_props.setdefault(conclusion, set()).update(hypotheses)
+
+        repeated_maps = tuple(
+            (arg.repeated_props, arg.index_order) for arg in union_args
+        )
+        repeated_props: PropertyMap = {}
+        conclusions = set.intersection(*(set(prop) for prop, _ in repeated_maps))
+        for conclusion in conclusions:
+            repeated_props[conclusion] = {
+                frozenset.intersection(
+                    *(
+                        hypothesis | (output_fields - frozenset(fields))
+                        for hypothesis, (_, fields) in zip(
+                            hypotheses, repeated_maps, strict=True
+                        )
+                    )
+                )
+                for hypotheses in product(
+                    *(prop[conclusion] for prop, _ in repeated_maps)
+                )
+            }
+
+        return FDStats(base, dense_props, blocked_props, repeated_props)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
-        result = join_args[0]
-        for arg in join_args[1:]:
-            result = self._mapjoin_join_binary(op, result, arg)
-        return result
+        base = super()._mapjoin_defs(op, *join_args)
+        output_fields = frozenset(base.index_order)
+        if len(join_args) == 1:
+            dense_props = set(join_args[0].dense_props)
+        elif all(
+            any(frozenset(arg.index_order).issubset(dims) for dims in arg.dense_props)
+            for arg in join_args
+        ):
+            dense_props = {output_fields}
+        else:
+            dense_props = set()
 
-    def _mapjoin_join_binary(
-        self, op: FinchOperator, a: FDStats, b: FDStats
-    ) -> FDStats:
-        base = super()._mapjoin_defs(op, a, b)
-        dense_props = self._join_dense_properties(base, a, b)
-        blocked_props = self._join_properties(
-            a.blocked_props, a.index_order, b.blocked_props, b.index_order
-        )
-        repeated_props = self._join_properties(
-            a.repeated_props, a.index_order, b.repeated_props, b.index_order
-        )
-        return FDStats(base, dense_props, blocked_props, repeated_props)
-
-    @staticmethod
-    def _join_dense_properties(
-        base: BaseTensorStats, a: FDStats, b: FDStats
-    ) -> DensePropertySet:
-        a_fields = frozenset(a.index_order)
-        b_fields = frozenset(b.index_order)
-        if not any(a_fields.issubset(dims) for dims in a.dense_props):
-            return set()
-        if not any(b_fields.issubset(dims) for dims in b.dense_props):
-            return set()
-        return {frozenset(base.index_order)}
-
-    @staticmethod
-    def _join_properties(a: PropertyMap, a_idxs, b: PropertyMap, b_idxs) -> PropertyMap:
-        a_idxs = frozenset(a_idxs)
-        b_idxs = frozenset(b_idxs)
-        out: PropertyMap = {}
-        for conclusion, a_hypotheses in a.items():
-            if conclusion not in b:
-                continue
-            hypotheses: set[frozenset[Field]] = set()
-            for a_hypothesis in a_hypotheses:
-                for b_hypothesis in b[conclusion]:
-                    hypotheses.add(
-                        a_hypothesis.union(b_idxs - a_idxs)
-                        & b_hypothesis.union(a_idxs - b_idxs)
+        joined_props: list[PropertyMap] = []
+        for attr in ("blocked_props", "repeated_props"):
+            properties = tuple(
+                (getattr(arg, attr), arg.index_order) for arg in join_args
+            )
+            conclusions = set.intersection(*(set(prop) for prop, _ in properties))
+            out: PropertyMap = {}
+            for conclusion in conclusions:
+                out[conclusion] = {
+                    frozenset.intersection(
+                        *(
+                            hypothesis | (output_fields - frozenset(fields))
+                            for hypothesis, (_, fields) in zip(
+                                hypotheses, properties, strict=True
+                            )
+                        )
                     )
-            out[conclusion] = hypotheses
-        return out
+                    for hypotheses in product(
+                        *(prop[conclusion] for prop, _ in properties)
+                    )
+                }
+            joined_props.append(out)
 
-    @staticmethod
-    def _drop_property_indices(
-        props: PropertyMap,
-        dropped_indices: frozenset[Field],
-    ) -> PropertyMap:
-        return {
-            conclusion: {hypothesis - dropped_indices for hypothesis in hypotheses}
-            for conclusion, hypotheses in props.items()
-            if conclusion not in dropped_indices
-        }
+        blocked_props, repeated_props = joined_props
+        return FDStats(base, dense_props, blocked_props, repeated_props)
 
     def aggregate(
         self,
@@ -144,6 +125,15 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
     ) -> FDStats:
         base = self.aggregate_def(op, init, reduce_indices, stats)
         dropped_indices = frozenset(reduce_indices)
+        projected_props = [
+            {
+                conclusion: {hypothesis - dropped_indices for hypothesis in hypotheses}
+                for conclusion, hypotheses in props.items()
+                if conclusion not in dropped_indices
+            }
+            for props in (stats.blocked_props, stats.repeated_props)
+        ]
+        blocked_props, repeated_props = projected_props
         return FDStats(
             base,
             {
@@ -151,8 +141,8 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                 for dims in stats.dense_props
                 if dims - dropped_indices
             },
-            self._drop_property_indices(stats.blocked_props, dropped_indices),
-            self._drop_property_indices(stats.repeated_props, dropped_indices),
+            blocked_props,
+            repeated_props,
         )
 
     def relabel(self, stats: FDStats, relabel_indices: tuple[Field, ...]) -> FDStats:
