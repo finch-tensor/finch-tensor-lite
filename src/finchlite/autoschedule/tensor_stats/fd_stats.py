@@ -3,8 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-import numpy as np
-
 from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field, StatsFactory
 from finchlite.tensor.traits import Blocked, Dense, FormatProperty, Repeated
@@ -42,22 +40,22 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: FDStats) -> FDStats:
-        base = super()._mapjoin_defs(op, *union_args)
-        dense_props: PropertyMap = {}
-        blocked_props: PropertyMap = {}
-        repeated_props: PropertyMap = {}
+        result = union_args[0]
+        for arg in union_args[1:]:
+            result = self._mapjoin_union_binary(op, result, arg)
+        return result
 
-        for arg in union_args:
-            self._union_properties(dense_props, arg.dense_props)
-            self._union_properties(blocked_props, arg.blocked_props)
-            self._join_properties(repeated_props, arg.repeated_props)
-
-        return FDStats(
-            base,
-            dense_props,
-            blocked_props,
-            repeated_props,
-        )
+    def _mapjoin_union_binary(
+        self, op: FinchOperator, a: FDStats, b: FDStats
+    ) -> FDStats:
+        base = super()._mapjoin_defs(op, a, b)
+        dense_props = deepcopy(a.dense_props)
+        blocked_props = deepcopy(a.blocked_props)
+        self._union_properties(dense_props, b.dense_props)
+        self._union_properties(blocked_props, b.blocked_props)
+        repeated_props = deepcopy(a.repeated_props)
+        self._join_properties(repeated_props, b.repeated_props)
+        return FDStats(base, dense_props, blocked_props, repeated_props)
 
     @staticmethod
     def _union_properties(a: PropertyMap, b: PropertyMap):
@@ -65,25 +63,19 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             a.setdefault(conclusion, set()).update(hypotheses)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
-        base = super()._mapjoin_defs(op, *join_args)
-        if not join_args:
-            return FDStats(base)
-
-        dense_props = deepcopy(join_args[0].dense_props)
-        blocked_props = deepcopy(join_args[0].blocked_props)
-        repeated_props = deepcopy(join_args[0].repeated_props)
-
+        result = join_args[0]
         for arg in join_args[1:]:
-            dense_props = self._join_properties(dense_props, arg.dense_props)
-            blocked_props = self._join_properties(blocked_props, arg.blocked_props)
-            repeated_props = self._join_properties(repeated_props, arg.repeated_props)
+            result = self._mapjoin_join_binary(op, result, arg)
+        return result
 
-        return FDStats(
-            base,
-            dense_props,
-            blocked_props,
-            repeated_props,
-        )
+    def _mapjoin_join_binary(
+        self, op: FinchOperator, a: FDStats, b: FDStats
+    ) -> FDStats:
+        base = super()._mapjoin_defs(op, a, b)
+        dense_props = self._join_properties(a.dense_props, b.dense_props)
+        blocked_props = self._join_properties(a.blocked_props, b.blocked_props)
+        repeated_props = self._join_properties(a.repeated_props, b.repeated_props)
+        return FDStats(base, dense_props, blocked_props, repeated_props)
 
     @staticmethod
     def _join_properties(a: PropertyMap, b: PropertyMap) -> PropertyMap:
