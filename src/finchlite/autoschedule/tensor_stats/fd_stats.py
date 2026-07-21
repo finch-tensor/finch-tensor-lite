@@ -28,11 +28,23 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         for prop in props:
             match prop:
                 case Dense():
-                    dense_props.add(frozenset(self._fields_for_dims(base, prop.dims)))
+                    dense_props.add(
+                        frozenset(base.index_order[dim] for dim in prop.dims)
+                    )
                 case Blocked():
-                    self._add_property(base, blocked_props, prop)
+                    hypotheses = frozenset(
+                        base.index_order[dim] for dim in prop.hypothesis_dims
+                    )
+                    for dim in prop.conclusion_dims:
+                        conclusion = base.index_order[dim]
+                        blocked_props.setdefault(conclusion, set()).add(hypotheses)
                 case Repeated():
-                    self._add_property(base, repeated_props, prop)
+                    hypotheses = frozenset(
+                        base.index_order[dim] for dim in prop.hypothesis_dims
+                    )
+                    for dim in prop.conclusion_dims:
+                        conclusion = base.index_order[dim]
+                        repeated_props.setdefault(conclusion, set()).add(hypotheses)
 
         return FDStats(
             base,
@@ -102,22 +114,23 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             properties = tuple(
                 (getattr(arg, attr), arg.index_order) for arg in join_args
             )
-            conclusions = set.intersection(*(set(prop) for prop, _ in properties))
             out: PropertyMap = {}
-            for conclusion in conclusions:
-                out[conclusion] = {
-                    frozenset().union(
-                        *(
-                            hypothesis | (output_fields - frozenset(fields))
-                            for hypothesis, (_, fields) in zip(
-                                hypotheses, properties, strict=True
+            if properties:
+                conclusions = set.intersection(*(set(prop) for prop, _ in properties))
+                for conclusion in conclusions:
+                    out[conclusion] = {
+                        frozenset().union(
+                            *(
+                                hypothesis | (output_fields - frozenset(fields))
+                                for hypothesis, (_, fields) in zip(
+                                    hypotheses, properties, strict=True
+                                )
                             )
                         )
-                    )
-                    for hypotheses in product(
-                        *(prop[conclusion] for prop, _ in properties)
-                    )
-                }
+                        for hypotheses in product(
+                            *(prop[conclusion] for prop, _ in properties)
+                        )
+                    }
             joined_props.append(out)
 
         blocked_props, repeated_props = joined_props
@@ -161,8 +174,20 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                 frozenset(relabel_map[field] for field in dims)
                 for dims in stats.dense_props
             },
-            self._relabel_property_map(stats.blocked_props, relabel_map),
-            self._relabel_property_map(stats.repeated_props, relabel_map),
+            {
+                relabel_map[conclusion]: {
+                    frozenset(relabel_map[field] for field in hypothesis)
+                    for hypothesis in hypotheses
+                }
+                for conclusion, hypotheses in stats.blocked_props.items()
+            },
+            {
+                relabel_map[conclusion]: {
+                    frozenset(relabel_map[field] for field in hypothesis)
+                    for hypothesis in hypotheses
+                }
+                for conclusion, hypotheses in stats.repeated_props.items()
+            },
         )
 
     def reorder(self, stats: FDStats, reorder_indices: tuple[Field, ...]) -> FDStats:
@@ -173,42 +198,6 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             stats.blocked_props,
             stats.repeated_props,
         )
-
-    def _fields_for_dims(
-        self,
-        base: BaseTensorStats,
-        dims: tuple[int, ...],
-    ) -> tuple[Field, ...]:
-        try:
-            return tuple(base.index_order[dim] for dim in dims)
-        except IndexError as exc:
-            raise ValueError(
-                f"Format property dimensions {dims} do not fit tensor "
-                f"with {len(base.index_order)} dimensions."
-            ) from exc
-
-    def _add_property(
-        self,
-        base: BaseTensorStats,
-        props_by_conclusion: PropertyMap,
-        prop: Blocked | Repeated,
-    ):
-        hypotheses = frozenset(self._fields_for_dims(base, prop.hypothesis_dims))
-        for conclusion in self._fields_for_dims(base, prop.conclusion_dims):
-            props_by_conclusion.setdefault(conclusion, set()).add(hypotheses)
-
-    def _relabel_property_map(
-        self,
-        props: PropertyMap,
-        relabel_map: dict[Field, Field],
-    ) -> PropertyMap:
-        return {
-            relabel_map[conclusion]: {
-                frozenset(relabel_map[field] for field in hypothesis)
-                for hypothesis in hypotheses
-            }
-            for conclusion, hypotheses in props.items()
-        }
 
 
 class FDStats(BaseTensorStats):
@@ -223,3 +212,8 @@ class FDStats(BaseTensorStats):
         self.dense_props = deepcopy(dense_props) if dense_props else set()
         self.blocked_props = deepcopy(blocked_props) if blocked_props else {}
         self.repeated_props = deepcopy(repeated_props) if repeated_props else {}
+        for dims in self.dense_props:
+            for conclusion in dims:
+                self.blocked_props.setdefault(conclusion, set()).add(
+                    dims - {conclusion}
+                )
