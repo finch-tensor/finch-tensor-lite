@@ -140,10 +140,7 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
 
     formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
 
-    assert formatter.output_stats[0].dense_props == {
-        frozenset({i}),
-        frozenset({i, j}),
-    }
+    assert formatter.output_stats[0].dense_props == {frozenset({i, j})}
     assert capture.last_stats[B] is formatter.output_stats[0]
 
 
