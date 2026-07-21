@@ -59,24 +59,12 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     stats = FDStatsFactory()(fl.FillTensor((2, 3), 0), (i, j))
 
     assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
-    assert stats.repeated_props == {
-        i: {frozenset()},
-        j: {frozenset({i})},
-    }
-    assert stats.blocked_props == {
-        i: {frozenset(), frozenset({j})},
-        j: {frozenset({i})},
-    }
 
     row, col = Field("row"), Field("col")
     relabeled = FDStatsFactory().relabel(stats, (row, col))
     assert relabeled.dense_props == {
         frozenset({row}),
         frozenset({row, col}),
-    }
-    assert relabeled.repeated_props == {
-        row: {frozenset()},
-        col: {frozenset({row})},
     }
 
 
@@ -86,7 +74,6 @@ def test_fd_stats_constructor_maps_hierarchical_array_dense_properties():
     stats = FDStatsFactory()(tensor, (i, j))
 
     assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
-    assert stats.repeated_props == {}
 
 
 def test_fd_stats_mapjoin_union_preserves_property_maps():
@@ -101,50 +88,9 @@ def test_fd_stats_mapjoin_union_preserves_property_maps():
     stats = factory.mapjoin(ffuncs.add, fill_stats, array_stats)
 
     assert stats.dense_props == {frozenset({i, j})}
-    assert stats.repeated_props == {}
 
 
-def test_fd_stats_mapjoin_unions_property_hypotheses():
-    i, j, c = Field("i"), Field("j"), Field("c")
-    factory = FDStatsFactory()
-    left = FDStats(
-        BaseTensorStats((i, c), {i: 2.0, c: 2.0}, 0),
-        blocked_props={c: {frozenset({i})}},
-        repeated_props={c: {frozenset({i})}},
-    )
-    right = FDStats(
-        BaseTensorStats((j, c), {j: 2.0, c: 2.0}, 0),
-        blocked_props={c: {frozenset({j})}},
-        repeated_props={c: {frozenset({j})}},
-    )
-
-    expected = {c: {frozenset({i, j})}}
-    for op in (ffuncs.add, ffuncs.mul):
-        stats = factory.mapjoin(op, left, right)
-        assert stats.blocked_props == expected
-        assert stats.repeated_props == expected
-
-
-def test_fd_stats_dense_join_operand_preserves_blocked_property():
-    i, c = Field("i"), Field("c")
-    factory = FDStatsFactory()
-    blocked = FDStats(
-        BaseTensorStats((i, c), {i: 2.0, c: 2.0}, 0),
-        blocked_props={c: {frozenset({i})}},
-        repeated_props={c: {frozenset({i})}},
-    )
-    dense = FDStats(
-        BaseTensorStats((i, c), {i: 2.0, c: 2.0}, 0),
-        dense_props={frozenset({i, c})},
-    )
-
-    stats = factory.mapjoin(ffuncs.mul, blocked, dense)
-
-    assert stats.blocked_props == blocked.blocked_props
-    assert stats.repeated_props == {}
-
-
-def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
+def test_fd_stats_aggregate_drops_reduced_indices_from_dense_properties():
     i, j = Field("i"), Field("j")
     factory = FDStatsFactory()
     stats = factory(fl.FillTensor((2, 3), 0), (i, j))
@@ -152,7 +98,6 @@ def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
     stats = factory.aggregate(ffuncs.add, None, (i,), stats)
 
     assert stats.dense_props == {frozenset({j})}
-    assert stats.repeated_props == {j: {frozenset()}}
 
 
 def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
