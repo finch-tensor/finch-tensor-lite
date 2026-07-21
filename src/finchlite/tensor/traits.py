@@ -33,27 +33,23 @@ class FormatProperty:
 
 class Dense(FormatProperty):
     """
-    Every value along the conclusion dimensions exists whenever the hypothesis
+    Every slice along the conclusion dimension exists whenever the hypothesis
     dimensions identify a non-fill slice.
     """
 
 
 class Blocked(FormatProperty):
     """
-    Adjacent values in the conclusion dimensions tend to occur together when the
-    hypothesis dimensions are fixed.
+    Each non-fill slice at an odd position along the conclusion dimension occurs together with a
+    subsequent non-fill slice.
     """
 
 
 class Repeated(FormatProperty):
     """
-    Adjacent values in the conclusion dimensions tend to share a value when the
-    hypothesis dimensions are fixed.
+    Each slice at an odd position along the conclusion dimension occurs together
+    with an subsequent identical slice.
     """
-
-
-class Extruded(FormatProperty):
-    """The conclusion dimensions are represented by one repeated slice."""
 
 
 class AxiomaticTensor(Tensor, ABC):

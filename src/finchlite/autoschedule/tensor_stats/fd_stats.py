@@ -7,9 +7,8 @@ import numpy as np
 
 from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field, StatsFactory
-from finchlite.tensor.traits import Blocked, Dense, Extruded, FormatProperty, Repeated
+from finchlite.tensor.traits import Blocked, Dense, FormatProperty, Repeated
 
-from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 PropertyMap = dict[Field, set[frozenset[Field]]]
@@ -25,7 +24,6 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         dense_props: PropertyMap = {}
         blocked_props: PropertyMap = {}
         repeated_props: PropertyMap = {}
-        extruded_props: PropertyMap = {}
 
         for prop in props:
             match prop:
@@ -35,15 +33,12 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                     self._add_property(base, blocked_props, prop)
                 case Repeated():
                     self._add_property(base, repeated_props, prop)
-                case Extruded():
-                    self._add_property(base, extruded_props, prop)
 
         return FDStats(
             base,
             dense_props,
             blocked_props,
             repeated_props,
-            extruded_props,
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: FDStats) -> FDStats:
@@ -51,20 +46,17 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         dense_props: PropertyMap = {}
         blocked_props: PropertyMap = {}
         repeated_props: PropertyMap = {}
-        extruded_props: PropertyMap = {}
 
         for arg in union_args:
             self._union_properties(dense_props, arg.dense_props)
             self._union_properties(blocked_props, arg.blocked_props)
-            self._union_properties(repeated_props, arg.repeated_props)
-            self._union_properties(extruded_props, arg.extruded_props)
+            self._join_properties(repeated_props, arg.repeated_props)
 
         return FDStats(
             base,
             dense_props,
             blocked_props,
             repeated_props,
-            extruded_props,
         )
 
     @staticmethod
@@ -80,20 +72,17 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         dense_props = deepcopy(join_args[0].dense_props)
         blocked_props = deepcopy(join_args[0].blocked_props)
         repeated_props = deepcopy(join_args[0].repeated_props)
-        extruded_props = deepcopy(join_args[0].extruded_props)
 
         for arg in join_args[1:]:
             dense_props = self._join_properties(dense_props, arg.dense_props)
             blocked_props = self._join_properties(blocked_props, arg.blocked_props)
             repeated_props = self._join_properties(repeated_props, arg.repeated_props)
-            extruded_props = self._join_properties(extruded_props, arg.extruded_props)
 
         return FDStats(
             base,
             dense_props,
             blocked_props,
             repeated_props,
-            extruded_props,
         )
 
     @staticmethod
@@ -105,7 +94,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             hypotheses: set[frozenset[Field]] = set()
             for a_hypothesis in a_hypotheses:
                 for b_hypothesis in b[conclusion]:
-                    hypotheses.add(a_hypothesis | b_hypothesis)
+                    hypotheses.add(a_hypothesis & b_hypothesis)
             out[conclusion] = hypotheses
         return out
 
@@ -134,7 +123,6 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             self._drop_property_indices(stats.dense_props, dropped_indices),
             self._drop_property_indices(stats.blocked_props, dropped_indices),
             self._drop_property_indices(stats.repeated_props, dropped_indices),
-            self._drop_property_indices(stats.extruded_props, dropped_indices),
         )
 
     def relabel(self, stats: FDStats, relabel_indices: tuple[Field, ...]) -> FDStats:
@@ -145,7 +133,6 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             self._relabel_property_map(stats.dense_props, relabel_map),
             self._relabel_property_map(stats.blocked_props, relabel_map),
             self._relabel_property_map(stats.repeated_props, relabel_map),
-            self._relabel_property_map(stats.extruded_props, relabel_map),
         )
 
     def reorder(self, stats: FDStats, reorder_indices: tuple[Field, ...]) -> FDStats:
@@ -155,7 +142,6 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             stats.dense_props,
             stats.blocked_props,
             stats.repeated_props,
-            stats.extruded_props,
         )
 
     def _fields_for_dims(
@@ -195,22 +181,18 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         }
 
 
-class FDStats(NumericStats):
+class FDStats(BaseTensorStats):
     def __init__(
         self,
         base: BaseTensorStats,
         dense_props: PropertyMap | None = None,
         blocked_props: PropertyMap | None = None,
         repeated_props: PropertyMap | None = None,
-        extruded_props: PropertyMap | None = None,
     ):
         super().__init__(base)
         self.dense_props = self._chase(deepcopy(dense_props) if dense_props else {})
         self.blocked_props = deepcopy(blocked_props) if blocked_props else {}
         self.repeated_props = deepcopy(repeated_props) if repeated_props else {}
-        self.extruded_props = self._chase(
-            deepcopy(extruded_props) if extruded_props else {}
-        )
 
     def _chase(
         self,
@@ -231,14 +213,3 @@ class FDStats(NumericStats):
                                 hypotheses.add(chased)
                                 changed = True
         return props
-
-    def estimate_non_fill_values(self) -> float:
-        total = 1.0
-        for size in self.dim_sizes.values():
-            total *= size
-        return total
-
-    def get_embedding(self) -> np.ndarray:
-        sizes = [float(self.dim_sizes[field]) for field in self.index_order]
-
-        return np.array(np.log2(sizes))

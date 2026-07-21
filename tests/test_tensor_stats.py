@@ -67,7 +67,6 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
         j: {frozenset({i})},
     }
     assert stats.blocked_props == {}
-    assert stats.extruded_props == {}
 
     row, col = Field("row"), Field("col")
     relabeled = FDStatsFactory().relabel(stats, (row, col))
