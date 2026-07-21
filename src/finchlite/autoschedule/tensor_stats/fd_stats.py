@@ -65,7 +65,11 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         unioned_props: list[PropertyMap] = []
         for attr in ("blocked_props", "repeated_props"):
             properties = tuple(
-                (getattr(arg, attr), arg.index_order) for arg in union_args
+                (
+                    getattr(arg, attr),
+                    output_fields - frozenset(arg.index_order),
+                )
+                for arg in union_args
             )
             conclusions = set.intersection(*(set(prop) for prop, _ in properties))
             out: PropertyMap = {}
@@ -73,8 +77,8 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                 out[conclusion] = {
                     frozenset().union(
                         *(
-                            hypothesis | (output_fields - frozenset(fields))
-                            for hypothesis, (_, fields) in zip(
+                            hypothesis | broadcast_fields
+                            for hypothesis, (_, broadcast_fields) in zip(
                                 hypotheses, properties, strict=True
                             )
                         )
@@ -85,8 +89,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                 }
             unioned_props.append(out)
 
-        blocked_props, repeated_props = unioned_props
-        return FDStats(base, dense_props, blocked_props, repeated_props)
+        return FDStats(base, dense_props, *unioned_props)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: FDStats) -> FDStats:
         base = super()._mapjoin_defs(op, *join_args)
@@ -98,43 +101,45 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                 frozenset(arg.index_order).issubset(dims) for dims in arg.dense_props
             )
         ]
-        if not sparse_args:
-            dense_props = {output_fields}
-        elif len(sparse_args) == 1:
-            sparse_arg = sparse_args[0]
-            dense_props = {
-                dims | (output_fields - frozenset(sparse_arg.index_order))
-                for dims in sparse_arg.dense_props
-            }
-        else:
-            dense_props = set()
+        match sparse_args:
+            case []:
+                dense_props = {output_fields}
+            case [sparse_arg]:
+                broadcast_fields = output_fields - frozenset(sparse_arg.index_order)
+                dense_props = {
+                    dims | broadcast_fields for dims in sparse_arg.dense_props
+                }
+            case _:
+                dense_props = set()
 
         joined_props: list[PropertyMap] = []
         for attr in ("blocked_props", "repeated_props"):
             properties = tuple(
-                (getattr(arg, attr), arg.index_order) for arg in join_args
+                (
+                    getattr(arg, attr),
+                    output_fields - frozenset(arg.index_order),
+                )
+                for arg in join_args
             )
             out: PropertyMap = {}
-            if properties:
-                conclusions = set.intersection(*(set(prop) for prop, _ in properties))
-                for conclusion in conclusions:
-                    out[conclusion] = {
-                        frozenset().union(
-                            *(
-                                hypothesis | (output_fields - frozenset(fields))
-                                for hypothesis, (_, fields) in zip(
-                                    hypotheses, properties, strict=True
-                                )
+            conclusions = set.intersection(*(set(prop) for prop, _ in properties))
+            for conclusion in conclusions:
+                out[conclusion] = {
+                    frozenset().union(
+                        *(
+                            hypothesis | broadcast_fields
+                            for hypothesis, (_, broadcast_fields) in zip(
+                                hypotheses, properties, strict=True
                             )
                         )
-                        for hypotheses in product(
-                            *(prop[conclusion] for prop, _ in properties)
-                        )
-                    }
+                    )
+                    for hypotheses in product(
+                        *(prop[conclusion] for prop, _ in properties)
+                    )
+                }
             joined_props.append(out)
 
-        blocked_props, repeated_props = joined_props
-        return FDStats(base, dense_props, blocked_props, repeated_props)
+        return FDStats(base, dense_props, *joined_props)
 
     def aggregate(
         self,
@@ -145,15 +150,14 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
     ) -> FDStats:
         base = self.aggregate_def(op, init, reduce_indices, stats)
         dropped_indices = frozenset(reduce_indices)
-        projected_props = [
+        projected_props = (
             {
                 conclusion: {hypothesis - dropped_indices for hypothesis in hypotheses}
                 for conclusion, hypotheses in props.items()
                 if conclusion not in dropped_indices
             }
             for props in (stats.blocked_props, stats.repeated_props)
-        ]
-        blocked_props, repeated_props = projected_props
+        )
         return FDStats(
             base,
             {
@@ -161,33 +165,29 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
                 for dims in stats.dense_props
                 if dims - dropped_indices
             },
-            blocked_props,
-            repeated_props,
+            *projected_props,
         )
 
     def relabel(self, stats: FDStats, relabel_indices: tuple[Field, ...]) -> FDStats:
         base = self.relabel_def(stats, relabel_indices)
         relabel_map = dict(zip(stats.index_order, relabel_indices, strict=True))
+        relabeled_props = (
+            {
+                relabel_map[conclusion]: {
+                    frozenset(relabel_map[field] for field in hypothesis)
+                    for hypothesis in hypotheses
+                }
+                for conclusion, hypotheses in props.items()
+            }
+            for props in (stats.blocked_props, stats.repeated_props)
+        )
         return FDStats(
             base,
             {
                 frozenset(relabel_map[field] for field in dims)
                 for dims in stats.dense_props
             },
-            {
-                relabel_map[conclusion]: {
-                    frozenset(relabel_map[field] for field in hypothesis)
-                    for hypothesis in hypotheses
-                }
-                for conclusion, hypotheses in stats.blocked_props.items()
-            },
-            {
-                relabel_map[conclusion]: {
-                    frozenset(relabel_map[field] for field in hypothesis)
-                    for hypothesis in hypotheses
-                }
-                for conclusion, hypotheses in stats.repeated_props.items()
-            },
+            *relabeled_props,
         )
 
     def reorder(self, stats: FDStats, reorder_indices: tuple[Field, ...]) -> FDStats:
