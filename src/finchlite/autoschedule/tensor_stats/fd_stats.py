@@ -11,7 +11,7 @@ from finchlite.tensor.traits import Blocked, Dense, Repeated
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 PropertyMap = dict[Field, set[frozenset[Field]]]
-DensePropertySet = set[frozenset[Field]]
+PropertySet = set[frozenset[Field]]
 
 
 class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"]):
@@ -21,7 +21,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> FDStats:
         base = super().__call__(tensor, fields)
         props = getattr(tensor.ftype, "level_format_properties", ())
-        dense_props: DensePropertySet = set()
+        dense_props: PropertySet = set()
         blocked_props: PropertyMap = {}
         repeated_props: PropertyMap = {}
 
@@ -208,7 +208,7 @@ class FDStats(BaseTensorStats):
     def __init__(
         self,
         base: BaseTensorStats,
-        dense_props: DensePropertySet | None = None,
+        dense_props: PropertySet | None = None,
         blocked_props: PropertyMap | None = None,
         repeated_props: PropertyMap | None = None,
     ):
