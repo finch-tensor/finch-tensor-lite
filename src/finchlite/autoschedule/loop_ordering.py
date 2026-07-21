@@ -3,7 +3,7 @@ from functools import reduce
 from itertools import chain as join_chains
 
 from finchlite.algebra.tensor import TensorFType
-from finchlite.algebra.utils import intersect
+from finchlite.algebra.utils import intersect, is_subsequence, with_subsequence
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -22,7 +22,7 @@ from finchlite.finch_logic import (
     TensorStats,
 )
 from finchlite.finch_logic.nodes import MapJoin
-from finchlite.symbolic import PostOrderDFS, PostWalk, Rewrite
+from finchlite.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finchlite.util.logging import LOG_LOGIC_POST_OPT
 
 from .loop_order_cost import (
@@ -31,9 +31,83 @@ from .loop_order_cost import (
 )
 from .optimize import propagate_copy_queries, with_unique_lhs
 from .stages import LogicLoopOrderOptimizer
-from .standardize import concordize, flatten_plans, push_fields
+from .util import flatten_plans, propagate_copy_queries, push_fields
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+
+
+def concordize(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
+    needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
+    namespace = Namespace(root)
+    field_orders: dict[Alias, tuple[Field, ...]] = {}
+
+    match root:
+        case Plan(bodies):
+            for body in bodies:
+                match body:
+                    case Query(lhs, rhs):
+                        field_orders[lhs] = rhs.fields()
+
+    def rule_0(ex):
+        match ex:
+            case Table(Alias(_) as var, idxs) if (
+                var in field_orders
+                and idxs != field_orders[var]
+                and set(idxs) == set(field_orders[var])
+            ):
+                perm = tuple(field_orders[var].index(idx) for idx in idxs)
+                return Table(
+                    needed_swizzles.setdefault(var, {}).setdefault(
+                        perm, Alias(namespace.freshen(var.name))
+                    ),
+                    idxs,
+                )
+            case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
+                if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
+                    idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
+                    perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
+                    return Reorder(
+                        Table(
+                            needed_swizzles.setdefault(var, {}).setdefault(
+                                perm, Alias(namespace.freshen(var.name))
+                            ),
+                            idxs_subseq,
+                        ),
+                        idxs_2,
+                    )
+                return None
+
+    def _get_swizzle_queries(lhs: Alias) -> tuple[Query, ...]:
+        ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
+        idxs = tuple([Field(f"i_{i}") for i in range(ndims)])
+        return tuple(
+            Query(alias, Reorder(Table(lhs, idxs), tuple(idxs[p] for p in perm)))
+            for perm, alias in needed_swizzles[lhs].items()
+        )
+
+    def rule_1(ex):
+        match ex:
+            case Query(lhs, _) as q if lhs in needed_swizzles:
+                swizzle_queries = _get_swizzle_queries(lhs)
+                return Plan((q, *swizzle_queries))
+
+    root = flatten_plans(root)
+    match root:
+        case Plan(bodies) if isinstance(bodies[-1], Produces):
+            prod = bodies[-1]
+            root = Plan(bodies[:-1])
+            root = Rewrite(PostWalk(rule_0))(root)
+            root = Rewrite(PostWalk(rule_1))(root)
+            # Consider also aliases from input arguments.
+            for alias in bindings:
+                if alias in needed_swizzles:
+                    swizzle_queries = _get_swizzle_queries(alias)
+                    root = Plan((*swizzle_queries, root))
+            return flatten_plans(Plan((root, prod)))
+        case _:
+            raise Exception(f"Invalid root: {root}")
 
 
 def add_output_orders(prgm: LogicStatement) -> LogicStatement:

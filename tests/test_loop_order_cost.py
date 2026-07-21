@@ -1,6 +1,4 @@
-import time
 from collections import OrderedDict
-from functools import reduce
 
 import pytest
 
@@ -8,18 +6,27 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
-from finchlite.algebra.utils import is_subsequence
-from finchlite.autoschedule.loop_order_cost import loop_order_cost
-from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finchlite.autoschedule.loop_order_cost import (
+    SEQ_READ_COST,
+    SEQ_WRITE_COST,
+    cost_of_reformat,
+    get_conjunctive_and_disjunctive_inputs,
+    get_loop_lookups,
+    loop_order_cost,
+    needs_reformat,
+)
+from finchlite.autoschedule.tensor_stats import DCStatsFactory
 from finchlite.finch_logic import Alias, Field, Literal, MapJoin, Table
 
-AXES = {"i": 0, "j": 1, "k": 2}
 ORDERS = [
     (Field("i"), Field("j"), Field("k")),
     (Field("j"), Field("i"), Field("k")),
     (Field("j"), Field("k"), Field("i")),
     (Field("k"), Field("j"), Field("i")),
 ]
+
+_AXES_A = {"i": 0, "j": 1}
+_AXES_B = {"j": 0, "k": 1}
 
 
 def _sparse(shape, nnz, rng):
@@ -31,37 +38,63 @@ def _sparse(shape, nnz, rng):
     return mat
 
 
-def _ref_cost(A, B, order):
-    masks = {
-        frozenset(("i", "j")): A[:, :, None] != 0,
-        frozenset(("j", "k")): B[None, :, :] != 0,
-    }
-    cost = 0.0
-    for k in range(1, len(order) + 1):
-        prefix = set(order[:k])
-        rels = [mask for axes, mask in masks.items() if axes & prefix]
-        subquery = reduce(np.logical_and, rels)
-        reduce_axes = tuple(AXES[n] for n in AXES if n not in prefix)
-        cost += subquery.any(axis=reduce_axes).sum()
-    if not is_subsequence(("i", "j"), order):
-        cost += np.count_nonzero(A)
-    if not is_subsequence(("j", "k"), order):
-        cost += np.count_nonzero(B)
-    return float(cost)
-
-
-def _cost(A, B, order, sf):
+def _expr_and_bindings(A, B, sf):
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b = Alias("A"), Alias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     bindings = OrderedDict({a: sf(fl.asarray(A), (i, j)), b: sf(fl.asarray(B), (j, k))})
-    return loop_order_cost(expr, order, sf, bindings)
+    return expr, bindings
+
+
+def _prefix_lookup_factor(A, B, prefix):
+    new_var = prefix[-1].name
+    prefix_names = {field.name for field in prefix}
+    lookup_factor = 0.0
+
+    for mat, index_order, axes in (
+        (A, ("i", "j"), _AXES_A),
+        (B, ("j", "k"), _AXES_B),
+    ):
+        if new_var not in index_order:
+            continue
+
+        rel_dims = [dim for dim in index_order if dim in prefix_names]
+        space = 1
+        for dim in rel_dims:
+            space *= mat.shape[axes[dim]]
+        density = np.count_nonzero(mat) / space if space else 0.0
+        is_dense = density > 0.05
+        lookup_factor += SEQ_READ_COST / 5 if is_dense else SEQ_READ_COST
+
+    lookup_factor += SEQ_WRITE_COST
+    return lookup_factor
+
+
+def _ref_cost(A, B, order, sf, expr, bindings):
+    stats_bindings = bindings.copy()
+    cache: dict[object, object] = {}
+    conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
+        expr, sf, stats_bindings, cache
+    )
+    cost = 0.0
+    for j in range(1, len(order) + 1):
+        prefix = order[:j]
+        lookups = get_loop_lookups(prefix, conjunct_stats, disjunct_stats, sf)
+        cost += lookups * _prefix_lookup_factor(A, B, prefix)
+
+    seen = []
+    for stat in conjunct_stats + disjunct_stats:
+        if any(stat is s for s in seen):
+            continue
+        seen.append(stat)
+        if needs_reformat(stat, order):
+            cost += cost_of_reformat(stat)
+    return cost
 
 
 def test_loop_order_cost():
-    test_start = time.perf_counter()
     rng = np.random.default_rng(42)
-    sf = ExactStatsFactory()
+    sf = DCStatsFactory()
     cases = [
         (
             np.array([[1, 0, 0], [0, 2, 0], [0, 0, 0]], float),
@@ -77,42 +110,16 @@ def test_loop_order_cost():
             )
         )
 
-    n_costs = 0
-    cost_time = 0.0
-    ref_time = 0.0
-
     for A, B in cases:
         for order in ORDERS:
-            names = tuple(f.name for f in order)
-
-            t0 = time.perf_counter()
-            got = _cost(A, B, order, sf)
-            cost_time += time.perf_counter() - t0
-            n_costs += 1
-
-            t0 = time.perf_counter()
-            expected = _ref_cost(A, B, names)
-            ref_time += time.perf_counter() - t0
-
+            expr, bindings = _expr_and_bindings(A, B, sf)
+            got = loop_order_cost(expr, order, sf, bindings)
+            expected = _ref_cost(A, B, order, sf, expr, bindings)
             assert got == pytest.approx(expected)
-
-    avg_cost_ms = cost_time / n_costs * 1000
-    avg_ref_ms = ref_time / n_costs * 1000
-    total_time = time.perf_counter() - test_start
-    print(
-        f"loop_order_cost: {cost_time:.4f}s total "
-        f"({n_costs} calls, {avg_cost_ms:.2f}ms avg)"
-    )
-    print(
-        f"_ref_cost:       {ref_time:.4f}s total "
-        f"({n_costs} calls, {avg_ref_ms:.2f}ms avg)"
-    )
-    print(f"test total:      {total_time:.4f}s")
 
 
 def test_empty_relation():
-    test_start = time.perf_counter()
-    sf = ExactStatsFactory()
+    sf = DCStatsFactory()
     # l_ is l, precommit throws bad name error otehrwise
     i, j, k, l_, m = (Field(name) for name in "ijklm")
     a, b, c, d = (Alias(name) for name in "ABCD")
@@ -134,17 +141,6 @@ def test_empty_relation():
         }
     )
 
-    t0 = time.perf_counter()
     forward = loop_order_cost(expr, (i, j, k, l_, m), sf, bindings)
-    forward_time = time.perf_counter() - t0
-
-    t0 = time.perf_counter()
     reverse = loop_order_cost(expr, (m, l_, k, j, i), sf, bindings)
-    reverse_time = time.perf_counter() - t0
-
     assert forward > reverse
-
-    total_time = time.perf_counter() - test_start
-    print(f"loop_order_cost forward: {forward_time:.4f}s")
-    print(f"loop_order_cost reverse: {reverse_time:.4f}s")
-    print(f"test total:              {total_time:.4f}s")

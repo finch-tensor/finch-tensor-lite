@@ -35,9 +35,9 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 
 def make_tensor(shape, fill_value, *, dtype=None):
     dtype = ftype(fill_value) if dtype is None else ftype(dtype)
-    return finchlite.asarray(
-        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
-    )
+    arr = np.empty(shape, dtype=np.dtype(to_numpy_type(dtype)))
+    arr[...] = fill_value
+    return finchlite.asarray(arr)
 
 
 class LogicInterpreter(UnvalidatedForm, LogicEvaluator):

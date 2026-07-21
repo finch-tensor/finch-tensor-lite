@@ -1,11 +1,36 @@
 import builtins
+import functools
+import operator
+import warnings
+from collections import namedtuple
 from collections.abc import Sequence
 from typing import Any
 
-from finchlite.algebra import FinchOperator
+import numpy as np
+import scipy.fft as scipy_fft
+import scipy.linalg as scipy_linalg
+import scipy.sparse.linalg as scipy_sparse_linalg
+
+from finchlite.algebra import FinchOperator, to_numpy, to_scipy
 
 from . import lazy
 from .fuse import compute
+
+EighResult = namedtuple("EighResult", ["eigenvalues", "eigenvectors"])
+QRResult = namedtuple("QRResult", ["Q", "R"])
+SlogdetResult = namedtuple("SlogdetResult", ["sign", "logabsdet"])
+SVDResult = namedtuple("SVDResult", ["U", "S", "Vh"])
+
+
+def _warn_compute(x, op_name: str):
+    if isinstance(x, lazy.LazyTensor):
+        warnings.warn(
+            f"{op_name} requires a materialized array; computing lazy operand.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return compute(x)
+    return x
 
 
 def full(
@@ -15,39 +40,146 @@ def full(
     dtype: Any | None = None,
     device=None,
 ):
-    return compute(lazy.full(shape, fill_value, dtype=dtype))
+    return compute(lazy.full(shape, fill_value, dtype=dtype, device=device))
 
 
 def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    return compute(lazy.zeros(shape, dtype=dtype))
+    return compute(lazy.zeros(shape, dtype=dtype, device=device))
 
 
 def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    return compute(lazy.ones(shape, dtype=dtype))
+    return compute(lazy.ones(shape, dtype=dtype, device=device))
 
 
 def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
-    return compute(lazy.empty(shape, dtype=dtype))
+    return compute(lazy.empty(shape, dtype=dtype, device=device))
+
+
+def eye(
+    n_rows: int,
+    n_cols: int | None = None,
+    *,
+    k: int = 0,
+    dtype: Any | None = None,
+    device=None,
+):
+    return compute(lazy.eye(n_rows, n_cols, k=k, dtype=dtype, device=device))
+
+
+def triu(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.triu(x, k=k)
+    return compute(lazy.triu(x, k=k))
+
+
+def tril(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tril(x, k=k)
+    return compute(lazy.tril(x, k=k))
+
+
+def diag(x, /, *, k: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.diag(x, k=k)
+    return compute(lazy.diag(x, k=k))
+
+
+def diff(x, /, *, axis: int = -1, n: int = 1, prepend=None, append=None):
+    if (
+        isinstance(x, lazy.LazyTensor)
+        or isinstance(prepend, lazy.LazyTensor)
+        or isinstance(append, lazy.LazyTensor)
+    ):
+        return lazy.diff(x, axis=axis, n=n, prepend=prepend, append=append)
+    return compute(lazy.diff(x, axis=axis, n=n, prepend=prepend, append=append))
+
+
+def cumulative_sum(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    dtype=None,
+    include_initial: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.cumulative_sum(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    return compute(
+        lazy.cumulative_sum(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    )
+
+
+def cumulative_prod(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    dtype=None,
+    include_initial: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.cumulative_prod(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    return compute(
+        lazy.cumulative_prod(
+            x,
+            axis=axis,
+            dtype=dtype,
+            include_initial=include_initial,
+        )
+    )
+
+
+def diagonal(x, /, *, offset: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.diagonal(x, offset=offset)
+    return compute(lazy.diagonal(x, offset=offset))
+
+
+def trace(x, /, *, offset: int = 0, dtype=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.trace(x, offset=offset, dtype=dtype)
+    return compute(lazy.trace(x, offset=offset, dtype=dtype))
 
 
 def full_like(
     x, /, fill_value: bool | complex, *, dtype: Any | None = None, device=None
 ):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.full_like(x, fill_value, dtype=dtype)
-    return compute(lazy.full_like(x, fill_value, dtype=dtype))
+        return lazy.full_like(x, fill_value, dtype=dtype, device=device)
+    return compute(lazy.full_like(x, fill_value, dtype=dtype, device=device))
+
+
+def empty_like(x, /, *, dtype: Any | None = None, device=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.empty_like(x, dtype=dtype, device=device)
+    return compute(lazy.empty_like(x, dtype=dtype, device=device))
 
 
 def zeros_like(x, /, *, dtype: Any | None = None, device=None):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.zeros_like(x, dtype=dtype)
-    return full_like(x, 0, dtype=dtype)
+        return lazy.zeros_like(x, dtype=dtype, device=device)
+    return full_like(x, 0, dtype=dtype, device=device)
 
 
 def ones_like(x, /, *, dtype: Any | None = None, device=None):
     if isinstance(x, lazy.LazyTensor):
-        return lazy.ones_like(x, dtype=dtype)
-    return full_like(x, 1, dtype=dtype)
+        return lazy.ones_like(x, dtype=dtype, device=device)
+    return full_like(x, 1, dtype=dtype, device=device)
 
 
 def arange(
@@ -59,7 +191,7 @@ def arange(
     dtype: Any | None = None,
     device=None,
 ):
-    return compute(lazy.arange(start, stop, step, dtype=dtype))
+    return compute(lazy.arange(start, stop, step, dtype=dtype, device=device))
 
 
 def linspace(
@@ -72,7 +204,9 @@ def linspace(
     device=None,
     endpoint: bool = True,
 ):
-    return compute(lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint))
+    return compute(
+        lazy.linspace(start, stop, num, dtype=dtype, endpoint=endpoint, device=device)
+    )
 
 
 def permute_dims(arg, /, axes: tuple[int, ...]):
@@ -174,6 +308,66 @@ def prod(
     return compute(lazy.prod(x, axis=axis, dtype=dtype, keepdims=keepdims))
 
 
+def argmin(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmin(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmin(x, axis=axis, keepdims=keepdims))
+
+
+def argmax(
+    x,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argmax(x, axis=axis, keepdims=keepdims)
+    return compute(lazy.argmax(x, axis=axis, keepdims=keepdims))
+
+
+def argsort(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    descending: bool = False,
+    stable: bool = True,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.argsort(x, axis=axis, descending=descending, stable=stable)
+    return compute(lazy.argsort(x, axis=axis, descending=descending, stable=stable))
+
+
+def sort(
+    x,
+    /,
+    *,
+    axis: int = -1,
+    descending: bool = False,
+    stable: bool = True,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.sort(x, axis=axis, descending=descending, stable=stable)
+    return compute(lazy.sort(x, axis=axis, descending=descending, stable=stable))
+
+
+def searchsorted(x1, x2, /, *, side: str = "left", sorter=None):
+    if (
+        isinstance(x1, lazy.LazyTensor)
+        or isinstance(x2, lazy.LazyTensor)
+        or isinstance(sorter, lazy.LazyTensor)
+    ):
+        return lazy.searchsorted(x1, x2, side=side, sorter=sorter)
+    return compute(lazy.searchsorted(x1, x2, side=side, sorter=sorter))
+
+
 def elementwise(f: FinchOperator, *args):
     if builtins.any(isinstance(arg, lazy.LazyTensor) for arg in args):
         return lazy.elementwise(f, *args)
@@ -256,6 +450,477 @@ def matrix_transpose(x, /):
     return compute(lazy.matrix_transpose(x))
 
 
+def inv(x, /):
+    x = _warn_compute(x, "inv")
+    try:
+        return lazy.asarray(
+            to_numpy(scipy_sparse_linalg.inv(to_scipy(lazy.asarray(x))))
+        )
+    except NotImplementedError:
+        pass
+    x = to_numpy(lazy.asarray(x))
+    return lazy.asarray(np.ascontiguousarray(np.linalg.inv(x)))
+
+
+def cholesky(x, /, *, upper=False):
+    x = _warn_compute(x, "cholesky")
+    x = to_numpy(lazy.asarray(x))
+    result = np.linalg.cholesky(x)
+    if upper:
+        result = np.swapaxes(np.conjugate(result), -1, -2)
+    return lazy.asarray(result)
+
+
+def cross(x1, x2, /, *, axis=-1):
+    if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
+        return lazy.cross(x1, x2, axis=axis)
+    return lazy.asarray(
+        np.cross(to_numpy(lazy.asarray(x1)), to_numpy(lazy.asarray(x2)), axis=axis)
+    )
+
+
+def _min_perm_swaps(arr):
+    """
+    Minimum number of swaps needed to order a
+    permutation array
+    """
+    # from https://www.thepoorcoder.com/hackerrank-minimum-swaps-2-solution/
+    a = dict(enumerate(arr))
+    b = {v: k for k, v in a.items()}
+    count = 0
+    for i in a:
+        x = a[i]
+        if x != i:
+            y = b[i]
+            a[y] = x
+            b[x] = y
+            count += 1
+    return count
+
+
+def det(x, /):
+    # https://stackoverflow.com/questions/19107617/how-to-compute-scipy-sparse-matrix-determinant-without-turning-it-to-dense
+    x = _warn_compute(x, "det")
+    try:
+        x_sp = to_scipy(lazy.asarray(x))
+        lu = scipy_sparse_linalg.splu(x_sp.tocsc())
+        diag_u = lu.U.diagonal()
+        swap_sign = (-1) ** (_min_perm_swaps(lu.perm_r) + _min_perm_swaps(lu.perm_c))
+        return lazy.asarray(np.asarray(swap_sign * diag_u.prod()))
+    except NotImplementedError:
+        pass
+    x = to_numpy(lazy.asarray(x))
+    return lazy.asarray(np.asarray(np.linalg.det(x)))
+
+
+def lu(x, /, *, permute_l=False, p_indices=False):
+    x = _warn_compute(x, "lu")
+    try:
+        return scipy_sparse_linalg.splu(to_scipy(lazy.asarray(x)).tocsc())
+    except NotImplementedError:
+        pass
+    x = to_numpy(lazy.asarray(x))
+    return tuple(
+        lazy.asarray(part)
+        for part in scipy_linalg.lu(x, permute_l=permute_l, p_indices=p_indices)
+    )
+
+
+def eigh(x, /, *, k=None, rtol=None, atol=None):
+    x = _warn_compute(x, "eigh")
+    if k is not None:
+        try:
+            kwargs = {
+                "k": k,
+                "return_eigenvectors": True,
+            }
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "eigh sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = builtins.min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
+            if tol is not None:
+                kwargs["tol"] = tol
+            eigenvalues, eigenvectors = scipy_sparse_linalg.eigsh(
+                to_scipy(lazy.asarray(x)), **kwargs
+            )
+            return EighResult(lazy.asarray(eigenvalues), lazy.asarray(eigenvectors))
+        except NotImplementedError:
+            pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "eigh dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    x = to_numpy(lazy.asarray(x))
+    eigenvalues, eigenvectors = np.linalg.eigh(x)
+    return EighResult(lazy.asarray(eigenvalues), lazy.asarray(eigenvectors))
+
+
+def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
+    x = _warn_compute(x, "eigvalsh")
+    if k is not None:
+        try:
+            kwargs = {
+                "k": k,
+                "return_eigenvectors": False,
+            }
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "eigvalsh sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = builtins.min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
+            if tol is not None:
+                kwargs["tol"] = tol
+            return lazy.asarray(
+                scipy_sparse_linalg.eigsh(to_scipy(lazy.asarray(x)), **kwargs)
+            )
+        except NotImplementedError:
+            pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "eigvalsh dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    x = to_numpy(lazy.asarray(x))
+    return lazy.asarray(np.linalg.eigvalsh(x))
+
+
+def matrix_rank(x, /, *, rtol=None, atol=None):
+    x = _warn_compute(x, "matrix_rank")
+    x = to_numpy(lazy.asarray(x))
+    if atol is not None:
+        if rtol is not None:
+            warnings.warn(
+                "matrix_rank cannot apply both rtol and atol with this fallback; "
+                "using atol.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, tol=atol)))
+    if rtol is None:
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x)))
+    try:
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, rtol=rtol)))
+    except TypeError:
+        warnings.warn(
+            "matrix_rank fallback cannot apply rtol as a relative tolerance with "
+            "this NumPy version; using it as an absolute tolerance.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return lazy.asarray(np.asarray(np.linalg.matrix_rank(x, tol=rtol)))
+
+
+def pinv(x, /, *, rtol=None):
+    x = _warn_compute(x, "pinv")
+    x = to_numpy(lazy.asarray(x))
+    if rtol is None:
+        return lazy.asarray(np.linalg.pinv(x))
+    try:
+        return lazy.asarray(np.linalg.pinv(x, rtol=rtol))
+    except TypeError:
+        return lazy.asarray(np.linalg.pinv(x, rcond=rtol))
+
+
+def qr(x, /, *, mode="reduced"):
+    x = _warn_compute(x, "qr")
+    x = to_numpy(lazy.asarray(x))
+    q, r = np.linalg.qr(x, mode=mode)
+    return QRResult(lazy.asarray(q), lazy.asarray(r))
+
+
+def slogdet(x, /):
+    x = _warn_compute(x, "slogdet")
+    x = to_numpy(lazy.asarray(x))
+    sign, logabsdet = np.linalg.slogdet(x)
+    return SlogdetResult(lazy.asarray(sign), lazy.asarray(logabsdet))
+
+
+def solve(x1, x2, /):
+    x1 = _warn_compute(x1, "solve")
+    x2 = _warn_compute(x2, "solve")
+    try:
+        x2_np = to_numpy(lazy.asarray(x2))
+        return lazy.asarray(
+            scipy_sparse_linalg.spsolve(to_scipy(lazy.asarray(x1)), x2_np)
+        )
+    except NotImplementedError:
+        pass
+    x1 = to_numpy(lazy.asarray(x1))
+    x2 = to_numpy(lazy.asarray(x2))
+    return lazy.asarray(np.linalg.solve(x1, x2))
+
+
+def svd(x, /, *, full_matrices=True, k=None, rtol=None, atol=None):
+    x = _warn_compute(x, "svd")
+    if k is not None:
+        try:
+            kwargs = {
+                "k": k,
+                "return_singular_vectors": True,
+            }
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "svd sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = builtins.min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
+            if tol is not None:
+                kwargs["tol"] = tol
+            u, s, vh = scipy_sparse_linalg.svds(to_scipy(lazy.asarray(x)), **kwargs)
+            return SVDResult(lazy.asarray(u), lazy.asarray(s), lazy.asarray(vh))
+        except NotImplementedError:
+            pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "svd dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    x = to_numpy(lazy.asarray(x))
+    u, s, vh = np.linalg.svd(x, full_matrices=full_matrices)
+    return SVDResult(lazy.asarray(u), lazy.asarray(s), lazy.asarray(vh))
+
+
+def svdvals(x, /, *, k=None, rtol=None, atol=None):
+    x = _warn_compute(x, "svdvals")
+    if k is not None:
+        try:
+            kwargs = {
+                "k": k,
+                "return_singular_vectors": False,
+            }
+            if rtol is not None and atol is not None:
+                warnings.warn(
+                    "svdvals sparse fallback supports only one tolerance; "
+                    "using min(rtol, atol).",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                tol = builtins.min(rtol, atol)
+            elif rtol is not None:
+                tol = rtol
+            else:
+                tol = atol
+            if tol is not None:
+                kwargs["tol"] = tol
+            return lazy.asarray(
+                scipy_sparse_linalg.svds(to_scipy(lazy.asarray(x)), **kwargs)
+            )
+        except NotImplementedError:
+            pass
+    if rtol is not None or atol is not None:
+        warnings.warn(
+            "svdvals dense fallback does not support rtol or atol; "
+            "ignoring tolerance arguments.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    x = to_numpy(lazy.asarray(x))
+    svdvals_func = getattr(np.linalg, "svdvals", None)
+    if svdvals_func is None:
+        return lazy.asarray(np.linalg.svd(x, compute_uv=False))
+    return lazy.asarray(svdvals_func(x))
+
+
+def fft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "fft")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.fft(x, n=n, axis=axis, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.fft(x, n=n, axis=axis, norm=norm))
+
+
+def ifft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "ifft")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.ifft(x, n=n, axis=axis, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.ifft(x, n=n, axis=axis, norm=norm))
+
+
+def fftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "fftn")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.fftn(x, s=s, axes=axes, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.fftn(x, s=s, axes=axes, norm=norm))
+
+
+def ifftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "ifftn")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.ifftn(x, s=s, axes=axes, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.ifftn(x, s=s, axes=axes, norm=norm))
+
+
+def rfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "rfft")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.rfft(x, n=n, axis=axis, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.rfft(x, n=n, axis=axis, norm=norm))
+
+
+def irfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "irfft")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.irfft(x, n=n, axis=axis, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.irfft(x, n=n, axis=axis, norm=norm))
+
+
+def rfftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "rfftn")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.rfftn(x, s=s, axes=axes, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.rfftn(x, s=s, axes=axes, norm=norm))
+
+
+def irfftn(x, /, *, s=None, axes=None, norm=None):
+    x = _warn_compute(x, "irfftn")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.irfftn(x, s=s, axes=axes, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.irfftn(x, s=s, axes=axes, norm=norm))
+
+
+def hfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "hfft")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.hfft(x, n=n, axis=axis, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.hfft(x, n=n, axis=axis, norm=norm))
+
+
+def ihfft(x, /, *, n=None, axis=-1, norm=None):
+    x = _warn_compute(x, "ihfft")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.ihfft(x, n=n, axis=axis, norm=norm))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.ihfft(x, n=n, axis=axis, norm=norm))
+
+
+def fftshift(x, /, *, axes=None):
+    x = _warn_compute(x, "fftshift")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.fftshift(x, axes=axes))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.fftshift(x, axes=axes))
+
+
+def ifftshift(x, /, *, axes=None):
+    x = _warn_compute(x, "ifftshift")
+    x = to_numpy(lazy.asarray(x))
+    try:
+        return lazy.asarray(scipy_fft.ifftshift(x, axes=axes))
+    except NotImplementedError:
+        return lazy.asarray(np.fft.ifftshift(x, axes=axes))
+
+
+def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
+    try:
+        result = scipy_fft.fftfreq(n, d=d)
+    except NotImplementedError:
+        result = np.fft.fftfreq(n, d=d)
+    if dtype is not None:
+        result = result.astype(lazy._np_dtype(dtype))
+    return lazy.asarray(result, device=device)
+
+
+def rfftfreq(n, /, *, d=1.0, dtype=None, device=None):
+    try:
+        result = scipy_fft.rfftfreq(n, d=d)
+    except NotImplementedError:
+        result = np.fft.rfftfreq(n, d=d)
+    if dtype is not None:
+        result = result.astype(lazy._np_dtype(dtype))
+    return lazy.asarray(result, device=device)
+
+
+def matrix_power(x, n, /):
+    """
+    Computes the power of a matrix.
+    """
+    if isinstance(x, lazy.LazyTensor) and not (isinstance(n, int) and n < 0):
+        return lazy.matrix_power(x, n)
+    if isinstance(n, int) and n < 0:
+        return matrix_power(inv(x), -n)
+    try:
+        return lazy.asarray(
+            to_numpy(scipy_sparse_linalg.matrix_power(to_scipy(lazy.asarray(x)), n))
+        )
+    except NotImplementedError:
+        pass
+    return compute(lazy.matrix_power(x, n))
+
+
+def matrix_norm(x, /, *, keepdims=False, ord="fro"):
+    if isinstance(x, lazy.LazyTensor):
+        try:
+            return lazy.matrix_norm(x, keepdims=keepdims, ord=ord)
+        except NotImplementedError:
+            pass
+    x = _warn_compute(x, "matrix_norm")
+    try:
+        result = scipy_sparse_linalg.norm(
+            to_scipy(lazy.asarray(x)),
+            ord=ord,
+            axis=(-2, -1),
+        )
+        if keepdims:
+            result = np.reshape(result, (1, 1))
+        return lazy.asarray(np.asarray(result))
+    except NotImplementedError:
+        pass
+    x = to_numpy(lazy.asarray(x))
+    matrix_norm_fn = getattr(np.linalg, "matrix_norm", None)
+    if matrix_norm_fn is None:
+        result = np.linalg.norm(x, ord=ord, axis=(-2, -1), keepdims=keepdims)
+    else:
+        result = matrix_norm_fn(x, keepdims=keepdims, ord=ord)
+    return lazy.asarray(np.asarray(result))
+
+
 def bitwise_invert(x):
     if isinstance(x, lazy.LazyTensor):
         return lazy.bitwise_invert(x)
@@ -326,7 +991,7 @@ def remainder(x1, x2):
     return compute(lazy.remainder(x1, x2))
 
 
-def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]]):
+def tensordot(x1, x2, /, *, axes: int | tuple[Sequence[int], Sequence[int]] = 2):
     """
     Computes the tensordot operation.
 
@@ -359,6 +1024,12 @@ def vecdot(x1, x2, /, *, axis=-1):
     if isinstance(x1, lazy.LazyTensor) or isinstance(x2, lazy.LazyTensor):
         return lazy.vecdot(x1, x2, axis=axis)
     return compute(lazy.vecdot(x1, x2, axis=axis))
+
+
+def vector_norm(x, /, *, axis=None, keepdims=False, ord=2):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.vector_norm(x, axis=axis, keepdims=keepdims, ord=ord)
+    return compute(lazy.vector_norm(x, axis=axis, keepdims=keepdims, ord=ord))
 
 
 def any(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
@@ -453,6 +1124,81 @@ def sign(x):
 # https://data-apis.org/array-api/2024.12/API_specification/manipulation_functions.html
 
 
+def _flatten_for_concat(array):
+    array = lazy.asarray(array)
+    size = functools.reduce(operator.mul, array.shape, 1)
+    if hasattr(array, "reshape"):
+        return array.reshape((size,))
+    if hasattr(array, "to_numpy"):
+        return lazy.asarray(np.asarray(array.to_numpy()).reshape((size,)))
+    return lazy.asarray(np.asarray(array).reshape((size,)))
+
+
+def concat(arrays, /, *, axis: int | None = 0):
+    arrays = tuple(arrays)
+    if builtins.any(isinstance(array, lazy.LazyTensor) for array in arrays):
+        return lazy.concat(arrays, axis=axis)
+    if axis is None:
+        arrays = tuple(_flatten_for_concat(array) for array in arrays)
+        axis = 0
+    return compute(lazy.concat(arrays, axis=axis))
+
+
+def flip(x, /, *, axis: int | tuple[int, ...] | None = None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.flip(x, axis=axis)
+    return compute(lazy.flip(x, axis=axis))
+
+
+def repeat(x, repeats, /, *, axis: int | None = None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.repeat(x, repeats, axis=axis)
+    return compute(lazy.repeat(x, repeats, axis=axis))
+
+
+def roll(
+    x,
+    /,
+    shift: int | tuple[int, ...],
+    *,
+    axis: int | tuple[int, ...] | None = None,
+):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.roll(x, shift, axis=axis)
+    return compute(lazy.roll(x, shift, axis=axis))
+
+
+def stack(arrays, /, *, axis: int = 0):
+    arrays = tuple(arrays)
+    if builtins.any(isinstance(array, lazy.LazyTensor) for array in arrays):
+        return lazy.stack(arrays, axis=axis)
+    return compute(lazy.stack(arrays, axis=axis))
+
+
+def tile(x, repetitions: tuple[int, ...], /):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.tile(x, repetitions)
+    return compute(lazy.tile(x, repetitions))
+
+
+def unstack(x, /, *, axis: int = 0):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.unstack(x, axis=axis)
+    return compute(lazy.unstack(x, axis=axis))
+
+
+def take(x, indices, /, *, axis: int | None = None):
+    if isinstance(x, lazy.LazyTensor) or isinstance(indices, lazy.LazyTensor):
+        return lazy.take(x, indices, axis=axis)
+    return compute(lazy.take(x, indices, axis=axis))
+
+
+def take_along_axis(x, indices, /, *, axis: int = -1):
+    if isinstance(x, lazy.LazyTensor) or isinstance(indices, lazy.LazyTensor):
+        return lazy.take_along_axis(x, indices, axis=axis)
+    return compute(lazy.take_along_axis(x, indices, axis=axis))
+
+
 def broadcast_to(x, /, shape: Sequence[int]):
     """
     Broadcasts an array to a new shape.
@@ -494,6 +1240,12 @@ def broadcast_arrays(*args):
         return lazy.broadcast_arrays(*args)
     # compute can take in a list of LazyTensors
     return compute(lazy.broadcast_arrays(*args))
+
+
+def meshgrid(*arrays, indexing: str = "xy"):
+    if builtins.any(isinstance(arr, lazy.LazyTensor) for arr in arrays):
+        return lazy.meshgrid(*arrays, indexing=indexing)
+    return compute(lazy.meshgrid(*arrays, indexing=indexing))
 
 
 def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...], /):
@@ -785,6 +1537,8 @@ def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = Fa
 
 
 def reshape(x, /, shape: tuple, *, copy=None):
+    if isinstance(x, lazy.LazyTensor):
+        return lazy.reshape(x, shape, copy=copy)
     if not hasattr(x, "reshape"):
         raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
     return x.reshape(shape, copy=copy)
