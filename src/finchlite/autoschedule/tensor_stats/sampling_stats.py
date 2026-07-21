@@ -8,6 +8,42 @@ from finchlite.finch_logic import Field
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStatsFactory, BaseTensorStats
 
+
+def _dgood1(d_n:float,frequencies:dict,n:float,N:float)->float:
+
+    if d_n == 0:
+        return 0.0
+    if not frequencies:
+        return d_n
+    if N<=n:
+        return d_n
+    max_i = int(max(frequencies.keys()))
+    total = d_n
+    coef = 1.0
+    for i in range(1,max_i+1):
+        j = i-1
+        denom = n-j
+        if denom <= 0:
+            break
+        coef *= (N-n+j)/denom
+        f_i = frequencies.get(i,0.0)
+        if f_i:
+            sign = 1.0 if (i%2)==0 else -1.0
+            total = sign*coef*f_i
+        if not math.isfinite(total) or not math.isfinite(coef):
+            return d_n
+        
+    if not(0.0<=total<=N):
+        return d_n
+    return float(total)
+
+def _dsilly(d_n:float,q:float)->float:
+    if d_n == 0 :
+        return 0.0
+    if q<=0:
+        return d_n
+    return float(d_n/min(q,1.0))
+
 def _duj1(d_n:float,f_1:float,q:float,n:float)->float:
     """"
     Using un-smoothened first order jackknife estimator
@@ -266,11 +302,10 @@ def _reorder_to(sketch:np.ndarray,current_order:list,target_order:list)->np.ndar
 
 class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
-    def __init__(self, sample_prob:float=0.5,estimator: str = "uj1",use_coverage:bool=False):
+    def __init__(self, sample_prob:float=0.5,estimator: str = "uj1"):
         super().__init__(SamplingStats)
         self.sample_prob = sample_prob
         self.estimator = estimator
-        self.use_coverage = use_coverage
         self._masks : dict = {}
         self._rng = np.random.default_rng()
 
@@ -282,7 +317,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         return self._masks[mask_key]
 
     def __call__(self, tensor:Any, fields:tuple[Field,...])->SamplingStats:
-        return SamplingStats(tensor,fields,sample_prob=self.sample_prob,estimator=self.estimator,mask_fn=self._get_mask,masks_ref=self._masks,use_coverage=self.use_coverage)
+        return SamplingStats(tensor,fields,sample_prob=self.sample_prob,estimator=self.estimator,mask_fn=self._get_mask,masks_ref=self._masks)
     
     
     def _mapjoin_join(self, op:FinchOperator, *join_args:SamplingStats)->SamplingStats:
@@ -310,7 +345,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         result = _reorder_to(result,result_order,list(base_stats.index_order))
 
         return SamplingStats.from_base_stats(base_stats,sketch=result,remainder_dims=new_remainder,sample_prob=self.sample_prob,
-                                             remainder_dim_sizes=new_remainder_sizes,estimator=self.estimator,use_coverage = self.use_coverage,masks_ref = self._masks)
+                                             remainder_dim_sizes=new_remainder_sizes,estimator=self.estimator,masks_ref = self._masks)
     
     def _mapjoin_union(self, op:FinchOperator, *union_args:SamplingStats):
         """
@@ -355,7 +390,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
         return SamplingStats.from_base_stats(base_stats,sketch=result,remainder_dims=new_remainder,
                                              sample_prob=self.sample_prob,remainder_dim_sizes=new_remainder_sizes,
-                                             estimator=self.estimator,use_coverage = self.use_coverage,masks_ref = self._masks)
+                                             estimator=self.estimator,masks_ref = self._masks)
 
     def aggregate(self, op:FinchOperator, init: Any| None, reduce_indices : tuple[Field,...], stats:SamplingStats):
         """
@@ -392,20 +427,20 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
         return SamplingStats.from_base_stats(base_stats,sketch=new_sketch,remainder_dims=new_remainder,
                                              sample_prob=self.sample_prob,remainder_dim_sizes=new_remainder_sizes,
-                                             estimator=self.estimator,use_coverage = self.use_coverage,masks_ref = self._masks)
+                                             estimator=self.estimator,masks_ref = self._masks)
 
     def relabel(self, stats:SamplingStats, relabel_indices:tuple[Field,...])->SamplingStats:
         base_stats = self.relabel_def(stats,relabel_indices)
         return SamplingStats.from_base_stats(base_stats,sketch=stats.sketch.copy(),remainder_dims=set(stats.remainder_dims),
                                              sample_prob=self.sample_prob,remainder_dim_sizes=dict(stats.remainder_dim_sizes),
-                                             estimator=self.estimator,use_coverage = self.use_coverage,masks_ref = self._masks)
+                                             estimator=self.estimator,masks_ref = self._masks)
     def reorder(self,stats:SamplingStats,reorder_indices:tuple[Field,...])->SamplingStats:
         base_stats = self.reorder_def(stats,reorder_indices)
         old_order = list(stats.index_order)
         new_sketch = _reorder_to(stats.sketch.copy(),old_order,list(reorder_indices))
         return SamplingStats.from_base_stats(base_stats,sketch=new_sketch,remainder_dims=set(stats.remainder_dims),
                                              sample_prob=self.sample_prob,remainder_dim_sizes=dict(stats.remainder_dim_sizes),
-                                             estimator=self.estimator,use_coverage = self.use_coverage,masks_ref = self._masks)
+                                             estimator=self.estimator,masks_ref = self._masks)
 
 
 class SamplingStats(NumericStats):
@@ -419,12 +454,11 @@ class SamplingStats(NumericStats):
     remainder_dims : set
     sample_prob : float
 
-    def __init__(self, tensor:Any, fields:tuple[Field,...],sample_prob:float=0.5,estimator : str = "uj1",mask_fn=None,masks_ref:dict|None=None,use_coverage:bool=False):
+    def __init__(self, tensor:Any, fields:tuple[Field,...],sample_prob:float=0.5,estimator : str = "uj1",mask_fn=None,masks_ref:dict|None=None,):
         super().__init__(tensor, fields)
         self.sample_prob = sample_prob
         self.remainder_dims = set()
         self.estimator = estimator
-        self.use_coverage = use_coverage
         self.remainder_dim_sizes : dict = {}
         self.masks_ref = masks_ref if masks_ref is not None else {}
 
@@ -505,7 +539,7 @@ class SamplingStats(NumericStats):
         ndims = len(all_dims)
         q = self.sample_prob ** ndims
 
-        needs_freq = self.estimator in ("uj2","schlosser","sh2","sh3")
+        needs_freq = self.estimator in ("uj2","schlosser","sh2","sh3","good1")
         if needs_freq:
             nonzero_vals = flat[flat>0]
             unique_vals,counts = np.unique(nonzero_vals,return_counts=True)
@@ -514,6 +548,9 @@ class SamplingStats(NumericStats):
             frequencies = {}
         if self.estimator == "uj1":
             formula_est =  _duj1(d_n, f_1, q, n)
+
+        elif self.estimator == "good1":
+            formula_est = _dgood1(d_n,frequencies,n,N)
 
         elif self.estimator == "sj1":
             formula_est = _dsj1(d_n, q, N)
@@ -529,15 +566,16 @@ class SamplingStats(NumericStats):
         elif self.estimator == "sh3":
             formula_est = _dsh3(d_n, f_1, frequencies, q, n)
 
+        elif self.estimator == "silly":
+            q_output = self.sample_prob**len(self.index_order)
+            formula_est = _dsilly(d_n,q_output)
+
         else:
             raise ValueError(
                 f"Unknown estimator: {self.estimator!r}."
-                f"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3"
+                f"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1"
             )
         
-        if self.use_coverage:
-            coverage_est = self.coverage_correction()
-            return float(max(formula_est,coverage_est))
         
         return float(formula_est)
 
