@@ -58,10 +58,7 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     i, j = Field("i"), Field("j")
     stats = FDStatsFactory()(fl.FillTensor((2, 3), 0), (i, j))
 
-    assert stats.dense_props == {
-        i: {frozenset()},
-        j: {frozenset(), frozenset({i})},
-    }
+    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
     assert stats.repeated_props == {
         i: {frozenset()},
         j: {frozenset({i})},
@@ -71,8 +68,8 @@ def test_fd_stats_constructor_maps_hierarchical_format_properties():
     row, col = Field("row"), Field("col")
     relabeled = FDStatsFactory().relabel(stats, (row, col))
     assert relabeled.dense_props == {
-        row: {frozenset()},
-        col: {frozenset(), frozenset({row})},
+        frozenset({row}),
+        frozenset({row, col}),
     }
     assert relabeled.repeated_props == {
         row: {frozenset()},
@@ -85,10 +82,7 @@ def test_fd_stats_constructor_maps_hierarchical_array_dense_properties():
     tensor = fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
     stats = FDStatsFactory()(tensor, (i, j))
 
-    assert stats.dense_props == {
-        i: {frozenset()},
-        j: {frozenset(), frozenset({i})},
-    }
+    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
     assert stats.repeated_props == {}
 
 
@@ -103,14 +97,8 @@ def test_fd_stats_mapjoin_union_preserves_property_maps():
 
     stats = factory.mapjoin(ffuncs.add, fill_stats, array_stats)
 
-    assert stats.dense_props == {
-        i: {frozenset()},
-        j: {frozenset(), frozenset({i})},
-    }
-    assert stats.repeated_props == {
-        i: {frozenset()},
-        j: {frozenset({i})},
-    }
+    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
+    assert stats.repeated_props == {}
 
 
 def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
@@ -120,7 +108,7 @@ def test_fd_stats_aggregate_drops_reduced_indices_from_property_maps():
 
     stats = factory.aggregate(ffuncs.add, None, (i,), stats)
 
-    assert stats.dense_props == {j: {frozenset()}}
+    assert stats.dense_props == {frozenset({j})}
     assert stats.repeated_props == {j: {frozenset()}}
 
 
@@ -165,8 +153,8 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
     formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
 
     assert formatter.output_stats[0].dense_props == {
-        i: {frozenset()},
-        j: {frozenset(), frozenset({i})},
+        frozenset({i}),
+        frozenset({i, j}),
     }
     assert capture.last_stats[B] is formatter.output_stats[0]
 
@@ -207,7 +195,7 @@ def test_fd_formatter_uses_dense_levels_for_dense_properties():
 def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     i, j = Field("i"), Field("j")
     base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
-    stats = FDStats(base, dense_props={i: {frozenset()}})
+    stats = FDStats(base, dense_props={frozenset({i})})
 
     ftype = FDFormatter().get_tensor_ftype(
         0,
@@ -226,10 +214,7 @@ def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
     base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
     stats = FDStats(
         base,
-        dense_props={
-            i: {frozenset()},
-            j: {frozenset()},
-        },
+        dense_props={frozenset({i}), frozenset({j})},
     )
 
     ftype = FDFormatter().get_tensor_ftype(
@@ -309,13 +294,13 @@ def test_fd_formatter_csr_dcsr_format_algebra():
     assert _fd_output_pattern(csr_matmul_csr) == ("sparse", "sparse")
 
 
-def test_fd_stats_chase_ignores_circular_dependencies():
+def test_fd_stats_records_dense_projections_without_chasing():
     i, j = Field("i"), Field("j")
 
     class TensorFType:
         level_format_properties = [
-            DenseProperty((0,), (1,)),
-            DenseProperty((1,), (0,)),
+            DenseProperty((0, 1)),
+            DenseProperty((1,)),
         ]
 
     class Tensor:
@@ -325,10 +310,7 @@ def test_fd_stats_chase_ignores_circular_dependencies():
 
     stats = FDStatsFactory()(Tensor(), (i, j))
 
-    assert stats.dense_props == {
-        i: {frozenset({j})},
-        j: {frozenset({i})},
-    }
+    assert stats.dense_props == {frozenset({i, j}), frozenset({j})}
 
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────

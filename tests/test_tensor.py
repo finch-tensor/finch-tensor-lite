@@ -202,8 +202,8 @@ def test_fiber_tensor():
         )
     )
     assert fmt.level_format_properties == [
-        DenseProperty((), (0,)),
-        DenseProperty((0,), (1,)),
+        DenseProperty((0,)),
+        DenseProperty((0, 1)),
     ]
     sparse_fmt = fiber_tensor(
         dense(
@@ -221,8 +221,8 @@ def test_fiber_tensor():
         )
     )
     assert sparse_fmt.level_format_properties == [
-        DenseProperty((), (0,)),
-        DenseProperty((0, 1), (2,)),
+        DenseProperty((0,)),
+        DenseProperty((0, 1, 2)),
     ]
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)
@@ -267,8 +267,8 @@ def test_bufferized_ndarray_level_format_properties():
     tensor = BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
 
     assert tensor.ftype.level_format_properties == [
-        DenseProperty((), (0,)),
-        DenseProperty((0,), (1,)),
+        DenseProperty((0,)),
+        DenseProperty((0, 1)),
     ]
 
 
@@ -278,15 +278,15 @@ def test_bufferized_ndarray_level_format_properties():
         (
             FillTensor((2, 3), 0),
             [
-                DenseProperty((), (0,)),
-                DenseProperty((0,), (1,)),
+                DenseProperty((0,)),
+                DenseProperty((0, 1)),
                 RepeatedProperty((), (0,)),
                 RepeatedProperty((0,), (1,)),
             ],
         ),
         (
             IndexTensor((2, 3)),
-            [DenseProperty((), (0,)), DenseProperty((0,), (1,))],
+            [DenseProperty((0,)), DenseProperty((0, 1))],
         ),
         (ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_), []),
         (EyeTensor((2, 3)), []),

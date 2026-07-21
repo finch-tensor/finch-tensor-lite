@@ -127,9 +127,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         return self._lvl_t
 
     def level_format_properties(self, n):
-        return [Dense(tuple(range(n)), (n,))] + self.lvl_t.level_format_properties(
-            n + 1
-        )
+        return [Dense(tuple(range(n + 1)))] + self.lvl_t.level_format_properties(n + 1)
 
     def level_lower_dim(self, ctx, lvl, r):
         if r == 0:

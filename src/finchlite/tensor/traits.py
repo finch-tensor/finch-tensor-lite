@@ -18,38 +18,42 @@ class Random(AccessCapability):
     """The level supports direct access by index."""
 
 
-@dataclass(frozen=True)
 class FormatProperty:
-    """
-    A structural rule from known dimensions to implied dimensions.
+    """Marker for a structural property exposed by a tensor format."""
 
-    For example, a dense property with hypothesis dims ``x`` and conclusion
-    dims ``y`` says that any non-fill slice at ``x`` contains all ``y`` values.
+
+@dataclass(frozen=True)
+class Dense(FormatProperty):
+    """
+    Every slice identified by ``dims`` contains a non-fill value.
+
+    Equivalently, the tensor's non-fill support has a complete projection onto
+    these dimensions.
+    """
+
+    dims: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class Blocked(FormatProperty):
+    """
+    Each non-fill slice at an odd position along the conclusion dimensions
+    occurs together with a subsequent non-fill slice.
     """
 
     hypothesis_dims: tuple[int, ...]
     conclusion_dims: tuple[int, ...]
 
 
-class Dense(FormatProperty):
-    """
-    Every slice along the conclusion dimension exists whenever the hypothesis
-    dimensions identify a non-fill slice.
-    """
-
-
-class Blocked(FormatProperty):
-    """
-    Each non-fill slice at an odd position along the conclusion dimension occurs together with a
-    subsequent non-fill slice.
-    """
-
-
+@dataclass(frozen=True)
 class Repeated(FormatProperty):
     """
     Each slice at an odd position along the conclusion dimension occurs together
     with an subsequent identical slice.
     """
+
+    hypothesis_dims: tuple[int, ...]
+    conclusion_dims: tuple[int, ...]
 
 
 class AxiomaticTensor(Tensor, ABC):

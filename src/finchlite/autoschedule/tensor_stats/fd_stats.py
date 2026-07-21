@@ -5,11 +5,12 @@ from typing import Any
 
 from finchlite.algebra import FinchOperator
 from finchlite.finch_logic import Field, StatsFactory
-from finchlite.tensor.traits import Blocked, Dense, FormatProperty, Repeated
+from finchlite.tensor.traits import Blocked, Dense, Repeated
 
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 PropertyMap = dict[Field, set[frozenset[Field]]]
+DensePropertySet = set[frozenset[Field]]
 
 
 class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"]):
@@ -19,14 +20,14 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> FDStats:
         base = super().__call__(tensor, fields)
         props = getattr(tensor.ftype, "level_format_properties", ())
-        dense_props: PropertyMap = {}
+        dense_props: DensePropertySet = set()
         blocked_props: PropertyMap = {}
         repeated_props: PropertyMap = {}
 
         for prop in props:
             match prop:
                 case Dense():
-                    self._add_property(base, dense_props, prop)
+                    dense_props.add(frozenset(self._fields_for_dims(base, prop.dims)))
                 case Blocked():
                     self._add_property(base, blocked_props, prop)
                 case Repeated():
@@ -49,13 +50,25 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self, op: FinchOperator, a: FDStats, b: FDStats
     ) -> FDStats:
         base = super()._mapjoin_defs(op, a, b)
-        dense_props = deepcopy(a.dense_props)
+        dense_props = self._union_dense_properties(base, a, b)
         blocked_props = deepcopy(a.blocked_props)
-        self._union_properties(dense_props, b.dense_props)
         self._union_properties(blocked_props, b.blocked_props)
-        repeated_props = deepcopy(a.repeated_props)
-        self._join_properties(repeated_props, a.index_order, b.repeated_props, b.index_order)
+        repeated_props = self._join_properties(
+            a.repeated_props, a.index_order, b.repeated_props, b.index_order
+        )
         return FDStats(base, dense_props, blocked_props, repeated_props)
+
+    @staticmethod
+    def _union_dense_properties(
+        base: BaseTensorStats, a: FDStats, b: FDStats
+    ) -> DensePropertySet:
+        output_fields = frozenset(base.index_order)
+        a_broadcast = output_fields - frozenset(a.index_order)
+        b_broadcast = output_fields - frozenset(b.index_order)
+        return {
+            *(dims | a_broadcast for dims in a.dense_props),
+            *(dims | b_broadcast for dims in b.dense_props),
+        }
 
     @staticmethod
     def _union_properties(a: PropertyMap, b: PropertyMap):
@@ -72,13 +85,31 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self, op: FinchOperator, a: FDStats, b: FDStats
     ) -> FDStats:
         base = super()._mapjoin_defs(op, a, b)
-        dense_props = self._join_properties(a.dense_props, a.index_order, b.dense_props, b.index_order)
-        blocked_props = self._join_properties(a.blocked_props, a.index_order, b.blocked_props, b.index_order)
-        repeated_props = self._join_properties(a.repeated_props, a.index_order, b.repeated_props, b.index_order)
+        dense_props = self._join_dense_properties(base, a, b)
+        blocked_props = self._join_properties(
+            a.blocked_props, a.index_order, b.blocked_props, b.index_order
+        )
+        repeated_props = self._join_properties(
+            a.repeated_props, a.index_order, b.repeated_props, b.index_order
+        )
         return FDStats(base, dense_props, blocked_props, repeated_props)
 
     @staticmethod
+    def _join_dense_properties(
+        base: BaseTensorStats, a: FDStats, b: FDStats
+    ) -> DensePropertySet:
+        a_fields = frozenset(a.index_order)
+        b_fields = frozenset(b.index_order)
+        if not any(a_fields.issubset(dims) for dims in a.dense_props):
+            return set()
+        if not any(b_fields.issubset(dims) for dims in b.dense_props):
+            return set()
+        return {frozenset(base.index_order)}
+
+    @staticmethod
     def _join_properties(a: PropertyMap, a_idxs, b: PropertyMap, b_idxs) -> PropertyMap:
+        a_idxs = frozenset(a_idxs)
+        b_idxs = frozenset(b_idxs)
         out: PropertyMap = {}
         for conclusion, a_hypotheses in a.items():
             if conclusion not in b:
@@ -86,7 +117,10 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
             hypotheses: set[frozenset[Field]] = set()
             for a_hypothesis in a_hypotheses:
                 for b_hypothesis in b[conclusion]:
-                    hypotheses.add(a_hypothesis.union(b_idxs - a_idxs) & b_hypothesis.union(a_idxs - b_idxs))
+                    hypotheses.add(
+                        a_hypothesis.union(b_idxs - a_idxs)
+                        & b_hypothesis.union(a_idxs - b_idxs)
+                    )
             out[conclusion] = hypotheses
         return out
 
@@ -112,7 +146,11 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         dropped_indices = frozenset(reduce_indices)
         return FDStats(
             base,
-            self._drop_property_indices(stats.dense_props, dropped_indices),
+            {
+                dims - dropped_indices
+                for dims in stats.dense_props
+                if dims - dropped_indices
+            },
             self._drop_property_indices(stats.blocked_props, dropped_indices),
             self._drop_property_indices(stats.repeated_props, dropped_indices),
         )
@@ -122,7 +160,10 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         relabel_map = dict(zip(stats.index_order, relabel_indices, strict=True))
         return FDStats(
             base,
-            self._relabel_property_map(stats.dense_props, relabel_map),
+            {
+                frozenset(relabel_map[field] for field in dims)
+                for dims in stats.dense_props
+            },
             self._relabel_property_map(stats.blocked_props, relabel_map),
             self._relabel_property_map(stats.repeated_props, relabel_map),
         )
@@ -153,7 +194,7 @@ class FDStatsFactory(BaseTensorStatsFactory["FDStats"], StatsFactory["FDStats"])
         self,
         base: BaseTensorStats,
         props_by_conclusion: PropertyMap,
-        prop: FormatProperty,
+        prop: Blocked | Repeated,
     ):
         hypotheses = frozenset(self._fields_for_dims(base, prop.hypothesis_dims))
         for conclusion in self._fields_for_dims(base, prop.conclusion_dims):
@@ -177,31 +218,11 @@ class FDStats(BaseTensorStats):
     def __init__(
         self,
         base: BaseTensorStats,
-        dense_props: PropertyMap | None = None,
+        dense_props: DensePropertySet | None = None,
         blocked_props: PropertyMap | None = None,
         repeated_props: PropertyMap | None = None,
     ):
         super().__init__(base)
-        self.dense_props = self._chase(deepcopy(dense_props) if dense_props else {})
+        self.dense_props = deepcopy(dense_props) if dense_props else set()
         self.blocked_props = deepcopy(blocked_props) if blocked_props else {}
         self.repeated_props = deepcopy(repeated_props) if repeated_props else {}
-
-    def _chase(
-        self,
-        props: PropertyMap,
-    ) -> PropertyMap:
-        changed = True
-        while changed:
-            changed = False
-            for conclusion, hypotheses in tuple(props.items()):
-                for hypothesis in tuple(hypotheses):
-                    for head in hypothesis:
-                        tail = hypothesis - {head}
-                        for replacement in tuple(props.get(head, ())):
-                            chased = tail | replacement
-                            if conclusion in chased:
-                                continue
-                            if chased not in hypotheses:
-                                hypotheses.add(chased)
-                                changed = True
-        return props

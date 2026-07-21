@@ -107,9 +107,10 @@ class FDFormatter(SmartFormatter):
         for dim in reversed(range(len(stats.index_order))):
             field = stats.index_order[dim]
             outer_fields = frozenset(stats.index_order[:dim])
+            required_fields = outer_fields | {field}
             is_dense = any(
-                outer_fields.issubset(hypothesis)
-                for hypothesis in stats.dense_props.get(field, ())
+                required_fields.issubset(dense_fields)
+                for dense_fields in stats.dense_props
             )
             if is_dense:
                 lvl = dense(lvl, shape_type[dim])
