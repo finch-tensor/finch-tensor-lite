@@ -11,8 +11,10 @@ from finchlite.algebra import (
     ImmutableStructFType,
     TupleFType,
     bool_,
+    ftype,
     normalize_device,
 )
+from finchlite.codegen import NumpyBuffer
 from finchlite.compile.lower import FinchTensorFType
 
 from .override_tensor import OverrideTensor
@@ -295,17 +297,12 @@ class FiberTensor(OverrideTensor):
         from .level import DenseLevel, ElementLevel, SparseListLevel
 
         if self.ndim != 2:
-            raise ValueError(
-                "SciPy sparse arrays only support two-dimensional tensors; "
-                f"received {self.ndim} dimensions."
-            )
+            raise ValueError("SciPy sparse arrays must be two-dimensional.")
+
+        if self.fill_value != 0:
+            raise ValueError("SciPy CSR conversion requires a zero fill value.")
 
         match self.lvl:
-            case DenseLevel(lvl=DenseLevel(lvl=ElementLevel() as element)):
-                return scipy_sparse.csr_array(
-                    element.val.arr.reshape(self.shape, copy=False)
-                )
-
             case DenseLevel(
                 lvl=SparseListLevel(
                     lvl=ElementLevel() as element,
@@ -313,68 +310,14 @@ class FiberTensor(OverrideTensor):
                     idx=idx,
                 )
             ):
-                if self.fill_value != 0:
-                    raise ValueError(
-                        "SciPy sparse arrays require a zero fill value; "
-                        f"received {self.fill_value!r}."
-                    )
                 return scipy_sparse.csr_array(
                     (element.val.arr, idx.arr, ptr.arr),
                     shape=self.shape,
                     copy=False,
                 )
-
-            case SparseListLevel(
-                lvl=DenseLevel(lvl=ElementLevel() as element, dimension=ncols),
-                ptr=ptr,
-                idx=idx,
-            ):
-                if self.fill_value != 0:
-                    raise ValueError(
-                        "SciPy sparse arrays require a zero fill value; "
-                        f"received {self.fill_value!r}."
-                    )
-                q_start = int(ptr.arr[self.pos])
-                q_stop = int(ptr.arr[self.pos + 1])
-                rows = np.repeat(idx.arr[q_start:q_stop], int(ncols))
-                cols = np.tile(np.arange(ncols, dtype=idx.arr.dtype), q_stop - q_start)
-                data = element.val.arr[q_start * int(ncols) : q_stop * int(ncols)]
-                return scipy_sparse.coo_array(
-                    (data, (rows, cols)), shape=self.shape
-                ).tocsr()
-
-            case SparseListLevel(
-                lvl=SparseListLevel(
-                    lvl=ElementLevel() as element,
-                    ptr=inner_ptr,
-                    idx=inner_idx,
-                ),
-                ptr=outer_ptr,
-                idx=outer_idx,
-            ):
-                if self.fill_value != 0:
-                    raise ValueError(
-                        "SciPy sparse arrays require a zero fill value; "
-                        f"received {self.fill_value!r}."
-                    )
-                q_start = int(outer_ptr.arr[self.pos])
-                q_stop = int(outer_ptr.arr[self.pos + 1])
-                counts = np.diff(inner_ptr.arr[q_start : q_stop + 1])
-                rows = np.repeat(outer_idx.arr[q_start:q_stop], counts)
-                p_start = int(inner_ptr.arr[q_start])
-                p_stop = int(inner_ptr.arr[q_stop])
-                return scipy_sparse.coo_array(
-                    (
-                        element.val.arr[p_start:p_stop],
-                        (rows, inner_idx.arr[p_start:p_stop]),
-                    ),
-                    shape=self.shape,
-                ).tocsr()
-
             case _:
                 raise NotImplementedError(
-                    "SciPy conversion requires DenseLevel or SparseListLevel "
-                    f"received {self.ftype}."
+                    f"Finch format {self.ftype} is not supported by SciPy conversion."
                 )
 
     def item(self):
@@ -509,6 +452,44 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             pos=self.position_type(0),
             dirty_bit=False,
             _device=self.device,
+        )
+
+    @staticmethod
+    def from_scipy(obj, device=None):
+        from .level import (
+            DenseLevel,
+            ElementLevel,
+            SparseListLevel,
+            dense,
+            element,
+            sparse_list,
+        )
+
+        data = obj.data
+        indices = obj.indices
+        indptr = obj.indptr
+        element_lvl = element(
+            fill_value=np.zeros((), dtype=data.dtype)[()],
+            element_type=ftype(data.dtype),
+            position_type=ftype(indices.dtype),
+        )
+        sparse_lvl = sparse_list(element_lvl, dimension_type=ftype(indices.dtype))
+        dense_lvl = dense(sparse_lvl, dimension_type=ftype(indices.dtype))
+
+        return FiberTensor(
+            DenseLevel(
+                SparseListLevel(
+                    ElementLevel(
+                        _format=element_lvl,
+                        _val=NumpyBuffer(data),
+                    ),
+                    dimension=sparse_lvl.dimension_type(obj.shape[1]),
+                    ptr=NumpyBuffer(indptr),
+                    idx=NumpyBuffer(indices),
+                ),
+                dimension=dense_lvl.dimension_type(obj.shape[0]),
+            ),
+            _device=device,
         )
 
 
