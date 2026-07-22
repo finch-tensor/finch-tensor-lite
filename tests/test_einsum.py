@@ -396,9 +396,7 @@ def test_bool_literals(rng):
 
     # Test boolean operations with literals
     A_bool = rng.random((2, 2)) > 0.5
-    result_and = finch.einop(
-        "D[i,j] = A_bool[i,j] and True and False", A_bool=A_bool
-    )
+    result_and = finch.einop("D[i,j] = A_bool[i,j] and True and False", A_bool=A_bool)
     expected_and = np.logical_and(np.logical_and(A_bool, True), False)
     finch_assert_allclose(result_and, expected_and)
 

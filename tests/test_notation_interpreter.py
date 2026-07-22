@@ -145,9 +145,7 @@ def test_matrix_multiplication(a, b):
     mod = ntn.NotationInterpreter()(prgm)
 
     c = np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
-    result = mod.matmul(
-        finch.asarray(c), finch.asarray(a), finch.asarray(b)
-    )
+    result = mod.matmul(finch.asarray(c), finch.asarray(a), finch.asarray(b))
 
     expected = np.matmul(a, b)
 

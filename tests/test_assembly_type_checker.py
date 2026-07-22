@@ -138,9 +138,7 @@ def test_assign_basic():
     checker = asm.AssemblyTypeChecker()
     assert (
         checker(
-            asm.Assign(
-                asm.Variable("x", finch.float64), asm.Literal(np.float64(2.0))
-            )
+            asm.Assign(asm.Variable("x", finch.float64), asm.Literal(np.float64(2.0)))
         )
         is None
     )

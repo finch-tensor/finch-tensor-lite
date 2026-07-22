@@ -195,11 +195,7 @@ def test_masks_are_serial_but_operations_keep_input_device():
 
 def test_fiber_tensor():
     fmt = fiber_tensor(
-        dense(
-            dense(
-                element(np.int64(0), finch.int64, finch.intp, NumpyBufferFType)
-            )
-        )
+        dense(dense(element(np.int64(0), finch.int64, finch.intp, NumpyBufferFType)))
     )
     assert fmt.level_format_properties == [
         DenseProperty((0,)),
@@ -254,9 +250,7 @@ def test_sparse_level_construct_initializes_empty_storage():
     assert all(idx.length() == 0 for idx in coo_level.tbl)
     assert coo_level.lvl.val.length() == 0
 
-    bytemap_level = finch.sparse_bytemap(elem_t, finch.intp).construct(
-        (4,), pos=3
-    )
+    bytemap_level = finch.sparse_bytemap(elem_t, finch.intp).construct((4,), pos=3)
     np.testing.assert_array_equal(bytemap_level.ptr.arr, np.zeros(4, dtype=np.intp))
     np.testing.assert_array_equal(bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_))
     assert bytemap_level.srt.length() == 0
@@ -392,12 +386,8 @@ def test_symbolic_tensors_reject_materialization(tensor):
 def test_triu_tril(k):
     arr = np.arange(12, dtype=np.int32).reshape((3, 4))
 
-    np.testing.assert_array_equal(
-        finch.triu(arr, k=k).to_numpy(), np.triu(arr, k=k)
-    )
-    np.testing.assert_array_equal(
-        finch.tril(arr, k=k).to_numpy(), np.tril(arr, k=k)
-    )
+    np.testing.assert_array_equal(finch.triu(arr, k=k).to_numpy(), np.triu(arr, k=k))
+    np.testing.assert_array_equal(finch.tril(arr, k=k).to_numpy(), np.tril(arr, k=k))
 
 
 @pytest.mark.parametrize("k", [-1, 0, 1])
@@ -405,12 +395,8 @@ def test_diag(k):
     vec = np.array([1, 2, 3], dtype=np.int32)
     mat = np.arange(12, dtype=np.int32).reshape((3, 4))
 
-    np.testing.assert_array_equal(
-        finch.diag(vec, k=k).to_numpy(), np.diag(vec, k=k)
-    )
-    np.testing.assert_array_equal(
-        finch.diag(mat, k=k).to_numpy(), np.diag(mat, k=k)
-    )
+    np.testing.assert_array_equal(finch.diag(vec, k=k).to_numpy(), np.diag(vec, k=k))
+    np.testing.assert_array_equal(finch.diag(mat, k=k).to_numpy(), np.diag(mat, k=k))
 
 
 @pytest.mark.parametrize(
@@ -432,9 +418,7 @@ def test_diff(arr, axis, n):
         expected,
     )
     np.testing.assert_array_equal(
-        finch.compute(
-            finch.diff(finch.lazy(arr), axis=axis, n=n)
-        ).to_numpy(),
+        finch.compute(finch.diff(finch.lazy(arr), axis=axis, n=n)).to_numpy(),
         expected,
     )
 
@@ -566,6 +550,4 @@ def test_lazy_array_api_matrix_functions():
     np.testing.assert_array_equal(
         finch.compute(finch.diag(x, k=1)).to_numpy(), np.diag(arr, k=1)
     )
-    assert finch.compute(finch.trace(x, offset=1)).item() == np.trace(
-        arr, offset=1
-    )
+    assert finch.compute(finch.trace(x, offset=1)).item() == np.trace(arr, offset=1)

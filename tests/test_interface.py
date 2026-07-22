@@ -263,9 +263,7 @@ def test_elementwise_operations(a, b, a_wrap, b_wrap, ops, np_op):
         for op in ops:
             result = op(wa, wb)
 
-            if isinstance(wa, finch.LazyTensor) or isinstance(
-                wb, finch.LazyTensor
-            ):
+            if isinstance(wa, finch.LazyTensor) or isinstance(wb, finch.LazyTensor):
                 assert isinstance(result, finch.LazyTensor)
 
                 result = finch.compute(result)
@@ -464,9 +462,7 @@ def test_device_hierarchy_objects_and_ftypes():
     assert finch.ftype(cpu_dev) == finch.CPUFType("main")
     assert finch.CPUFType("main").device == finch.CPUFType("main")
     assert finch.CPUFType("main").parent_device_type == finch.SerialFType()
-    assert finch.CPUFType("main")(2) == finch.CPU(
-        finch.serial(), id="main", n=2
-    )
+    assert finch.CPUFType("main")(2) == finch.CPU(finch.serial(), id="main", n=2)
     assert finch.common_device(finch.serial(), cpu_dev) == cpu_dev
     assert finch.common_device(cpu_dev, finch.serial()) == cpu_dev
     with pytest.raises(ValueError):
@@ -516,17 +512,10 @@ def test_iinfo_returns_python_scalars():
 def test_result_type():
     assert finch.result_type(finch.int8, finch.int16) == finch.int16
     assert finch.result_type(finch.int32, finch.uint32) == finch.int64
+    assert finch.result_type(finch.float32, finch.float64) == finch.float64
+    assert finch.result_type(finch.complex64, finch.complex128) == finch.complex128
     assert (
-        finch.result_type(finch.float32, finch.float64) == finch.float64
-    )
-    assert (
-        finch.result_type(finch.complex64, finch.complex128)
-        == finch.complex128
-    )
-    assert (
-        finch.result_type(
-            finch.asarray([1], dtype=finch.int32), finch.uint16
-        )
+        finch.result_type(finch.asarray([1], dtype=finch.int32), finch.uint16)
         == finch.int32
     )
 
@@ -949,9 +938,7 @@ def test_searchsorted(wrap, side, use_sorter):
 
 
 @pytest.mark.parametrize("wrap", [lambda x: x, finch.lazy])
-@pytest.mark.parametrize(
-    "op, np_op", [(finch.min, np.min), (finch.max, np.max)]
-)
+@pytest.mark.parametrize("op, np_op", [(finch.min, np.min), (finch.max, np.max)])
 @pytest.mark.parametrize("axis", [None, 0, 1])
 def test_min_max_nan_propagation(wrap, op, np_op, axis):
     x = np.array([[1.0, np.nan], [3.0, 4.0]])
@@ -1533,21 +1520,15 @@ def test_linalg_vector_norm_large_values():
 @pytest.mark.usefixtures("interpreter_scheduler")
 def test_linalg_vector_norm_negative_ord_stable_values():
     tiny = np.array([1e-308, 1e308], dtype=np.float64)
-    tiny_result = finch.compute(
-        finch.linalg.vector_norm(finch.lazy(tiny), ord=-2)
-    )
+    tiny_result = finch.compute(finch.linalg.vector_norm(finch.lazy(tiny), ord=-2))
     finch_assert_allclose(tiny_result, np.float64(1e-308))
 
     zero = np.array([0.0, 2.0], dtype=np.float64)
-    zero_result = finch.compute(
-        finch.linalg.vector_norm(finch.lazy(zero), ord=-2)
-    )
+    zero_result = finch.compute(finch.linalg.vector_norm(finch.lazy(zero), ord=-2))
     finch_assert_allclose(zero_result, np.float64(0.0))
 
     nan = np.array([1.0, np.nan], dtype=np.float64)
-    nan_result = finch.compute(
-        finch.linalg.vector_norm(finch.lazy(nan), ord=-2)
-    )
+    nan_result = finch.compute(finch.linalg.vector_norm(finch.lazy(nan), ord=-2))
     assert np.isnan(nan_result.item())
 
 
@@ -1808,13 +1789,8 @@ def test_fft_eager_methods_use_numpy_fallback():
     finch_assert_allclose(finch.fft.fft(x), np.fft.fft(x))
     finch_assert_allclose(finch.fft.rfft(x), np.fft.rfft(x))
     finch_assert_allclose(finch.fft.fftfreq(4), np.fft.fftfreq(4))
-    assert (
-        finch.fft.fftfreq(4, dtype=finch.float32).to_numpy().dtype == np.float32
-    )
-    assert (
-        finch.fft.rfftfreq(4, dtype=finch.float32).to_numpy().dtype
-        == np.float32
-    )
+    assert finch.fft.fftfreq(4, dtype=finch.float32).to_numpy().dtype == np.float32
+    assert finch.fft.rfftfreq(4, dtype=finch.float32).to_numpy().dtype == np.float32
 
 
 def test_new_eager_only_methods_warn_compute_lazy_operands():
