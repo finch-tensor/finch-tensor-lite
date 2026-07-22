@@ -7,29 +7,311 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
+from finchlite.algebra import TensorFType, TupleFType, ftype
+from finchlite.autoschedule.capture import LogicCapture
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
+from finchlite.autoschedule.smart_formatter import FDFormatter, SmartFormatter
 from finchlite.autoschedule.tensor_stats import (
     DC,
-    BlockedStats,
+    BaseTensorStats,
+    BaseTensorStatsFactory,
     BlockedStatsFactory,
-    DatabaseStatsFactory,
     DCStats,
     DCStatsFactory,
-    DenseStats,
     DenseStatsFactory,
     DummyStatsFactory,
-    TensorDef,
-    UniformStats,
+    FDStats,
+    FDStatsFactory,
+    LPStats,
+    LPStatsFactory,
     UniformStatsFactory,
+    VPStatsFactory,
 )
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
+    Alias,
     Field,
     Literal,
     MapJoin,
+    Plan,
+    Produces,
+    Query,
     Table,
 )
+from finchlite.tensor.traits import Dense as DenseProperty
+
+
+def _overwrite_def(stat, base: BaseTensorStats):
+    """Overwrite a stat's BaseTensorStats state in place.
+
+    Stats now inherit from :class:`BaseTensorStats`, so we copy ``base``'s state
+    onto the stat directly.
+    """
+    stat.index_order = base.index_order
+    stat.dim_sizes = base.dim_sizes
+    stat.fill_value = base.fill_value
+    return stat
+
+
+def test_fd_stats_constructor_maps_hierarchical_format_properties():
+    i, j = Field("i"), Field("j")
+    stats = FDStatsFactory()(fl.FillTensor((2, 3), 0), (i, j))
+
+    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
+
+    row, col = Field("row"), Field("col")
+    relabeled = FDStatsFactory().relabel(stats, (row, col))
+    assert relabeled.dense_props == {
+        frozenset({row}),
+        frozenset({row, col}),
+    }
+
+
+def test_fd_stats_constructor_maps_hierarchical_array_dense_properties():
+    i, j = Field("i"), Field("j")
+    tensor = fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
+    stats = FDStatsFactory()(tensor, (i, j))
+
+    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
+
+
+def test_fd_stats_mapjoin_union_preserves_property_maps():
+    i, j = Field("i"), Field("j")
+    factory = FDStatsFactory()
+    fill_stats = factory(fl.FillTensor((2, 3), 0), (i, j))
+    array_stats = factory(
+        fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32)),
+        (i, j),
+    )
+
+    stats = factory.mapjoin(ffuncs.add, fill_stats, array_stats)
+
+    assert stats.dense_props == {frozenset({i, j})}
+
+
+def test_fd_stats_aggregate_drops_reduced_indices_from_dense_properties():
+    i, j = Field("i"), Field("j")
+    factory = FDStatsFactory()
+    stats = factory(fl.FillTensor((2, 3), 0), (i, j))
+
+    stats = factory.aggregate(ffuncs.add, None, (i,), stats)
+
+    assert stats.dense_props == {frozenset({j})}
+
+
+def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
+    class RecordingSmartFormatter(SmartFormatter):
+        def __init__(self, loader):
+            super().__init__(loader)
+            self.output_stats = []
+
+        def get_tensor_ftype(self, fill_value, shape_type, stats) -> TensorFType:
+            self.output_stats.append(stats)
+            fill_ftype = ftype(
+                fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+            )
+            return fl.BufferizedNDArrayFType(
+                buffer_type=fl.NumpyBufferFType(fill_ftype),
+                ndim=len(shape_type),
+                dimension_type=TupleFType.from_tuple(shape_type),
+                fill_value=fill_value,
+            )
+
+    i, j = Field("i"), Field("j")
+    A, B = Alias("A"), Alias("B")
+    tensor = fl.FillTensor((2, 3), 0)
+    stats_factory = FDStatsFactory()
+    stats = {A: stats_factory(tensor, (i, j))}
+    capture = LogicCapture()
+    formatter = RecordingSmartFormatter(capture)
+    prgm = Plan(
+        (
+            Query(
+                B,
+                MapJoin(
+                    Literal(ffuncs.add),
+                    (Table(A, (i, j)), Table(A, (i, j))),
+                ),
+            ),
+            Produces((B,)),
+        )
+    )
+
+    formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
+
+    assert formatter.output_stats[0].dense_props == {frozenset({i, j})}
+    assert capture.last_stats[B] is formatter.output_stats[0]
+
+
+def test_fd_formatter_uses_dense_levels_for_dense_properties():
+    i, j = Field("i"), Field("j")
+    A, B = Alias("A"), Alias("B")
+    tensor = fl.FillTensor((2, 3), 0)
+    stats_factory = FDStatsFactory()
+    stats = {A: stats_factory(tensor, (i, j))}
+    capture = LogicCapture()
+    formatter = FDFormatter(capture)
+    prgm = Plan(
+        (
+            Query(
+                B,
+                MapJoin(
+                    Literal(ffuncs.add),
+                    (Table(A, (i, j)), Table(A, (i, j))),
+                ),
+            ),
+            Produces((B,)),
+        )
+    )
+
+    formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
+
+    ftype = capture.last_bindings[B]
+    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+
+    constructed = ftype.construct((2, 3))
+    np.testing.assert_array_equal(constructed.to_numpy(), np.zeros((2, 3)))
+
+
+def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
+    i, j = Field("i"), Field("j")
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    stats = FDStats(base, dense_props={frozenset({i})})
+
+    ftype = FDFormatter().get_tensor_ftype(
+        0,
+        (fl.ftype(np.intp), fl.ftype(np.intp)),
+        stats,
+    )
+
+    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+
+
+def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
+    i, j = Field("i"), Field("j")
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    stats = FDStats(
+        base,
+        dense_props={frozenset({i}), frozenset({j})},
+    )
+
+    ftype = FDFormatter().get_tensor_ftype(
+        0,
+        (fl.ftype(np.intp), fl.ftype(np.intp)),
+        stats,
+    )
+
+    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+
+
+def _format_stats(levels, shape, fields):
+    lvl = fl.element(0, fl.int64, fl.intp, fl.NumpyBufferFType)
+    for level in reversed(levels):
+        match level:
+            case "dense":
+                lvl = fl.dense(lvl, fl.intp)
+            case "sparse":
+                lvl = fl.sparse_list(lvl, fl.intp)
+            case _:
+                raise ValueError(f"Unknown test level: {level}")
+    return FDStatsFactory()(fl.fiber_tensor(lvl).construct(shape), fields)
+
+
+def _fd_output_pattern(stats):
+    ftype = FDFormatter().get_tensor_ftype(
+        stats.fill_value,
+        tuple(fl.intp for _ in stats.index_order),
+        stats,
+    )
+    lvl = ftype.lvl_t
+    pattern = []
+    while not isinstance(lvl, fl.ElementLevelFType):
+        match lvl:
+            case fl.DenseLevelFType():
+                pattern.append("dense")
+            case fl.SparseHashLevelFType():
+                pattern.append("sparse")
+            case _:
+                raise AssertionError(f"Unexpected FD output level: {lvl}")
+        lvl = lvl.lvl_t
+    return tuple(pattern)
+
+
+def test_fd_formatter_csr_dcsr_format_algebra():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = FDStatsFactory()
+
+    csr_ij = _format_stats(("dense", "sparse"), (2, 3), (i, j))
+    csr_jk = _format_stats(("dense", "sparse"), (3, 4), (j, k))
+    dcsr_ij = _format_stats(("sparse", "sparse"), (2, 3), (i, j))
+    dcsr_jk = _format_stats(("sparse", "sparse"), (3, 4), (j, k))
+
+    csr_plus_csr = factory.mapjoin(ffuncs.add, csr_ij, csr_ij)
+    assert _fd_output_pattern(csr_plus_csr) == ("dense", "sparse")
+
+    csr_times_dcsr = factory.mapjoin(ffuncs.mul, csr_ij, dcsr_ij)
+    assert _fd_output_pattern(csr_times_dcsr) == ("sparse", "sparse")
+
+    dcsr_matmul_dcsr = factory.aggregate(
+        ffuncs.add,
+        0,
+        (j,),
+        factory.mapjoin(ffuncs.mul, dcsr_ij, dcsr_jk),
+    )
+    assert _fd_output_pattern(dcsr_matmul_dcsr) == ("sparse", "sparse")
+
+    csr_matmul_csr = factory.aggregate(
+        ffuncs.add,
+        0,
+        (j,),
+        factory.mapjoin(ffuncs.mul, csr_ij, csr_jk),
+    )
+    assert _fd_output_pattern(csr_matmul_csr) == ("sparse", "sparse")
+
+
+def test_fd_stats_join_dense_properties():
+    i, j = Field("i"), Field("j")
+    factory = FDStatsFactory()
+
+    dense = _format_stats(("dense", "dense"), (2, 3), (i, j))
+    csr = _format_stats(("dense", "sparse"), (2, 3), (i, j))
+    sparse = _format_stats(("sparse", "sparse"), (2, 3), (i, j))
+
+    assert factory.mapjoin(ffuncs.mul, dense, csr).dense_props == csr.dense_props
+    assert factory.mapjoin(ffuncs.mul, dense, dense, csr).dense_props == (
+        csr.dense_props
+    )
+    assert factory.mapjoin(ffuncs.mul, csr, sparse).dense_props == set()
+
+
+def test_fd_stats_records_dense_projections_without_chasing():
+    i, j = Field("i"), Field("j")
+
+    class TensorFType:
+        level_format_properties = [
+            DenseProperty((0, 1)),
+            DenseProperty((1,)),
+        ]
+
+    class Tensor:
+        shape = (2, 3)
+        fill_value = 0
+        ftype = TensorFType()
+
+    stats = FDStatsFactory()(Tensor(), (i, j))
+
+    assert stats.dense_props == {frozenset({i, j}), frozenset({j})}
+
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
 
@@ -504,7 +786,7 @@ def test_dummy_aggregate():
     assert stats.get_dim_size(i) == 10.0
 
 
-def test_dummy_copy_stats():
+def test_dummy_copy():
     node = Table(Literal(fl.asarray(np.eye(10))), (Field("i"), Field("j")))
 
     stats = insert_statistics(
@@ -514,7 +796,7 @@ def test_dummy_copy_stats():
         replace=False,
         cache={},
     )
-    copy = DummyStatsFactory().copy_stats(stats)
+    copy = DummyStatsFactory().copy(stats)
 
     assert copy.dim_sizes == stats.dim_sizes
     assert copy.index_order == stats.index_order
@@ -553,10 +835,10 @@ def test_dummy_reorder():
     assert reordered.get_dim_size(Field("j")) == stats.get_dim_size(Field("j"))
 
 
-# ─────────────────────────────── DatabaseStats tests ─────────────────────────────
+# ─────────────────────────────── VPStats tests ─────────────────────────────
 
 
-def test_database_from_tensor_and_getters():
+def test_vp_from_tensor_and_getters():
     data = np.zeros((2, 3))
     data[0, 0] = 1.0
     data[1, 1] = 1.0
@@ -564,7 +846,7 @@ def test_database_from_tensor_and_getters():
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -587,7 +869,7 @@ def test_database_from_tensor_and_getters():
         ((2, 2), [(0, 0), (0, 1), (1, 0), (1, 1)], 4.0),
     ],
 )
-def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
+def test_vp_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     axes = tuple(Field(f"x{i}") for i in range(len(shape)))
     data = np.zeros(shape)
     for idx in nnz_indices:
@@ -597,7 +879,7 @@ def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     node = Table(Literal(arr), axes)
 
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -608,7 +890,7 @@ def test_database_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     assert stats.estimate_non_fill_values() == expected_nnz
 
 
-def test_database_mapjoin_join():
+def test_vp_mapjoin_join():
     i, k, j = Field("i"), Field("k"), Field("j")
     data_a = np.eye(10)
     data_b = np.eye(10)
@@ -618,14 +900,14 @@ def test_database_mapjoin_join():
 
     cache = {}
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -634,7 +916,7 @@ def test_database_mapjoin_join():
 
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -643,7 +925,7 @@ def test_database_mapjoin_join():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_mapjoin_elementwise():
+def test_vp_mapjoin_elementwise():
     i, j = Field("i"), Field("j")
     data_a = np.zeros((10, 10))
     data_a[:5, :] = 1.0
@@ -655,14 +937,14 @@ def test_database_mapjoin_elementwise():
 
     cache = {}
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -670,7 +952,7 @@ def test_database_mapjoin_elementwise():
     )
 
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=MapJoin(Literal(ffuncs.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
@@ -679,7 +961,7 @@ def test_database_mapjoin_elementwise():
     assert stats.estimate_non_fill_values() == pytest.approx(100.0)
 
 
-def test_database_mapjoin_broadcast():
+def test_vp_mapjoin_broadcast():
     i, j, k = Field("i"), Field("j"), Field("k")
 
     data_a = np.zeros((4, 5))
@@ -696,14 +978,14 @@ def test_database_mapjoin_broadcast():
 
     cache = {}
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -711,7 +993,7 @@ def test_database_mapjoin_broadcast():
     )
 
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=MapJoin(Literal(ffuncs.add), (ta, tb)),
         bindings=OrderedDict(),
         replace=False,
@@ -723,7 +1005,7 @@ def test_database_mapjoin_broadcast():
     assert stats.V[k] == pytest.approx(3.0)
 
 
-def test_database_aggregate():
+def test_vp_aggregate():
     i, j = Field("i"), Field("j")
     data = np.eye(10)
     table = Table(Literal(fl.asarray(data)), (i, j))
@@ -735,7 +1017,7 @@ def test_database_aggregate():
         idxs=(j,),
     )
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node_sum,
         bindings=OrderedDict(),
         replace=False,
@@ -746,35 +1028,35 @@ def test_database_aggregate():
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
-def test_database_copy_stats():
+def test_vp_copy():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    copy = DatabaseStatsFactory().copy_stats(stats)
+    copy = VPStatsFactory().copy(stats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
     assert copy is not stats
 
 
-def test_database_relabel():
+def test_vp_relabel():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    relabeled = DatabaseStatsFactory().relabel(stats, (Field("row"), Field("col")))
+    relabeled = VPStatsFactory().relabel(stats, (Field("row"), Field("col")))
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
     assert relabeled.V[Field("row")] == stats.V[Field("i")]
@@ -783,18 +1065,18 @@ def test_database_relabel():
     assert Field("j") not in relabeled.V
 
 
-def test_database_reorder():
+def test_vp_reorder():
     data = np.eye(10)
     arr = fl.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
     stats = insert_statistics(
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    reordered = DatabaseStatsFactory().reorder(stats, (Field("j"), Field("i")))
+    reordered = VPStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
 
@@ -812,20 +1094,22 @@ def test_embeddings():
     fields = (Field("i"), Field("j"))
 
     print("\n" + "=" * 80)
-    ds = DenseStats(arr, fields)
+    ds = DenseStatsFactory()(arr, fields)
     ds_emb = ds.get_embedding()
     print(f"DenseStats Embeddings : {ds_emb}")
 
-    us = UniformStats(arr, fields)
+    us = UniformStatsFactory()(arr, fields)
     us_emb = us.get_embedding()
     print(f"UniformStats Embeddings : {us_emb}")
 
-    dc_stats = DCStats(arr, fields)
+    dc_stats = DCStatsFactory()(arr, fields)
     dc_emb = dc_stats.get_embedding()
     print(f"DCStats Embeddings: {dc_emb}")
 
     blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStats.from_tensor(arr, fields, blocks_per_dim, UniformStatsFactory())
+    bs = BlockedStatsFactory(UniformStatsFactory(), blocks_per_dim=blocks_per_dim)(
+        arr, fields
+    )
     bs_emb = bs.get_embedding()
     print(f"BlockedStats Embeddings: {bs_emb}")
 
@@ -1045,13 +1329,12 @@ def test_blocked_stats_reorder_drop_one_index():
 
     i, j, k = Field("i"), Field("j"), Field("k")
     blocks_per_dim = {i: 2, j: 1, k: 3}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), (i, j, k), blocks_per_dim, UniformStatsFactory()
+    bs_factory = BlockedStatsFactory(
+        UniformStatsFactory(), blocks_per_dim=blocks_per_dim
     )
+    bs = bs_factory(fl.asarray(data), (i, j, k))
 
-    reordered = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
-        bs, (k, i)
-    )
+    reordered = bs_factory.reorder(bs, (k, i))
 
     assert reordered.index_order == (k, i)
     assert reordered.blocks.shape == (3, 2)
@@ -1063,12 +1346,11 @@ def test_blocked_stats_reorder_drop_two_index():
 
     i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
     blocks_per_dim = {i: 2, j: 1, k: 3, m: 1}
-    bs = BlockedStats.from_tensor(
-        fl.asarray(data), (i, j, k, m), blocks_per_dim, UniformStatsFactory()
+    bs_factory = BlockedStatsFactory(
+        UniformStatsFactory(), blocks_per_dim=blocks_per_dim
     )
-    reordered = BlockedStatsFactory(blocks_per_dim, UniformStatsFactory()).reorder(
-        bs, (k, i)
-    )
+    bs = bs_factory(fl.asarray(data), (i, j, k, m))
+    reordered = bs_factory.reorder(bs, (k, i))
 
     assert reordered.index_order == (k, i)
     assert reordered.blocks.shape == (3, 2)
@@ -1103,6 +1385,7 @@ def test_benchmark_structured_comparison():
         ("UniformStats", UniformStatsFactory()),
         ("DenseStats", DenseStatsFactory()),
         ("DCStats", DCStatsFactory()),
+        ("LPStats", LPStatsFactory()),
     ]
 
     print("\n" + "=" * 85)
@@ -1149,11 +1432,11 @@ def test_benchmark_structured_comparison():
         print("-" * 85)
 
 
-# ─────────────────────────────── TensorDef tests ─────────────────────────────────
+# ─────────────────────────── BaseTensorStats def tests ───────────────────────────
 
 
 def test_copy_and_getters():
-    td = TensorDef(
+    td = BaseTensorStats.from_fields(
         index_order=(Field("i"), Field("j")),
         dim_sizes={Field("i"): 2.0, Field("j"): 3.0},
         fill_value=42,
@@ -1175,27 +1458,13 @@ def test_copy_and_getters():
 )
 def test_reorder_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
-    td = TensorDef(index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0)
-    td2 = TensorDef.reorder(td, tuple(new_axes))
+    td = BaseTensorStats.from_fields(
+        index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0
+    )
+    td2 = BaseTensorStatsFactory.reorder_def(td, tuple(new_axes))
     assert td2.index_order == tuple(new_axes)
     for ax in new_axes:
         assert td2.get_dim_size(ax) == td.get_dim_size(ax)
-
-
-def test_set_fill_value():
-    td = TensorDef(index_order=(Field("i"),), dim_sizes={Field("i"): 5.0}, fill_value=0)
-    td2 = td.set_fill_value(7)
-    assert td2.fill_value == 7
-
-
-def test_add_dummy_idx():
-    td = TensorDef(index_order=(Field("i"),), dim_sizes={Field("i"): 3.0}, fill_value=0)
-    td2 = td.add_dummy_idx(Field("j"))
-    assert td2.index_order == (Field("i"), Field("j"))
-    assert td2.get_dim_size(Field("j")) == 1.0
-
-    td3 = td2.add_dummy_idx(Field("j"))
-    assert td3.index_order == (Field("i"), Field("j"))
 
 
 @pytest.mark.parametrize(
@@ -1237,9 +1506,9 @@ def test_add_dummy_idx():
         ),
     ],
 )
-def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
-    objs = [TensorDef(ax, dims, fv) for (ax, dims, fv) in defs]
-    out = TensorDef.mapjoin(func, *objs)
+def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
+    objs = [BaseTensorStats.from_fields(ax, dims, fv) for (ax, dims, fv) in defs]
+    out = BaseTensorStatsFactory._mapjoin_defs(func, *objs)
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
     assert out.fill_value == expected_fill
@@ -1325,7 +1594,7 @@ def test_tensordef_mapjoin(defs, func, expected_axes, expected_dims, expected_fi
         ),
     ],
 )
-def test_tensordef_aggregate(
+def test_base_aggregate(
     op_func,
     index_order,
     dim_sizes,
@@ -1335,8 +1604,10 @@ def test_tensordef_aggregate(
     expected_dims,
     expected_fill,
 ):
-    d = TensorDef(index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value)
-    out = TensorDef.aggregate(op_func, None, reduce_fields, d)
+    base = BaseTensorStats.from_fields(
+        index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value
+    )
+    out = BaseTensorStatsFactory.aggregate_def(op_func, None, reduce_fields, base)
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
@@ -1432,7 +1703,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("i")) == 2.0
     assert dsm.get_dim_size(Field("j")) == 3.0
     assert dsm.get_dim_size(Field("k")) == 4.0
-    assert dsm.fill_value == 0.0
+    assert dsm.fill_value == 1.0
 
     node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
     ds_sum = insert_statistics(
@@ -1828,7 +2099,9 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims, 0)
+    _overwrite_def(
+        stat, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims, 0)
+    )
     stat.dcs = set(dcs)
 
     assert stat.estimate_non_fill_values() == expected_nnz
@@ -1861,7 +2134,12 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+        ),
+    )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -1894,8 +2172,11 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(
-        frozenset([Field("i"), Field("j"), Field("k"), Field("l")]), dims, 0
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k"), Field("l")]), dims, 0
+        ),
     )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
@@ -1935,7 +2216,12 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+        ),
+    )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -1974,7 +2260,12 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
         cache={},
     )
 
-    stat.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0)
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+        ),
+    )
     stat.dcs = set(dcs)
     assert stat.estimate_non_fill_values() == expected_nnz
 
@@ -2029,15 +2320,14 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
             replace=False,
             cache={},
         )
-        s.tensordef = TensorDef(frozenset({Field("i")}), dims, 0)
+        _overwrite_def(s, BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0))
         s.dcs = set(dcs)
         stats_objs.append(s)
 
-    new_def = TensorDef(frozenset({Field("i")}), dims, 0)
-    out = DCStats._merge_dc_join(new_def, stats_objs)
+    out = DCStatsFactory().mapjoin(ffuncs.mul, *stats_objs)
 
-    assert out.tensordef.index_order == (Field("i"),)
-    assert out.tensordef.dim_sizes == dims
+    assert out.index_order == (Field("i"),)
+    assert out.dim_sizes == dims
     assert out.dcs == expected_dcs
 
 
@@ -2125,15 +2415,14 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         field_idx_set = frozenset(idx_set)
         field_dims = {k: new_dims[k] for k in idx_set}
 
-        td = TensorDef(field_idx_set, field_dims, 0)
-        stats_objs.append(DCStats.from_def(td, set(dcs)))
+        td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
+        stats_objs.append(DCStats(td, dcs=set(dcs)))
 
-    new_def = TensorDef(frozenset(new_dims.keys()), new_dims, 0)
-    out = DCStats._merge_dc_union(new_def, stats_objs)
+    out = DCStatsFactory().mapjoin(ffuncs.add, *stats_objs)
 
     # Does the order matter here ? - > Changed tuple to set as throwing assert error
-    assert set(out.tensordef.index_order) == set(new_dims.keys())
-    assert dict(out.tensordef.dim_sizes) == new_dims
+    assert set(out.index_order) == set(new_dims.keys())
+    assert dict(out.dim_sizes) == new_dims
     assert out.dcs == expected_dcs
 
 
@@ -2160,7 +2449,7 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
+    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
@@ -2171,7 +2460,7 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("i")}), dims2, 0)
+    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("i")}), dims2, 0))
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2211,7 +2500,9 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2224,7 +2515,9 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims2, 0)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims2, 0)
+    )
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2262,7 +2555,7 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i")}), dims1, 0)
+    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(fl.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
@@ -2273,7 +2566,7 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("j")}), dims2, 0)
+    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("j")}), dims2, 0))
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2316,7 +2609,9 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 0)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2330,7 +2625,9 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 0)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 0)
+    )
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2380,7 +2677,9 @@ def test_large_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset({Field("i"), Field("j")}), dims1, 1)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 1)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2393,7 +2692,9 @@ def test_large_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset({Field("j"), Field("k")}), dims2, 1)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 1)
+    )
     s2.dcs = set(dcs2)
 
     node3 = Table(
@@ -2407,7 +2708,12 @@ def test_large_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s3.tensordef = TensorDef(frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1)
+    _overwrite_def(
+        s3,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1
+        ),
+    )
     s3.dcs = set(dcs3)
 
     map = MapJoin(Literal(ffuncs.mul), (node1, node2))
@@ -2454,7 +2760,9 @@ def test_mixture_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s1.tensordef = TensorDef(frozenset([Field("i"), Field("j")]), dims1, 1)
+    _overwrite_def(
+        s1, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims1, 1)
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(
@@ -2467,7 +2775,9 @@ def test_mixture_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s2.tensordef = TensorDef(frozenset([Field("j"), Field("k")]), dims2, 1)
+    _overwrite_def(
+        s2, BaseTensorStats.from_fields(frozenset([Field("j"), Field("k")]), dims2, 1)
+    )
     s2.dcs = set(dcs2)
 
     node3 = Table(
@@ -2481,7 +2791,12 @@ def test_mixture_disjoint_disjunction_dc_card(
         replace=False,
         cache=cache,
     )
-    s3.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0)
+    _overwrite_def(
+        s3,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0
+        ),
+    )
     s3.dcs = set(dcs3)
 
     map = MapJoin(Literal(ffuncs.mul), (node1, node2))
@@ -2532,8 +2847,11 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
         replace=False,
         cache=cache,
     )
-    stat.tensordef = TensorDef(
-        frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+    _overwrite_def(
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
     )
     stat.dcs = set(dcs)
 
@@ -2588,7 +2906,12 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
         replace=False,
         cache=cache,
     )
-    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
+    _overwrite_def(
+        st,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
+    )
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -2642,7 +2965,12 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
         replace=False,
         cache=cache,
     )
-    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
+    _overwrite_def(
+        st,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
+    )
     st.dcs = set(dcs)
 
     reduce_node = Aggregate(
@@ -2713,7 +3041,12 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
         replace=False,
         cache=cache,
     )
-    st.tensordef = TensorDef(frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0)
+    _overwrite_def(
+        st,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+        ),
+    )
     st.dcs = set(dcs)
 
     reduce_fields = tuple(reduce_indices)
@@ -2732,3 +3065,200 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     )
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+# ─────────────────────────────── LPStats tests ────────────────────────────────
+
+
+def _lp_table(dense, fields):
+    return Table(Literal(fl.asarray(np.asarray(dense, dtype=np.float64))), fields)
+
+
+def _lp_stats(dense, fields, ps=(1.0, 2.0, math.inf)):
+    return insert_statistics(
+        stats_factory=LPStatsFactory(ps=ps),
+        node=_lp_table(dense, fields),
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+
+def test_lp_base_tensor_matches_nnz():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 0.0, 3.0], [4.0, 0.0, 0.0]])
+    stats = _lp_stats(A, (i, j))
+    assert isinstance(stats, LPStats)
+    assert stats.estimate_non_fill_values() == pytest.approx(float(np.count_nonzero(A)))
+
+
+def test_lp_base_tensor_matches_dc():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    lp = _lp_stats(A, (i, j))
+    dc = insert_statistics(
+        stats_factory=DCStatsFactory(),
+        node=_lp_table(A, (i, j)),
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert lp.estimate_non_fill_values() == pytest.approx(dc.estimate_non_fill_values())
+
+
+def test_lp_empty_tensor_is_zero():
+    i, j = Field("i"), Field("j")
+    A = np.zeros((3, 4))
+    stats = _lp_stats(A, (i, j))
+    assert stats.estimate_non_fill_values() == 0.0
+
+
+def test_lp_scalar_tensor():
+    stats = insert_statistics(
+        stats_factory=LPStatsFactory(),
+        node=Table(Literal(fl.asarray(np.asarray(5.0))), ()),
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == 1.0
+
+
+def test_lp_bound_is_valid_upper_bound_on_join():
+    # Broadcast product R(i,j) * S(j,k) over (i,j,k); the LP bound must be a
+    # valid upper bound on the true number of non-fill output entries.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    R = np.zeros((6, 4))
+    R[:, 0] = 1
+    R[0, 1] = R[1, 2] = R[2, 3] = 1
+    S = np.zeros((4, 6))
+    S[0, :] = 1
+    S[1, 0] = S[2, 1] = S[3, 2] = 1
+    true = sum(
+        1
+        for a in range(6)
+        for b in range(4)
+        for c in range(6)
+        if R[a, b] != 0 and S[b, c] != 0
+    )
+    f = LPStatsFactory()
+    out = f.mapjoin(
+        ffuncs.mul,
+        f(fl.asarray(R), (i, j)),
+        f(fl.asarray(S), (j, k)),
+    )
+    est = out.estimate_non_fill_values()
+    assert est >= true
+    assert est <= 6 * 4 * 6  # never exceeds dense capacity
+
+
+def test_lp_intermediate_p_is_tighter():
+    # With p=2 available the bound on a skewed join is tighter than the
+    # max-degree-only (p=inf) bound, while remaining a valid upper bound.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    R = np.zeros((6, 4))
+    R[:, 0] = 1
+    R[0, 1] = R[1, 2] = R[2, 3] = 1
+    S = np.zeros((4, 6))
+    S[0, :] = 1
+    S[1, 0] = S[2, 1] = S[3, 2] = 1
+    true = sum(
+        1
+        for a in range(6)
+        for b in range(4)
+        for c in range(6)
+        if R[a, b] != 0 and S[b, c] != 0
+    )
+
+    def bound(ps):
+        f = LPStatsFactory(ps=ps)
+        out = f.mapjoin(ffuncs.mul, f(fl.asarray(R), (i, j)), f(fl.asarray(S), (j, k)))
+        return out.estimate_non_fill_values()
+
+    b_inf = bound((1.0, math.inf))
+    b_2 = bound((1.0, 2.0, math.inf))
+    assert b_2 >= true
+    assert b_2 <= b_inf + 1e-6
+
+
+def test_lp_join_keeps_min():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 0.0], [0.0, 0.0, 3.0]])
+    B = np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 3.0]])
+    f = LPStatsFactory()
+    joined = f.mapjoin(ffuncs.mul, f(fl.asarray(A), (i, j)), f(fl.asarray(B), (i, j)))
+    true = float(np.count_nonzero(A * B))
+    assert joined.estimate_non_fill_values() >= true
+
+
+def test_lp_relabel_and_reorder():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    f = LPStatsFactory()
+    stats = f(fl.asarray(A), (i, j))
+    relabeled = f.relabel(stats, (k, j))
+    assert relabeled.index_order == (k, j)
+    # renaming must remap the field names inside the degree records, so the
+    # bound is unchanged and no record still references the old field `i`.
+    assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.dcs)
+    assert all((dc.from_indices | dc.to_indices) <= {k, j} for dc in relabeled.dcs)
+    assert relabeled.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values()
+    )
+    reordered = f.reorder(stats, (j, i))
+    assert reordered.index_order == (j, i)
+    assert reordered.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values()
+    )
+
+
+def test_dc_relabel_remaps_fields():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    f = DCStatsFactory()
+    stats = f(fl.asarray(A), (i, j))
+    relabeled = f.relabel(stats, (k, j))
+    assert relabeled.index_order == (k, j)
+    assert all(i not in dc.from_indices | dc.to_indices for dc in relabeled.dcs)
+    assert relabeled.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values()
+    )
+
+
+def test_lp_aggregate_drops_index():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    f = LPStatsFactory()
+    stats = f(fl.asarray(A), (i, j))
+    agg = f.aggregate(ffuncs.add, None, (j,), stats)
+    assert agg.index_order == (i,)
+    # after reducing j, the result has at most as many non-fill values as rows
+    assert agg.estimate_non_fill_values() <= A.shape[0]
+
+
+def test_lp_embedding_shape():
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
+    stats = _lp_stats(A, (i, j))
+    emb = stats.get_embedding()
+    assert emb.shape[0] == len(stats.index_order) + len(stats.dcs)
+    assert np.all(np.isfinite(emb))
+
+
+def test_lp_norm_endpoints():
+    # p=1 -> nnz along the conditioned column; p=inf -> max degree.
+    i, j = Field("i"), Field("j")
+    A = np.array([[1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
+    stats = _lp_stats(A, (i, j), ps=(1.0, math.inf))
+    by_p = {}
+    for dc in stats.dcs:
+        if dc.from_indices == frozenset({i}):
+            by_p[dc.p] = dc.value
+    # row 0 has degree 3, row 1 has degree 1: l1 = 4 (== nnz), linf = 3
+    assert by_p[1.0] == pytest.approx(4.0)
+    assert by_p[math.inf] == pytest.approx(3.0)
+
+
+def test_lpdc_is_hashable_frozen():
+    dc = DC(frozenset(), frozenset({Field("i")}), 3.0, 2.0)
+    assert dc in {dc}

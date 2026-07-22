@@ -35,9 +35,9 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 
 def make_tensor(shape, fill_value, *, dtype=None):
     dtype = ftype(fill_value) if dtype is None else ftype(dtype)
-    return finchlite.asarray(
-        np.full(shape, fill_value, dtype=np.dtype(to_numpy_type(dtype)))
-    )
+    arr = np.empty(shape, dtype=np.dtype(to_numpy_type(dtype)))
+    arr[...] = fill_value
+    return finchlite.asarray(arr)
 
 
 class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
@@ -102,7 +102,8 @@ class LogicMachine:
                 for crds in product(*[range(dims[idx]) for idx in idxs]):
                     idx_crds = dict(zip(idxs, crds, strict=True))
                     vals = [
-                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]] for arg in args
+                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]].item()
+                        for arg in args
                     ]
                     result[*crds] = op(*vals)
                 return TableValue(result, tuple(idxs))
@@ -121,7 +122,9 @@ class LogicMachine:
                         for (crd, idx) in zip(crds, arg.idxs, strict=True)
                         if idx not in node.idxs
                     ]
-                    result[*out_crds] = op(result[*out_crds], arg.tns[*crds])
+                    result[*out_crds] = op(
+                        result[*out_crds].item(), arg.tns[*crds].item()
+                    )
                 return TableValue(
                     result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
                 )
@@ -146,7 +149,7 @@ class LogicMachine:
                 for crds in product(*[range(dim) for dim in dims]):
                     node_crds = dict(zip(idxs, crds, strict=True))
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
-                    result[*crds] = arg.tns[*in_crds]
+                    result[*crds] = arg.tns[*in_crds].item()
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
@@ -159,7 +162,7 @@ class LogicMachine:
                     self.bindings[lhs] = tns
                 lhs = self(lhs)
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
-                    lhs[*crds] = rhs.tns[*crds]
+                    lhs[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case Plan(bodies):
                 res = ()

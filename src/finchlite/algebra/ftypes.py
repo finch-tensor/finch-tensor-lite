@@ -1,6 +1,7 @@
 import builtins
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
@@ -115,6 +116,12 @@ class FDTypeInteger(FDTypeNumeric):
         ...
 
 
+class FDTypeSignedInteger(FDTypeInteger): ...
+
+
+class FDTypeUnsignedInteger(FDTypeInteger): ...
+
+
 class FDTypeFloat(FDTypeNumeric):
     @property
     @abstractmethod
@@ -126,6 +133,44 @@ class FDTypeFloat(FDTypeNumeric):
 
 
 class FDTypeBoolean(FDTypeOrdered): ...
+
+
+@dataclass(frozen=True, slots=True)
+class FInfo:
+    bits: builtins.int
+    eps: builtins.float
+    max: builtins.float
+    min: builtins.float
+    smallest_normal: builtins.float
+    dtype: FDTypeFloat
+
+
+@dataclass(frozen=True, slots=True)
+class IInfo:
+    bits: builtins.int
+    max: builtins.int
+    min: builtins.int
+    dtype: FDTypeInteger
+
+
+def _finfo(dtype: FDTypeFloat, info) -> FInfo:
+    return FInfo(
+        bits=builtins.int(info.bits),
+        eps=builtins.float(info.eps),
+        max=builtins.float(info.max),
+        min=builtins.float(info.min),
+        smallest_normal=builtins.float(info.smallest_normal),
+        dtype=dtype,
+    )
+
+
+def _iinfo(dtype: FDTypeInteger, info) -> IInfo:
+    return IInfo(
+        bits=builtins.int(info.bits),
+        max=builtins.int(info.max),
+        min=builtins.int(info.min),
+        dtype=dtype,
+    )
 
 
 class FDTypeBuiltin(FDType):
@@ -186,6 +231,13 @@ class _FDTypeBuiltinBool(FDTypeBoolean, FDTypeBuiltin):
     def type(self):
         return builtins.bool
 
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            return ftype(self.type(False) + other.type(False))
+        if isinstance(other, FDTypeNumpy):
+            return other.__promote__(self)
+        return None
+
     def __repr__(self):
         return "finchlite.bool_"
 
@@ -210,7 +262,7 @@ class FDTypeNumericBuiltin(FDTypeBuiltin, FDTypeNumeric):
         return None
 
 
-class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeInteger, FDTypeReal):
+class _FDTypeBuiltinInt(FDTypeNumericBuiltin, FDTypeSignedInteger, FDTypeReal):
     @property
     def type(self):
         return builtins.int
@@ -253,7 +305,7 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         """
         The finfo object for this float type.
         """
-        return np.float64.finfo
+        return _finfo(self, np.float64.finfo)
 
     @property
     def type_min(self):
@@ -277,7 +329,7 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
 
     @property
     def finfo(self):
-        return np.float64.finfo
+        return _finfo(self, np.float64.finfo)
 
     @property
     def type_min(self):
@@ -314,44 +366,63 @@ class FDTypeNumpy(FDType):
 
     def __promote__(self, other):
         if isinstance(other, FDTypeNumpy):
-            promoted_dtype = np.promote_types(self.dtype, other.dtype)
-            return ftype(promoted_dtype.type)
-        if isinstance(other, FDTypeBuiltin):
-            promoted_dtype = np.promote_types(self.dtype, other.type)
-            return ftype(promoted_dtype.type)
+            return _promote_numpy_dtypes(self, other)
         return None
 
 
+def _promote_numpy_dtypes(T1: FDTypeNumpy, T2: FDTypeNumpy):
+    promoted_dtype = np.promote_types(T1.dtype, T2.dtype)
+    return ftype(promoted_dtype.type)
+
+
 class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            if other in (bool_, int_):
+                return self
+            if other == float_:
+                return _promote_numpy_dtypes(self, float32)
+            if other == complex_:
+                return _promote_numpy_dtypes(self, complex64)
+        return super().__promote__(other)
+
     @property
     def iinfo(self):
         """
         The iinfo object for this integer type.
         """
-        return np.iinfo(self.dtype)
+        return _iinfo(self, np.iinfo(self.dtype))
 
     @property
     def type_min(self):
         """
         The minimum value for this type.
         """
-        return self.iinfo.min
+        return self.dtype(self.iinfo.min)
 
     @property
     def type_max(self):
         """
         The maximum value for this type.
         """
-        return self.iinfo.max
+        return self.dtype(self.iinfo.max)
 
 
 class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            if other in (bool_, int_, float_):
+                return self
+            if other == complex_:
+                return _promote_numpy_dtypes(self, complex64)
+        return super().__promote__(other)
+
     @property
     def finfo(self):
         """
         The finfo object for this float type.
         """
-        return np.finfo(self.dtype)
+        return _finfo(self, np.finfo(self.dtype))
 
     @property
     def type_min(self):
@@ -368,8 +439,27 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
         return self.dtype(np.inf)
 
 
+class FDTypeNumpyComplex(FDTypeNumpyFloat, FDTypeComplex):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin) and other in (
+            bool_,
+            int_,
+            float_,
+            complex_,
+        ):
+            return self
+        return super().__promote__(other)
+
+
 # FTypes for numpy built-in datatypes
 class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
+    def __promote__(self, other):
+        if isinstance(other, FDTypeBuiltin):
+            if other == bool_:
+                return self
+            return None
+        return super().__promote__(other)
+
     @property
     def dtype(self):
         return np.bool_
@@ -389,7 +479,7 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
 bool = _FDTypeBool()
 
 
-class _FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt8(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int8
@@ -401,7 +491,7 @@ class _FDTypeInt8(FDTypeNumpyInteger, FDTypeReal):
 int8 = _FDTypeInt8()
 
 
-class _FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt16(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int16
@@ -413,7 +503,7 @@ class _FDTypeInt16(FDTypeNumpyInteger, FDTypeReal):
 int16 = _FDTypeInt16()
 
 
-class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt32(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int32
@@ -425,7 +515,7 @@ class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
 int32 = _FDTypeInt32()
 
 
-class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeInt64(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.int64
@@ -437,7 +527,7 @@ class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
 int64 = _FDTypeInt64()
 
 
-class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint8
@@ -449,7 +539,7 @@ class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeReal):
 uint8 = _FDTypeUInt8()
 
 
-class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint16
@@ -461,7 +551,7 @@ class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeReal):
 uint16 = _FDTypeUInt16()
 
 
-class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint32
@@ -473,7 +563,7 @@ class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeReal):
 uint32 = _FDTypeUInt32()
 
 
-class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeReal):
+class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
         return np.uint64
@@ -521,7 +611,7 @@ class _FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
 float64 = _FDTypeFloat64()
 
 
-class _FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
+class _FDTypeComplex64(FDTypeNumpyComplex):
     @property
     def dtype(self):
         return np.complex64
@@ -533,7 +623,7 @@ class _FDTypeComplex64(FDTypeNumpyFloat, FDTypeComplex):
 complex64 = _FDTypeComplex64()
 
 
-class _FDTypeComplex128(FDTypeNumpyFloat, FDTypeComplex):
+class _FDTypeComplex128(FDTypeNumpyComplex):
     @property
     def dtype(self):
         return np.complex128
@@ -557,6 +647,44 @@ def finfo(T: FDTypeFloat):
 
 def iinfo(T: FDTypeInteger):
     return T.iinfo
+
+
+def can_cast(from_, to, /) -> builtins.bool:
+    from_ = (
+        from_.dtype
+        if not isinstance(from_, FDType) and hasattr(from_, "dtype")
+        else from_
+    )
+    try:
+        return promote_type(from_, to) == to
+    except TypeError:
+        return False
+
+
+def result_type(*arrays_and_dtypes) -> FDType:
+    if len(arrays_and_dtypes) == 0:
+        raise TypeError("result_type requires at least one argument")
+    if not any(
+        isinstance(arg, FDType) or hasattr(arg, "ndim") for arg in arrays_and_dtypes
+    ):
+        raise TypeError("result_type requires at least one array or dtype argument")
+
+    concrete_types = [_result_type_arg(arg) for arg in arrays_and_dtypes]
+    result = concrete_types[0]
+    for dtype in concrete_types[1:]:
+        result = promote_type(result, dtype)
+
+    return result
+
+
+def _result_type_arg(arg) -> FDType:
+    if isinstance(arg, FDType):
+        return arg
+    if hasattr(arg, "dtype"):
+        return arg.dtype
+    dtype = ftype(arg)
+    assert isinstance(dtype, FDType)
+    return dtype
 
 
 class FTyped:
@@ -659,7 +787,7 @@ class MutableStructFType(StructFType):
         return True
 
 
-class TupleFType(ImmutableStructFType):
+class TupleFType(ImmutableStructFType, FDType):
     """FType for Python tuples, with a struct-compatible interface."""
 
     def __init__(self, struct_types):
@@ -687,6 +815,22 @@ class TupleFType(ImmutableStructFType):
     @property
     def struct_fieldtypes(self) -> list[Any]:
         return [type_ for (_, type_) in self.struct_fields]
+
+    def __promote__(self, other):
+        if not isinstance(other, TupleFType):
+            return None
+        if len(self.struct_fieldtypes) != len(other.struct_fieldtypes):
+            raise TypeError("Tuple operands must have the same length.")
+        return TupleFType.from_tuple(
+            tuple(
+                promote_type(type_, other_type)
+                for type_, other_type in zip(
+                    self.struct_fieldtypes,
+                    other.struct_fieldtypes,
+                    strict=True,
+                )
+            )
+        )
 
     def struct_hasattr(self, attr: str) -> builtins.bool:
         return attr in dict(self.struct_fields)
@@ -786,11 +930,34 @@ def fisinstance(x, f: FType):
     return f.fisinstance(x)
 
 
-def isdtype(x, T: FType):
+def isdtype(dtype, kind):
     """
-    Check if `x` is an instance of `T`.
+    Check if a dtype belongs to an Array API dtype kind.
     """
-    return fisinstance(x, T)
+    dtype = ftype(dtype)
+    if isinstance(kind, tuple):
+        return any(isdtype(dtype, k) for k in kind)
+    if isinstance(kind, str):
+        match kind:
+            case "bool":
+                return builtins.bool(dtype == bool)
+            case "signed integer":
+                return isinstance(dtype, FDTypeSignedInteger)
+            case "unsigned integer":
+                return isinstance(dtype, FDTypeUnsignedInteger)
+            case "integral":
+                return isinstance(dtype, FDTypeInteger)
+            case "real floating":
+                return isinstance(dtype, FDTypeFloat) and not isinstance(
+                    dtype, FDTypeComplex
+                )
+            case "complex floating":
+                return isinstance(dtype, FDTypeComplex)
+            case "numeric":
+                return isinstance(dtype, FDTypeNumeric)
+            case _:
+                raise ValueError(f"Unrecognized dtype kind: {kind!r}")
+    return builtins.bool(dtype == ftype(kind))
 
 
 def ftype(x) -> FType:
@@ -802,8 +969,53 @@ def ftype(x) -> FType:
         return x
     if isinstance(x, FTyped):
         return x.ftype
+    dtype: Any = None
     if isinstance(x, np.dtype):
-        x = x.type
+        if x.fields is not None:
+            assert x.names is not None
+            return TupleFType.from_tuple(
+                tuple(ftype(x.fields[name][0]) for name in x.names)
+            )
+        dtype = x
+    elif isinstance(x, np.void) and x.dtype.fields is not None:
+        assert x.dtype.names is not None
+        return TupleFType.from_tuple(
+            tuple(ftype(x.dtype.fields[name][0]) for name in x.dtype.names)
+        )
+    elif isinstance(x, np.generic):
+        dtype = x.dtype
+    elif isinstance(x, type) and issubclass(x, np.generic):
+        dtype = np.dtype(x)
+    if dtype is not None:
+        if dtype == np.dtype(np.bool_):
+            return bool
+        if dtype == np.dtype(np.int8):
+            return int8
+        if dtype == np.dtype(np.int16):
+            return int16
+        if dtype == np.dtype(np.int32):
+            return int32
+        if dtype == np.dtype(np.int64):
+            return int64
+        if dtype == np.dtype(np.uint8):
+            return uint8
+        if dtype == np.dtype(np.uint16):
+            return uint16
+        if dtype == np.dtype(np.uint32):
+            return uint32
+        if dtype == np.dtype(np.uint64):
+            return uint64
+        if dtype == np.dtype(np.float16):
+            return float16
+        if dtype == np.dtype(np.float32):
+            return float32
+        if dtype == np.dtype(np.float64):
+            return float64
+        if dtype == np.dtype(np.complex64):
+            return complex64
+        if dtype == np.dtype(np.complex128):
+            return complex128
+        raise NotImplementedError
     if type(x) is builtins.bool or x is builtins.bool:
         return bool_
     if type(x) is builtins.int or x is builtins.int:
@@ -812,32 +1024,6 @@ def ftype(x) -> FType:
         return float_
     if type(x) is builtins.complex or x is builtins.complex:
         return complex_
-    if type(x) is np.bool_ or x is np.bool_:
-        return bool
-    if type(x) is np.int8 or x is np.int8:
-        return int8
-    if type(x) is np.int16 or x is np.int16:
-        return int16
-    if type(x) is np.int32 or x is np.int32:
-        return int32
-    if type(x) is np.int64 or x is np.int64:
-        return int64
-    if type(x) is np.uint8 or x is np.uint8:
-        return uint8
-    if type(x) is np.uint16 or x is np.uint16:
-        return uint16
-    if type(x) is np.uint32 or x is np.uint32:
-        return uint32
-    if type(x) is np.uint64 or x is np.uint64:
-        return uint64
-    if type(x) is np.float32 or x is np.float32:
-        return float32
-    if type(x) is np.float64 or x is np.float64:
-        return float64
-    if type(x) is np.complex64 or x is np.complex64:
-        return complex64
-    if type(x) is np.complex128 or x is np.complex128:
-        return complex128
     if type(x) is builtins.str or x is builtins.str:
         return str_
     if x is None:

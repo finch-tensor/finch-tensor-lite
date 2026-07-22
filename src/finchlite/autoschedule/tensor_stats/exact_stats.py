@@ -11,43 +11,39 @@ from finchlite.finch_logic import (
     Aggregate,
     Field,
     Literal,
-    LogicExpression,
     MapJoin,
     Relabel,
     Reorder,
+    StatsFactory,
     Table,
 )
 from finchlite.finch_logic.nodes import TableValue
 
 from .numeric_stats import NumericStats
-from .tensor_def import TensorDef
-from .tensor_stats import BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
-class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
+class ExactStatsFactory(
+    BaseTensorStatsFactory["ExactStats"],
+    StatsFactory["ExactStats"],
+):
     def __init__(self):
         super().__init__(ExactStats)
 
-    def copy_stats(self, stat: ExactStats) -> ExactStats:
-        if not isinstance(stat, ExactStats):
-            raise TypeError("copy_stats expected a ExactStats instance")
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> ExactStats:
+        base = super().__call__(tensor, fields)
+        expr = Table(Literal(tensor != tensor.fill_value), fields)
+        return ExactStats(base, expr=expr)
 
-        return ExactStats.from_def(stat.tensordef.copy(), stat.expr)
-
-    def _mapjoin_join(
-        self, new_def: TensorDef, op: FinchOperator, join_args: list[ExactStats]
-    ) -> ExactStats:
-        if len(join_args) == 0:
-            return ExactStats.from_def(new_def, None)
-
+    def _mapjoin_join(self, op: FinchOperator, *join_args: ExactStats) -> ExactStats:
+        base = super()._mapjoin_defs(op, *join_args)
         expr = MapJoin(Literal(ffuncs.and_), tuple(s.expr for s in join_args))
-        return ExactStats.from_def(new_def, expr)
+        return ExactStats(base, expr=expr)
 
-    def _mapjoin_union(
-        self, new_def: TensorDef, op: FinchOperator, union_args: list[ExactStats]
-    ) -> ExactStats:
+    def _mapjoin_union(self, op: FinchOperator, *union_args: ExactStats) -> ExactStats:
+        base = super()._mapjoin_defs(op, *union_args)
         expr = MapJoin(Literal(ffuncs.or_), tuple(s.expr for s in union_args))
-        return ExactStats.from_def(new_def, expr)
+        return ExactStats(base, expr=expr)
 
     def aggregate(
         self,
@@ -56,7 +52,7 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
         reduce_indices: tuple[Field, ...],
         stats: ExactStats,
     ) -> ExactStats:
-        f = stats.tensordef.fill_value
+        f = stats.fill_value
         bool_op: FinchOperator
 
         if is_identity(op, f):
@@ -66,40 +62,36 @@ class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"]):
         else:
             bool_op, bool_init = ffuncs.and_, True
 
-        new_def = TensorDef.aggregate(op, init, reduce_indices, stats.tensordef)
+        base = self.aggregate_def(op, init, reduce_indices, stats)
         expr = Aggregate(
             Literal(bool_op), Literal(bool_init), stats.expr, reduce_indices
         )
-        return ExactStats.from_def(new_def, expr)
+        return ExactStats(base, expr=expr)
 
     def relabel(
         self, stats: ExactStats, relabel_indices: tuple[Field, ...]
     ) -> ExactStats:
-        new_def = TensorDef.relabel(stats.tensordef, relabel_indices)
+        base = self.relabel_def(stats, relabel_indices)
         expr = Relabel(stats.expr, relabel_indices)
-        return ExactStats.from_def(new_def, expr)
+        return ExactStats(base, expr=expr)
 
     def reorder(
         self, stats: ExactStats, reorder_indices: tuple[Field, ...]
     ) -> ExactStats:
-        new_def = TensorDef.reorder(stats.tensordef, reorder_indices)
+        base = self.reorder_def(stats, reorder_indices)
         expr = Reorder(stats.expr, reorder_indices)
-        return ExactStats.from_def(new_def, expr)
+        return ExactStats(base, expr=expr)
 
 
 class ExactStats(NumericStats):
-    def __init__(self, tensor, fields):
-        self.tensordef = TensorDef.from_tensor(tensor, fields)
-        self.expr = Table(Literal(tensor != tensor.fill_value), fields)
+    def __init__(
+        self,
+        base: BaseTensorStats,
+        expr: Any,
+    ):
+        super().__init__(base)
+        self.expr = expr
         self.nnz = self.estimate_non_fill_values()
-
-    @classmethod
-    def from_def(cls, tensordef: TensorDef, expr: LogicExpression | None) -> ExactStats:
-        obj = object.__new__(cls)
-        obj.tensordef = tensordef
-        obj.expr = expr
-        obj.nnz = obj.estimate_non_fill_values()
-        return obj
 
     def estimate_non_fill_values(self) -> float:
         if self.expr is None:

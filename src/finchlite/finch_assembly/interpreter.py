@@ -219,41 +219,21 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
             case asm.Load(buf, idx):
-                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 idx_e = self(idx)
                 return buf_e.load(idx_e)
-            case asm.LoadDict(dct, idx):
-                assert isinstance(dct, asm.Slot)
-                map_e = self(dct)
-                idx_e = self(idx)
-                return map_e.load(idx_e)
-            case asm.ExistsDict(dct, idx):
-                assert isinstance(dct, asm.Slot)
-                map_e = self(dct)
-                idx_e = self(idx)
-                return map_e.exists(idx_e)
             case asm.Store(buf, idx, val):
-                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
                 buf_e.store(idx_e, val_e)
                 return None
-            case asm.StoreDict(dct, idx, val):
-                assert isinstance(dct, asm.Slot)
-                map_e = self(dct)
-                idx_e = self(idx)
-                val_e = self(val)
-                return map_e.store(idx_e, val_e)
             case asm.Resize(buf, len_):
-                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 len_e = self(len_)
                 buf_e.resize(len_e)
                 return None
             case asm.Length(buf):
-                assert isinstance(buf, asm.Slot)
                 buf_e = self(buf)
                 return buf_e.length()
             case asm.Block(bodies):
@@ -370,16 +350,6 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                                 f"Unrecognized function definition: {func}"
                             )
                 return AssemblyInterpreterLibrary(self, kernels)
-            case asm.Print(args):
-                args_value_str = ""
-                for arg in args:
-                    args_value_str = args_value_str + f"{self(arg)} "
-                print(args_value_str, file=self.stdout)
-                return None
-            case asm.Stack(val):
-                raise NotImplementedError(
-                    "AssemblyInterpreter does not support symbolic, no target language"
-                )
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"

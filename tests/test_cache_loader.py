@@ -10,7 +10,7 @@ from finchlite.autoschedule.cache import (
 from finchlite.autoschedule.executor import LogicExecutor
 from finchlite.autoschedule.tensor_stats import DenseStatsFactory, UniformStatsFactory
 from finchlite.autoschedule.tensor_stats.blocked_stats import BlockedStatsFactory
-from finchlite.autoschedule.tensor_stats.dc_stats import DCStatsFactory
+from finchlite.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finchlite.finch_logic import (
     Alias,
     Field,

@@ -9,7 +9,6 @@ from .dataflow import (
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
-from .dct import Dict, DictFType
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyExpression,
@@ -20,7 +19,6 @@ from .nodes import (
     Break,
     BufferLoop,
     Call,
-    ExistsDict,
     ForLoop,
     Function,
     GetAttr,
@@ -30,17 +28,13 @@ from .nodes import (
     Length,
     Literal,
     Load,
-    LoadDict,
     Module,
-    Print,
     Repack,
     Resize,
     Return,
     SetAttr,
     Slot,
-    Stack,
     Store,
-    StoreDict,
     Unpack,
     Variable,
     WhileLoop,
@@ -48,6 +42,7 @@ from .nodes import (
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
+from .struct_slots import LowerPackedStructSlots
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 from .utils import get_vars_in_expr
 
@@ -73,9 +68,6 @@ __all__ = [
     "BufferFType",
     "BufferLoop",
     "Call",
-    "Dict",
-    "DictFType",
-    "ExistsDict",
     "ForLoop",
     "Function",
     "GetAttr",
@@ -85,18 +77,15 @@ __all__ = [
     "Length",
     "Literal",
     "Load",
-    "LoadDict",
+    "LowerPackedStructSlots",
     "Module",
     "NumberedStatement",
-    "Print",
     "Repack",
     "Resize",
     "Return",
     "SetAttr",
     "Slot",
-    "Stack",
     "Store",
-    "StoreDict",
     "Unpack",
     "Variable",
     "WhileLoop",

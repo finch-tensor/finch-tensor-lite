@@ -28,13 +28,39 @@ from finchlite.symbolic import (
     PostWalk,
     PreWalk,
     Rewrite,
+    gensym,
 )
 
-from .standardize import (
-    flatten_plans,
-    isolate_aggregates,
-    push_fields,
-)
+from .util import flatten_plans, propagate_copy_queries, push_fields
+
+
+def isolate_aggregates(root: LogicStatement) -> LogicStatement:
+    def transform(stmt):
+        stack = []
+
+        def rule_1(ex):
+            match ex:
+                case Aggregate(_, _, _, _) as agg:
+                    var = Alias(gensym("A"))
+                    stack.append(Query(var, agg))
+                    return Table(var, agg.fields())
+                case _:
+                    return None
+
+        match stmt:
+            case Query(lhs, Aggregate(op, init, arg, idxs)):
+                arg = Rewrite(PostWalk(rule_1))(arg)
+                return Plan((*stack, Query(lhs, Aggregate(op, init, arg, idxs))))
+            case Query(lhs, rhs):
+                rhs = Rewrite(PostWalk(rule_1))(rhs)
+                return Plan((*stack, Query(lhs, rhs)))
+            case Produces(args):
+                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
+                return Plan((*stack, Produces(args)))
+            case _:
+                return None
+
+    return Rewrite(PostWalk(transform))(root)
 
 
 def with_unique_lhs(
@@ -146,7 +172,7 @@ def optimize(
 
         prgm = isolate_aggregates(prgm)
 
-        prgm = propagate_copy_queries(prgm)
+        prgm = propagate_copy_queries(prgm, bindings)
         prgm = propagate_transpose_queries(prgm)
         prgm = propagate_map_queries(prgm)
 
@@ -284,30 +310,6 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
         return None
 
     return Rewrite(Fixpoint(PreWalk(rule_2)))(root)
-
-
-def propagate_copy_queries(root):
-    copies = {}
-
-    def rule_0(node):
-        match node:
-            case Query(lhs, Table(Alias(_) as rhs, _)):
-                copies[lhs] = copies.get(rhs, rhs)
-                return Plan()
-            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if (
-                idxs_1 == idxs_2
-            ):
-                copies[lhs] = copies.get(rhs, rhs)
-                return Plan()
-
-    root = Rewrite(PostWalk(rule_0))(root)
-
-    def rule_1(ex):
-        match ex:
-            case Alias() as a if a in copies:
-                return copies[a]
-
-    return Rewrite(PostWalk(rule_1))(root)
 
 
 def lift_fields(root):

@@ -98,7 +98,11 @@ def _insert_compute(
                 for expr in ret_expr:
                     for var in get_variables_in_stmt(expr):
                         vars.add(var)
-                lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
+                lazy_vars = tuple(sorted(vars, key=lambda var: var.name))
+                lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
+                lazies = (
+                    Assign(lazy_vars_tuple, Call(Literal(lazy), (lazy_vars_tuple,))),
+                )
                 exprs_to_compute = ()
                 return_vars = ()
                 for i, expr in enumerate(ret_expr):
@@ -108,12 +112,22 @@ def _insert_compute(
                         new_var = Variable(nspc.freshen("ret_" + str(i)))
                         exprs_to_compute += (Assign(new_var, expr),)
                         return_vars += (new_var,)
-                for var in return_vars:
-                    exprs_to_compute += (Assign(var, Call(Literal(compute), (var,))),)
+                return_vars_tuple = Call(Literal(tuple), return_vars)
+                exprs_to_compute += (
+                    Assign(
+                        return_vars_tuple,
+                        Call(Literal(compute), (return_vars_tuple,)),
+                    ),
+                )
                 return Block(lazies + exprs_to_compute + (Return(return_vars),))
             case NumberedStatement(stmt, sid) if sid == compute_sid:
-                computes = tuple(
-                    Assign(var, Call(Literal(compute), (var,))) for var in vars
+                compute_vars = tuple(sorted(vars, key=lambda var: var.name))
+                compute_vars_tuple = Call(Literal(tuple), compute_vars)
+                computes = (
+                    Assign(
+                        compute_vars_tuple,
+                        Call(Literal(compute), (compute_vars_tuple,)),
+                    ),
                 )
                 match stmt:
                     case Return():
@@ -128,13 +142,23 @@ def _insert_compute(
     return Rewrite(PostWalk(_visitor))(prgm)
 
 
+def maybelazy(arrs):
+    return tuple(lazy(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
+
+
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
     def _visitor(node):
         match node:
             case NumberedStatement(stmt, sid) if sid == lazy_sid and not isinstance(
                 stmt, (Return, Break)
             ):
-                lazies = tuple(Assign(var, Call(Literal(lazy), (var,))) for var in vars)
+                lazy_vars = tuple(sorted(vars, key=lambda var: var.name))
+                lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
+                lazies = (
+                    Assign(
+                        lazy_vars_tuple, Call(Literal(maybelazy), (lazy_vars_tuple,))
+                    ),
+                )
                 return Block(lazies + (node,))
             case node:
                 return node

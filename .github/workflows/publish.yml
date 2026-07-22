@@ -3,32 +3,38 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    #if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: pip install toml
+        run: pip install build toml
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          pixi-version: v0.71.3
       - name: Get version
         run: |
             VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["project"]["version"])')
             if [ $? -ne 0 ]; then exit 1; fi
             echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v1.17
+      - name: Build PyPI package
+        run: python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
-      - name: Create Release
-        uses: actions/create-release@v1
-        if: success()
+          password: ${{ secrets.PYPI_TOKEN }}
+      - name: Authenticate with Prefix.dev
+        run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
+      - name: Build and publish to Prefix.dev
+        run: pixi publish --target-channel https://prefix.dev/${{ secrets.PREFIX_CHANNEL_NAME }}
+      - name: Create a Release
+        uses: softprops/action-gh-release@v3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: Release ${{ env.VERSION }}
+          make_latest: true
           tag_name: ${{ env.VERSION }}
-          release_name: Release ${{ env.VERSION }}
-          draft: false
-          prerelease: false

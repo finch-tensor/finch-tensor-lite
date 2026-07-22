@@ -63,6 +63,8 @@ element_wise_ufunc_map = {
     np.logical_or: ffuncs.logical_or,
     np.logical_xor: ffuncs.logical_xor,
     np.logical_not: ffuncs.logical_not,
+    np.minimum: ffuncs.min,
+    np.maximum: ffuncs.max,
     np.equal: ffuncs.equal,
     np.not_equal: ffuncs.not_equal,
     np.less: ffuncs.less,
@@ -77,6 +79,16 @@ ufunc_map: dict[Any, Any] = {
 
 
 class OverrideTensor(Tensor):
+    @property
+    def mT(self):
+        return self.mod.matrix_transpose(self)
+
+    @property
+    def T(self):
+        if self.ndim != 2:
+            raise ValueError("T is only defined for 2D arrays")
+        return self.mod.matrix_transpose(self)
+
     @property
     def mod(self):
         return self.override_module()
@@ -127,7 +139,7 @@ class OverrideTensor(Tensor):
         if api_version not in {"2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
 
-        return self.mod
+        return sys.modules["finchlite"]
 
     def __add__(self, other):
         return self.mod.add(self, other)
@@ -265,7 +277,7 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to complex.")
         # dispatch to the scalar value's `__complex__` method
-        return complex(self[()])
+        return complex(self.item())
 
     def __float__(self):
         """
@@ -274,7 +286,7 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to float.")
         # dispatch to the scalar value's `__float__` method
-        return float(self[()])
+        return float(self.item())
 
     def __int__(self):
         """
@@ -283,7 +295,7 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to int.")
         # dispatch to the scalar value's `__int__` method
-        return int(self[()])
+        return int(self.item())
 
     def __bool__(self):
         """
@@ -292,12 +304,12 @@ class OverrideTensor(Tensor):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to bool.")
         # dispatch to the scalar value's `__bool__` method
-        return bool(self[()])
+        return bool(self.item())
 
     def __index__(self) -> int:
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to index.")
-        return operator.index(self.__int__())
+        return operator.index(self.item())
 
     def __log__(self):
         return self.mod.log(self)

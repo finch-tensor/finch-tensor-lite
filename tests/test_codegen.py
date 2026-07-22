@@ -1,4 +1,5 @@
 import ctypes
+import logging
 import re
 import subprocess
 import sys
@@ -12,17 +13,19 @@ import numpy as np
 import finchlite
 import finchlite.finch_assembly as asm
 from finchlite import dense, element, ffuncs, fiber_tensor, ftype
-from finchlite.algebra import TupleFType, ftypes
+from finchlite.algebra import ftypes
 from finchlite.codegen import (
     CCompiler,
     CGenerator,
+    MLIRCompiler,
+    MLIRGenerator,
     NumbaCompiler,
     NumbaGenerator,
     NumpyBuffer,
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.buffers import CHashTable, MallocBuffer, NumbaHashTable
+from finchlite.codegen.buffers import MallocBuffer
 from finchlite.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
@@ -38,11 +41,18 @@ from finchlite.tensor import BufferizedNDArrayFType
 from .conftest import finch_assert_equal
 
 
+@pytest.mark.c_backend
 def test_add_function():
     c_code = """
     #include <stdio.h>
 
-    int add(int a, int b) {
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
+
+    FINCH_EXPORT int add(int a, int b) {
         return a + b;
     }
     """
@@ -51,12 +61,19 @@ def test_add_function():
     assert result == 7, f"Expected 7, got {result}"
 
 
+@pytest.mark.c_backend
 def test_buffer_function():
     c_code = """
     #include <stdio.h>
     #include <stdlib.h>
     #include <stdint.h>
     #include <string.h>
+
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
 
     typedef struct CNumpyBuffer {
         void* arr;
@@ -65,7 +82,7 @@ def test_buffer_function():
         void* (*resize)(void**, size_t);
     } CNumpyBuffer;
 
-    void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
+    FINCH_EXPORT void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
         // Get the original data pointer and length
         double* data = (double*)(buffer->data);
         size_t length = buffer->length;
@@ -98,7 +115,7 @@ def test_buffer_function():
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
+        pytest.param(CCompiler(), NumpyBuffer, marks=pytest.mark.c_backend),
         (NumbaCompiler(), NumpyBuffer),
     ],
 )
@@ -154,6 +171,7 @@ def test_codegen(compiler, buffer):
     finch_assert_equal(result, expected)
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
@@ -235,6 +253,7 @@ def test_dot_product_malloc(compiler, buffer):
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "new_size"],
     [
@@ -279,7 +298,7 @@ def test_malloc_resize(compiler, new_size):
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
     [
-        (CCompiler(), NumpyBuffer),
+        pytest.param(CCompiler(), NumpyBuffer, marks=pytest.mark.c_backend),
         (NumbaCompiler(), NumpyBuffer),
         (asm.AssemblyInterpreter(), NumpyBuffer),
     ],
@@ -357,6 +376,7 @@ def test_dot_product(compiler, buffer):
     assert np.isclose(result, expected), f"Expected {expected}, got {result}"
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "extension", "buffer"],
     [
@@ -497,7 +517,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
 @pytest.mark.parametrize(
     ["compiler"],
     [
-        (CCompiler(),),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
         (NumbaCompiler(),),
         (asm.AssemblyInterpreter(),),
     ],
@@ -578,7 +598,7 @@ def test_if_statement(compiler):
 @pytest.mark.parametrize(
     "compiler",
     [
-        CCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
         NumbaCompiler(),
     ],
 )
@@ -699,6 +719,7 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
     file_regression.check(str(output), extension=extension)
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     "size,idx",
     [(size, idx) for size in range(1, 4) for idx in range(-1, 4)],
@@ -825,6 +846,7 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
             change(ab)
 
 
+@pytest.mark.c_backend
 @pytest.mark.parametrize(
     "size,idx,value",
     [
@@ -936,11 +958,9 @@ def test_np_numba_serialization(value, np_type):
         ),
     ],
 )
+@pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_numba(fmt_fn, dtype):
-    ctx = finchlite.get_default_scheduler()  # TODO: as fixture
-    finchlite.set_default_scheduler(ctx=finchlite.COMPILE_NUMBA)
-
     a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
     b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
@@ -956,192 +976,238 @@ def test_e2e_numba(fmt_fn, dtype):
 
     finch_assert_equal(result, a @ b)
 
-    finchlite.set_default_scheduler(ctx=ctx)
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_numba(a, dtype):
+    """Transposing through the compiled (assembly/numba) backend must produce
+    the actual transpose, not zeros.
+
+    Regression: a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = in[..., i]``). The notation->assembly
+    lowering dropped that ``If`` body (it was emitted into a throwaway block),
+    so ``compute(permute_dims(x))`` returned an all-zero array on every
+    compiled backend while the notation interpreter stayed correct. See the
+    lower-level reproduction in
+    ``test_notation_compiler.test_if_in_loop_is_lowered``.
+    """
+    a = a.astype(dtype)
+    wa = finchlite.lazy(finchlite.asarray(a))
+    result = finchlite.compute(finchlite.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
 
 
 @pytest.mark.parametrize(
-    ["compiler", "constructor"],
+    "fmt_fn",
     [
-        (
-            CCompiler(),
-            CHashTable,
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(ftype(dtype)),
+            ndim=2,
+            dimension_type=(ftypes.intp, ftypes.intp),
         ),
-        (
-            asm.AssemblyInterpreter(),
-            CHashTable,
-        ),
-        (
-            NumbaCompiler(),
-            NumbaHashTable,
-        ),
-        (
-            asm.AssemblyInterpreter(),
-            NumbaHashTable,
+        lambda dtype: fiber_tensor(
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
         ),
     ],
 )
-def test_hashtable(compiler, constructor):
-    table = constructor(
-        TupleFType.from_tuple((ftypes.int_, ftypes.int_)),
-        TupleFType.from_tuple((ftypes.int_, ftypes.int_, ftypes.int_)),
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
     )
 
-    table_v = asm.Variable("a", ftype(table))
-    table_slt = asm.Slot("a_", ftype(table))
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
 
-    key_type = table.ftype.key_type
-    val_type = table.ftype.value_type
-    key_v = asm.Variable("key", key_type)
-    val_v = asm.Variable("val", val_type)
+    fmt = fmt_fn(dtype)
+    wa = finchlite.lazy(finchlite.asarray(a, format=fmt))
+    wb = finchlite.lazy(finchlite.asarray(b, format=fmt))
 
-    module = asm.Module(
+    plan = finchlite.matmul(wa, wb)
+    result = finchlite.compute(plan)
+    finch_assert_equal(result, a @ b)
+
+
+@pytest.mark.mlir_backend
+def test_matmul_mlir_regression(file_regression):
+    m, k, n = 2, 3, 4
+    ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
+    bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
+    cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
+
+    i = asm.Variable("i", ftypes.intp)
+    j = asm.Variable("j", ftypes.intp)
+    p = asm.Variable("p", ftypes.intp)
+
+    a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+    b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
+    c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
+
+    c_idx = asm.Call(
+        asm.Literal(ffuncs.add),
         (
-            asm.Function(
-                asm.Variable("setidx", val_type),
-                (table_v, key_v, val_v),
-                asm.Block(
-                    (
-                        asm.Unpack(table_slt, table_v),
-                        asm.StoreDict(
-                            table_slt,
-                            key_v,
-                            val_v,
-                        ),
-                        asm.Repack(table_slt),
-                        asm.Return(asm.LoadDict(table_slt, key_v)),
-                    )
-                ),
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(n))),
             ),
-            asm.Function(
-                asm.Variable("exists", ftypes.bool),
-                (table_v, key_v),
-                asm.Block(
-                    (
-                        asm.Unpack(table_slt, table_v),
-                        asm.Return(asm.ExistsDict(table_slt, key_v)),
-                    )
-                ),
-            ),
-        )
-    )
-    compiled = compiler(module)
-    assert compiled.setidx(
-        table,
-        key_type.from_fields(1, 2),
-        val_type.from_fields(2, 3, 4),
-    ) == val_type.from_fields(2, 3, 4)
-
-    assert compiled.setidx(
-        table,
-        key_type.from_fields(1, 4),
-        val_type.from_fields(3, 4, 1),
-    ) == val_type.from_fields(3, 4, 1)
-
-    assert compiled.exists(table, key_type.from_fields(1, 2))
-
-    assert not compiled.exists(table, key_type.from_fields(1, 3))
-
-    assert not compiled.exists(table, val_type.from_fields(2, 3))
-
-
-@pytest.mark.parametrize(
-    ["compiler", "tabletype"],
-    [
-        (CCompiler(), CHashTable),
-        (asm.AssemblyInterpreter(), CHashTable),
-        (NumbaCompiler(), NumbaHashTable),
-        (asm.AssemblyInterpreter(), NumbaHashTable),
-    ],
-)
-def test_multiple_hashtable(compiler, tabletype):
-    """
-    This test exists because in the case of C, we might need to dump multiple
-    hash table definitions into the context.
-
-    So I am not gonna touch heterogeneous structs right now because the hasher
-    hashes the padding bytes too (even though they are worse than useless)
-    """
-
-    def _int_tupletype(arity):
-        return TupleFType.from_tuple(tuple(ftypes.int_ for _ in range(arity)))
-
-    def func(table, num: int):
-        key_type = table.ftype.key_type
-        val_type = table.ftype.value_type
-        key_v = asm.Variable("key", key_type)
-        val_v = asm.Variable("val", val_type)
-        table_v = asm.Variable("a", ftype(table))
-        table_slt = asm.Slot("a_", ftype(table))
-        return asm.Function(
-            asm.Variable(f"setidx_{num}", val_type),
-            (table_v, key_v, val_v),
-            asm.Block(
-                (
-                    asm.Unpack(table_slt, table_v),
-                    asm.StoreDict(
-                        table_slt,
-                        key_v,
-                        val_v,
-                    ),
-                    asm.Repack(table_slt),
-                    asm.Return(asm.LoadDict(table_slt, key_v)),
-                )
-            ),
-        )
-
-    table1 = tabletype(_int_tupletype(2), _int_tupletype(3))
-    table2 = tabletype(_int_tupletype(1), _int_tupletype(4))
-    table3 = tabletype(
-        TupleFType.from_tuple((ftypes.float_, ftypes.int_)),
-        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
-    )
-    table4 = tabletype(
-        TupleFType.from_tuple(
-            (ftypes.float_, TupleFType.from_tuple((ftypes.int_, ftypes.float_)))
+            j,
         ),
-        TupleFType.from_tuple((ftypes.float_, ftypes.float_)),
     )
-    table5 = tabletype(ftypes.int_, ftypes.int_)
 
-    mod = compiler(
-        asm.Module(
+    a_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(k))),
+            ),
+            p,
+        ),
+    )
+
+    b_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (p, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
+    body = asm.Store(
+        c_slt,
+        c_idx,
+        asm.Call(
+            asm.Literal(ffuncs.add),
             (
-                func(table1, 1),
-                func(table2, 2),
-                func(table3, 3),
-                func(table4, 4),
-                func(table5, 5),
+                asm.Load(c_slt, c_idx),
+                asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (
+                        asm.Load(a_slt, a_idx),
+                        asm.Load(b_slt, b_idx),
+                    ),
+                ),
+            ),
+        ),
+    )
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("matmul", ftypes.none_),
+                (a_v, b_v, c_v),
+                asm.Block(
+                    (
+                        asm.Unpack(a_slt, a_v),
+                        asm.Unpack(b_slt, b_v),
+                        asm.Unpack(c_slt, c_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.intp(0)),
+                            asm.Literal(np.intp(m)),
+                            asm.Block(
+                                (
+                                    asm.ForLoop(
+                                        j,
+                                        asm.Literal(np.intp(0)),
+                                        asm.Literal(np.intp(n)),
+                                        asm.Block(
+                                            (
+                                                asm.ForLoop(
+                                                    p,
+                                                    asm.Literal(np.intp(0)),
+                                                    asm.Literal(np.intp(k)),
+                                                    asm.Block((body,)),
+                                                ),
+                                            )
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(a_slt),
+                        asm.Repack(b_slt),
+                        asm.Repack(c_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+
+
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_dense_matmul_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="finchlite.codegen.mlir_codegen.mlir"):
+        result = finchlite.compute(
+            finchlite.matmul(
+                finchlite.lazy(finchlite.asarray(a, format=fmt)),
+                finchlite.lazy(finchlite.asarray(b, format=fmt)),
             )
         )
+
+    finch_assert_equal(result, a @ b)
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finchlite.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
     )
+    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+    file_regression.check(mlir_code, extension=".mlir")
 
-    # what's important here is that you can call setidx_1 on table1 and
-    # setidx_2 on table2.
-    assert mod.setidx_1(
-        table1,
-        (1, 2),
-        (2, 3, 4),
-    ) == (2, 3, 4)
 
-    assert mod.setidx_2(
-        table2,
-        (1,),
-        (2, 3, 4, 5),
-    ) == (2, 3, 4, 5)
-
-    assert mod.setidx_3(
-        table3,
-        (0.1, 2),
-        (0.2, 0.2),
-    ) == (0.2, 0.2)
-
-    assert mod.setidx_4(
-        table4,
+@pytest.mark.mlir_backend
+def test_mlir_resize_not_supported():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    prgm = asm.Module(
         (
-            0.1,
-            (1, 0.2),
-        ),
-        (0.2, 0.2),
-    ) == (0.2, 0.2)
-
-    assert mod.setidx_5(table5, 3, 2) == 2
+            asm.Function(
+                asm.Variable("grow", ftypes.none_),
+                (b_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.Resize(b_slt, asm.Literal(np.intp(6))),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    with pytest.raises(NotImplementedError, match="Resize"):
+        MLIRCompiler()(prgm)

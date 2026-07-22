@@ -2,6 +2,7 @@
 */DS_Store
 */.python-version
 .python-version
+/array-api-tests/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -102,12 +103,12 @@ ipython_config.py
 #   install all needed dependencies.
 #Pipfile.lock
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+# pixi
+#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-poetry.lock
+#   https://pixi.prefix.dev/latest/workspace/lock_file/#what-is-a-lock-file
+#pixi.lock
 
 # pdm
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
@@ -173,7 +174,6 @@ cython_debug/
 # pixi environments
 .pixi/
 *.egg-info
-pixi.lock
 
 # airspeed velocity
 .asv

@@ -5,7 +5,7 @@ import sysconfig
 from importlib.metadata import version
 from pathlib import Path
 
-import donfig  # type: ignore[import]
+import donfig
 
 """
 Finch Configuration Module
@@ -28,18 +28,33 @@ Use this module to easily manage and retrieve Finch-specific settings.
 is_windows = os.name == "nt"
 is_apple = sys.platform == "darwin"
 
+COMPILERS = ["cc", "clang", "gcc"]
+if is_windows:
+    COMPILERS.insert(0, "clang-cl")
+
+
+def get_cc() -> str | None:
+    for cc in COMPILERS:
+        if shutil.which(cc):
+            return cc
+    return None
+
+
 default = {
     "data_path": str(Path(sysconfig.get_path("data")) / "finchlite"),
     "cache_size": 10_000,
     "cache_enable": True,
-    "cc": str(os.getenv("CC") or shutil.which("gcc") or ("cl" if is_windows else "cc")),
-    "cflags": os.getenv("CFLAGS") or "-O3",
+    "cc": get_cc(),
+    "cflags": os.getenv("CFLAGS") or "-Og" if not is_windows else "/Og",
     "shared_cflags": os.getenv(
         "SHARED_CFLAGS",
-        "-shared -fPIC",
+        "-shared -fPIC" if not is_windows else "/LD /TC",
     ),
     "shared_library_suffix": (
-        os.getenv("SHARED_LIBRARY_SUFFIX", (".dll" if is_windows else ".so"))
+        os.getenv(
+            "SHARED_LIBRARY_SUFFIX",
+            (".dll" if is_windows else ".dylib" if is_apple else ".so"),
+        )
     ),
 }
 

@@ -1,0 +1,25 @@
+name: Docs
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          pixi-version: v0.71.3
+          environments: >-
+            docs
+      - name: Deploy Docs
+        run: pixi run -e docs mkdocs gh-deploy --force

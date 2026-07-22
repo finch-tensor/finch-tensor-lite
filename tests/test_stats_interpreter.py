@@ -4,7 +4,7 @@ import numpy as np
 
 import finchlite as fl
 from finchlite.algebra import ffuncs
-from finchlite.autoschedule.tensor_stats import DatabaseStatsFactory, DCStatsFactory
+from finchlite.autoschedule.tensor_stats import DCStatsFactory, VPStatsFactory
 from finchlite.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
     calculate_estimated_error,
@@ -128,7 +128,7 @@ def test_stats_matmul_error():
         ((2, 3), (3, 4)),
     ],
 )
-def test_database_stats_matrix_multiplication(shape_a, shape_b):
+def test_vp_stats_matrix_multiplication(shape_a, shape_b):
     a = fl.asarray(np.ones(shape_a))
     b = fl.asarray(np.ones(shape_b))
 
@@ -163,7 +163,7 @@ def test_database_stats_matrix_multiplication(shape_a, shape_b):
         )
     )
 
-    interpreter = StatsInterpreter(stats_factory=DatabaseStatsFactory())
+    interpreter = StatsInterpreter(stats_factory=VPStatsFactory())
     result_stats = interpreter(p, {})[0]
 
     expected_rows = shape_a[0]
@@ -174,7 +174,7 @@ def test_database_stats_matrix_multiplication(shape_a, shape_b):
     assert tuple(f.name for f in result_stats.index_order) == ("i", "j")
 
 
-def test_database_stats_matmul_error():
+def test_vp_stats_matmul_error():
     a_val = fl.asarray(np.ones((20, 30)))
     b_val = fl.asarray(np.ones((30, 20)))
 
@@ -211,7 +211,7 @@ def test_database_stats_matmul_error():
 
     errors = calculate_estimated_error(
         node=p,
-        stats_factory=DatabaseStatsFactory(),
+        stats_factory=VPStatsFactory(),
         logic_bindings={},
         stats_bindings={},
     )

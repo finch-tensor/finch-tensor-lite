@@ -51,7 +51,14 @@ Performance:
 """
 
 from finchlite.autoschedule import get_default_scheduler
-from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finchlite.finch_logic import (
+    Alias,
+    Field,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
 from finchlite.symbolic import gensym
 
 from .lazy import LazyTensor, asarray, lazy
@@ -104,13 +111,14 @@ def compute(arg, ctx=None):
         prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
         res = ctx(prgm)
         for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
+            device = lazy_args[lazy_idx].device
             if (
                 len(res[lazy_idx].shape) == 0
             ):  # if the result is a scalar, extract the value and turn it into a
                 # finch `Scalar`
-                outputs[out_idx] = asarray(res[lazy_idx][()])
+                outputs[out_idx] = asarray(res[lazy_idx][()], device=device)
             else:
-                outputs[out_idx] = res[lazy_idx]
+                outputs[out_idx] = asarray(res[lazy_idx], device=device)
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
