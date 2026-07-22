@@ -4,7 +4,7 @@ import finchlite as fl
 import finchlite.algebra.ffuncs as ffuncs
 from finchlite.finch_logic import Field
 from finchlite.autoschedule.tensor_stats.sampling_stats import (
-    SamplingStatsFactory,_duj1,_dsj1,_duj2,_dsh,_dsh2,_dsh3)
+    SamplingStatsFactory,_duj1,_dsj1,_duj2,_dsh,_dsh2,_dsh3,_dgood1)
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
 from finchlite.finch_logic import (
     Aggregate,
@@ -58,7 +58,7 @@ def test_verify_sketch_computation(n=20,density=0.4,sample_prob=0.5,seed=0):
 def test_estimators_isolated(D_true=100,N_true=1000000,q=0.125,trials=50,seed=0):
     rs = np.random.default_rng(seed)
     multiplicities = rs.geometric(p=0.5,size=D_true)
-    ests = {name:[] for name in ["uj1","sj1","uj2","schlosser","sh2","sh3"]}
+    ests = {name:[] for name in ["uj1","sj1","uj2","schlosser","sh2","sh3","good1"]}
     for _ in range(trials):
         counts = rs.binomial(multiplicities,q)#sampled entries out of available multiplicities
         d_n = float(np.sum(counts>0))#how many did we get in the sample 
@@ -74,6 +74,7 @@ def test_estimators_isolated(D_true=100,N_true=1000000,q=0.125,trials=50,seed=0)
         ests["schlosser"].append(_dsh(d_n,f_1,frequencies,q,n))
         ests["sh2"].append(_dsh2(d_n,f_1,frequencies,q,n,N_true))
         ests["sh3"].append(_dsh3(d_n,f_1,frequencies,q,n))
+        ests["good1"].append(_dgood1(d_n,frequencies,n,N_true))
 
     for name,vals in ests.items():
         vals = np.array(vals)
