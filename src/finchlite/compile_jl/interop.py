@@ -4,7 +4,6 @@ from typing import Any, cast
 
 import numpy as np
 
-from finchlite.algebra import TupleFType
 from finchlite.codegen import NumpyBuffer
 from finchlite.finch_assembly import Buffer
 from finchlite.tensor import (
@@ -35,13 +34,13 @@ def _as_julia_scalar(val):
     return val
 
 
-def _buffer_to_jl(buffer: Buffer):
+def _buffer_to_jl(buffer: Buffer, *, offset: int = 0):
     if isinstance(buffer, NumpyBuffer):
-        if isinstance(buffer.ftype.element_type, TupleFType):
-            data = jl.PythonCall.PyArray(jl.PythonCall.Py(buffer.arr))
-            tuple_type = jl.Tuple[jl.fieldtypes(jl.eltype(data))]
-            return jl.reinterpret(tuple_type, data)
-        return jl.Vector(buffer.arr)
+        return jl_dtypes.to_jl_vector(
+            buffer.ftype.element_type,
+            buffer.arr,
+            offset=offset,
+        )
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
 
@@ -118,8 +117,8 @@ def level_to_jl(level: Level):
                 int(subtables),
                 _plus_one_buffer_to_jl(cast(Buffer, ptr)),
                 _buffer_to_jl(cast(Buffer, tbl_ctrl)),
-                _plus_one_buffer_to_jl(cast(Buffer, tbl)),
-                _plus_one_buffer_to_jl(cast(Buffer, pool)),
+                _buffer_to_jl(cast(Buffer, tbl), offset=1),
+                _buffer_to_jl(cast(Buffer, pool)),
                 _plus_one_buffer_to_jl(cast(Buffer, perm)),
             )
         case _:

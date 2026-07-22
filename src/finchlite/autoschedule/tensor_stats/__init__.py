@@ -10,13 +10,12 @@ from .bound_stats import (
     LPStats,
     LPStatsFactory,
 )
-from .database_stats import DatabaseStats, DatabaseStatsFactory
 from .dense_stat import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
-from .errorlogger_stats import ErrorLoggerStats, ErrorLoggerStatsFactory, ErrorReport
 from .stats_interpreter import StatsInterpreter
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 from .uniform_stats import UniformStats, UniformStatsFactory
+from .vp_stats import VPStats, VPStatsFactory
 
 __all__ = [
     "DC",
@@ -28,19 +27,16 @@ __all__ = [
     "BoundStatsFactory",
     "DCStats",
     "DCStatsFactory",
-    "DatabaseStats",
-    "DatabaseStatsFactory",
     "DenseStats",
     "DenseStatsFactory",
     "DummyStats",
     "DummyStatsFactory",
-    "ErrorLoggerStats",
-    "ErrorLoggerStatsFactory",
-    "ErrorReport",
     "LPStats",
     "LPStatsFactory",
     "StatsInterpreter",
     "TensorStats",
     "UniformStats",
     "UniformStatsFactory",
+    "VPStats",
+    "VPStatsFactory",
 ]

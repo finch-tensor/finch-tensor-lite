@@ -2,7 +2,7 @@ import threading
 from contextlib import contextmanager
 
 from finchlite.autoschedule.optimize import DefaultLogicOptimizer
-from finchlite.codegen import NumbaCompiler
+from finchlite.codegen import MLIRCompiler, NumbaCompiler
 from finchlite.compile import NotationCompiler
 from finchlite.finch_assembly import (
     AssemblyInterpreter,
@@ -96,6 +96,26 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
         GalleyLogicalOptimizer(
             DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+            )
+        )
+    )
+)
+
+COMPILE_MLIR = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicOptimizer(
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(
+                    LogicCompiler(
+                        NotationCompiler(
+                            MLIRCompiler(),
+                            ctx_transforms=(
+                                LowerPackedStructSlots(),
+                                AssemblySimplify(),
+                            ),
+                        )
+                    )
+                )
             )
         )
     )

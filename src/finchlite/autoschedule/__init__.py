@@ -1,4 +1,3 @@
-from finchlite.autoschedule.optimize import DefaultLogicOptimizer
 from finchlite.finch_logic import (
     Aggregate,
     Alias,
@@ -18,6 +17,7 @@ from finchlite.symbolic import PostOrderDFS, PostWalk, PreWalk
 from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
+    COMPILE_MLIR,
     COMPILE_NUMBA,
     COMPILE_NUMBA_GALLEY,
     INTERPRET_ASSEMBLY,
@@ -30,12 +30,15 @@ from .default_schedulers import (
     with_default_scheduler,
 )
 from .executor import LogicExecutor
-from .formatter import DefaultLogicFormatter, LogicFormatter
+from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
+from .optimize import DefaultLogicOptimizer
+from .smart_formatter import FDFormatter, SmartFormatter
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
+    "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "COMPILE_NUMBA_GALLEY",
     "INTERPRET_ASSEMBLY",
@@ -45,9 +48,11 @@ __all__ = [
     "OPTIMIZE_LOGIC",
     "Aggregate",
     "Alias",
+    "BufferizedNDArrayFormatter",
     "DefaultLogicFormatter",
     "DefaultLogicOptimizer",
     "DefaultLoopOrderer",
+    "FDFormatter",
     "Field",
     "Literal",
     "LogicCapture",
@@ -67,6 +72,7 @@ __all__ = [
     "Query",
     "Relabel",
     "Reorder",
+    "SmartFormatter",
     "Table",
     "Value",
     "get_default_scheduler",

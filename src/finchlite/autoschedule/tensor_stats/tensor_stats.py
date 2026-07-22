@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from typing import Any, Generic, Self, TypeVar
@@ -20,7 +20,6 @@ from finchlite.finch_logic import (
     Field,
     Literal,
     MapJoin,
-    StatsFactory,
     Table,
     TensorStats,
 )
@@ -33,16 +32,34 @@ class BaseTensorStats(TensorStats):
     Base class for tensor statistics.
     """
 
-    def __init__(self, tensor: Any, fields: tuple[Field, ...]):
-        """Build the definition state by reading the shape and fill value off
-        of ``tensor``.
-        """
-        shape = tensor.shape
-        self._index_order = tuple(fields)
-        self._dim_sizes: OrderedDict[Field, float] = OrderedDict(
-            (axis, float(shape[i])) for i, axis in enumerate(fields)
-        )
-        self._fill_value = tensor.fill_value
+    def __init__(
+        self,
+        index_order: Iterable[Field] | BaseTensorStats,
+        dim_sizes: Mapping[Field, float] | None = None,
+        fill_value: Any = None,
+    ):
+        if isinstance(index_order, BaseTensorStats):
+            if dim_sizes is not None:
+                raise TypeError(
+                    "dim_sizes must be omitted when constructing from BaseTensorStats"
+                )
+            self._init_from_fields(
+                index_order.index_order, index_order.dim_sizes, index_order.fill_value
+            )
+        else:
+            if dim_sizes is None:
+                raise TypeError("dim_sizes are required when constructing from fields")
+            self._init_from_fields(index_order, dim_sizes, fill_value)
+
+    def _init_from_fields(
+        self,
+        index_order: Iterable[Field],
+        dim_sizes: Mapping[Field, float],
+        fill_value: Any,
+    ):
+        self._index_order = tuple(index_order)
+        self._dim_sizes: OrderedDict[Field, float] = OrderedDict(dim_sizes)
+        self._fill_value = fill_value
 
     @classmethod
     def from_fields(
@@ -51,25 +68,7 @@ class BaseTensorStats(TensorStats):
         dim_sizes: Mapping[Field, float],
         fill_value: Any,
     ) -> Self:
-        """Build an instance directly from raw definition fields, bypassing
-        ``__init__`` (which expects a tensor).
-        """
-        obj = object.__new__(cls)
-        obj._index_order = tuple(index_order)
-        obj._dim_sizes = OrderedDict(dim_sizes)
-        obj._fill_value = fill_value
-        return obj
-
-    @classmethod
-    def from_base_stats(cls, d: BaseTensorStats, **fields: Any) -> Self:
-        """Build a ``cls`` instance that reuses the definition state (index
-        order, dimension sizes, fill value) of ``d``, setting any
-        subclass-specific attributes from ``fields``.
-        """
-        obj = cls.from_fields(d.index_order, d.dim_sizes, d.fill_value)
-        for name, value in fields.items():
-            setattr(obj, name, value)
-        return obj
+        return cls(index_order, dim_sizes, fill_value)
 
     def copy(self) -> Self:
         new = object.__new__(type(self))
@@ -116,12 +115,16 @@ class BaseTensorStats(TensorStats):
         return float(prod)
 
 
-class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
+class BaseTensorStatsFactory(ABC, Generic[TS]):
     def __init__(self, stats_cls: type[TS]):
         self.stats_cls = stats_cls
 
-    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> TS:
-        return self.stats_cls(tensor, fields)
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> BaseTensorStats:
+        shape = tensor.shape
+        dim_sizes = OrderedDict(
+            (axis, float(shape[i])) for i, axis in enumerate(fields)
+        )
+        return BaseTensorStats(fields, dim_sizes, tensor.fill_value)
 
     def copy(self, stat: TS) -> TS:
         if not isinstance(stat, self.stats_cls):
@@ -143,11 +146,11 @@ class BaseTensorStatsFactory(StatsFactory[TS], Generic[TS]):
 
         return self._mapjoin_join(op, *join_args)
 
-    @abstractmethod
-    def _mapjoin_union(self, op: FinchOperator, *union_args: TS) -> TS: ...
+    def _mapjoin_union(self, op: FinchOperator, *union_args: TS) -> TS:
+        raise NotImplementedError
 
-    @abstractmethod
-    def _mapjoin_join(self, op: FinchOperator, *join_args: TS) -> TS: ...
+    def _mapjoin_join(self, op: FinchOperator, *join_args: TS) -> TS:
+        raise NotImplementedError
 
     @abstractmethod
     def aggregate(

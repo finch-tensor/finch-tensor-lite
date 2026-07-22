@@ -11,15 +11,35 @@ from finchlite import (
     dense,
     element,
     fiber_tensor,
+    sparse_list,
 )
 from finchlite.tensor import (
     BufferizedNDArray,
     EyeTensor,
     FillTensor,
     IndexTensor,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
     ParityMaskTensor,
     PatternTensor,
+    RepeatTensor,
     ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    UpperTriangleTensor,
+)
+from finchlite.tensor.traits import (
+    Blocked as BlockedProperty,
+)
+from finchlite.tensor.traits import (
+    Dense as DenseProperty,
+)
+from finchlite.tensor.traits import (
+    Repeated as RepeatedProperty,
 )
 
 
@@ -181,12 +201,119 @@ def test_fiber_tensor():
             )
         )
     )
+    assert fmt.level_format_properties == [
+        DenseProperty((0,)),
+        DenseProperty((0, 1)),
+    ]
+    sparse_fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                dense(
+                    element(
+                        np.int64(0),
+                        finchlite.int64,
+                        finchlite.intp,
+                        NumpyBufferFType,
+                    )
+                ),
+                finchlite.intp,
+            )
+        )
+    )
+    assert sparse_fmt.level_format_properties == [
+        DenseProperty((0,)),
+        DenseProperty((0, 1, 2)),
+    ]
 
     asarray(np.arange(12).reshape((3, 4)), format=fmt)
 
     cpu_dev = finchlite.cpu("fiber-test", n=2)
     tensor = asarray(np.arange(12).reshape((3, 4)), format=fmt, device=cpu_dev)
     assert tensor.device == cpu_dev
+
+
+def test_sparse_level_construct_initializes_empty_storage():
+    elem_t = element(0.0, finchlite.float64, finchlite.intp, NumpyBufferFType)
+
+    list_level = sparse_list(elem_t, finchlite.intp).construct((4,), pos=3)
+    np.testing.assert_array_equal(list_level.ptr.arr, np.zeros(4, dtype=np.intp))
+    assert list_level.idx.length() == 0
+    assert list_level.lvl.val.length() == 0
+
+    hash_level = finchlite.sparse_hash(elem_t, finchlite.intp).construct((4,), pos=3)
+    np.testing.assert_array_equal(hash_level.ptr.arr, np.zeros(4, dtype=np.intp))
+    assert hash_level.tbl_ctrl.length() == 0
+    assert hash_level.tbl.length() == 0
+    assert hash_level.pool.length() == 0
+    assert hash_level.perm.length() == 0
+    assert hash_level.lvl.val.length() == 0
+
+    coo_level = finchlite.sparse_coo(elem_t, 2, finchlite.intp).construct((4, 5), pos=3)
+    np.testing.assert_array_equal(coo_level.ptr.arr, np.zeros(4, dtype=np.intp))
+    assert len(coo_level.tbl) == 2
+    assert all(idx.length() == 0 for idx in coo_level.tbl)
+    assert coo_level.lvl.val.length() == 0
+
+    bytemap_level = finchlite.sparse_bytemap(elem_t, finchlite.intp).construct(
+        (4,), pos=3
+    )
+    np.testing.assert_array_equal(bytemap_level.ptr.arr, np.zeros(4, dtype=np.intp))
+    np.testing.assert_array_equal(bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_))
+    assert bytemap_level.srt.length() == 0
+    assert bytemap_level.lvl.val.length() == 12
+
+
+def test_bufferized_ndarray_level_format_properties():
+    tensor = BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
+
+    assert tensor.ftype.level_format_properties == [
+        DenseProperty((0,)),
+        DenseProperty((0, 1)),
+    ]
+
+
+@pytest.mark.parametrize(
+    "tensor, expected",
+    [
+        (
+            FillTensor((2, 3), 0),
+            [
+                DenseProperty((0,)),
+                DenseProperty((0, 1)),
+                RepeatedProperty((), (0,)),
+                RepeatedProperty((0,), (1,)),
+            ],
+        ),
+        (
+            IndexTensor((2, 3)),
+            [DenseProperty((0,)), DenseProperty((0, 1))],
+        ),
+        (ReshapeMaskTensor((2, 3), (3, 2), dtype=np.bool_), []),
+        (EyeTensor((2, 3)), []),
+        (
+            UpperTriangleTensor((3, 4)),
+            [BlockedProperty((0,), (1,)), BlockedProperty((1,), (0,))],
+        ),
+        (
+            LowerTriangleTensor((3, 4)),
+            [BlockedProperty((0,), (1,)), BlockedProperty((1,), (0,))],
+        ),
+        (PairSumTensor((3, 6)), [BlockedProperty((0,), (1,))]),
+        (PairCarryTensor((6, 3)), [BlockedProperty((1,), (0,))]),
+        (ReverseTensor((3, 3)), []),
+        (RollTensor((3, 3), k=1), []),
+        (
+            RepeatTensor((6, 3), k=2),
+            [BlockedProperty((1,), (0,)), RepeatedProperty((1,), (0,))],
+        ),
+        (OddEvenMergeSortPartnerMaskTensor((8, 8), p=2, k=1), []),
+        (OddEvenMergeSortLowerMaskTensor(8, p=2, k=1), []),
+        (OneHotMaskTensor(5, index=2), []),
+        (ParityMaskTensor(5), []),
+    ],
+)
+def test_symbolic_tensor_level_format_properties(tensor, expected):
+    assert tensor.ftype.level_format_properties == expected
 
 
 @pytest.mark.parametrize(
