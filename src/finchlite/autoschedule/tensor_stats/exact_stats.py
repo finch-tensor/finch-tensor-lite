@@ -23,7 +23,10 @@ from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
-class ExactStatsFactory(BaseTensorStatsFactory["ExactStats"], StatsFactory["ExactStats"]):
+class ExactStatsFactory(
+    BaseTensorStatsFactory["ExactStats"],
+    StatsFactory["ExactStats"],
+):
     def __init__(self):
         super().__init__(ExactStats)
 

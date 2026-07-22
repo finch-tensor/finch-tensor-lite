@@ -87,9 +87,7 @@ class BlockedStatsFactory(
                     local_blocks.append(block)
             new_blocks[coord] = inner_factory.mapjoin(op, *local_blocks)
 
-        return BlockedStats(
-            new_blocks, first_arg.blocks_per_dim, base, inner_factory
-        )
+        return BlockedStats(new_blocks, first_arg.blocks_per_dim, base, inner_factory)
 
     def aggregate(
         self,
@@ -101,9 +99,7 @@ class BlockedStatsFactory(
         if not isinstance(stats, BlockedStats):
             raise TypeError("BlockedStats expected for aggregate")
 
-        base = BaseTensorStatsFactory.aggregate_def(
-            op, init, reduce_indices, stats
-        )
+        base = BaseTensorStatsFactory.aggregate_def(op, init, reduce_indices, stats)
         grid_reduce_axes = []
         for i, idx in enumerate(stats.index_order):
             if idx in reduce_indices:
@@ -169,9 +165,7 @@ class BlockedStatsFactory(
             if isinstance(block, NumericStats):
                 new_blocks[coord] = stats.stats_factory.relabel(block, relabel_indices)
 
-        return BlockedStats(
-            new_blocks, new_blocks_per_dim, base, stats.stats_factory
-        )
+        return BlockedStats(new_blocks, new_blocks_per_dim, base, stats.stats_factory)
 
     def reorder(
         self, stats: BlockedStats, reorder_indices: tuple[Field, ...]

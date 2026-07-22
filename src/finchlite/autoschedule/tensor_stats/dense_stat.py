@@ -11,7 +11,10 @@ from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStatsFactory
 
 
-class DenseStatsFactory(BaseTensorStatsFactory["DenseStats"], StatsFactory["DenseStats"]):
+class DenseStatsFactory(
+    BaseTensorStatsFactory["DenseStats"],
+    StatsFactory["DenseStats"],
+):
     def __init__(self):
         super().__init__(DenseStats)
 

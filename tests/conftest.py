@@ -7,7 +7,7 @@ from numpy.random import default_rng
 from numpy.testing import assert_allclose, assert_equal
 
 from finchlite import get_default_scheduler, set_default_scheduler
-from finchlite.autoschedule import COMPILE_NUMBA, INTERPRET_LOGIC
+from finchlite.autoschedule import COMPILE_MLIR, COMPILE_NUMBA, INTERPRET_LOGIC
 from finchlite.finch_logic import Field
 
 
@@ -51,6 +51,13 @@ def interpreter_scheduler():
 def numba_compiler():
     ctx = get_default_scheduler()
     yield set_default_scheduler(ctx=COMPILE_NUMBA)
+    set_default_scheduler(ctx=ctx)
+
+
+@pytest.fixture
+def mlir_compiler():
+    ctx = get_default_scheduler()
+    yield set_default_scheduler(ctx=COMPILE_MLIR)
     set_default_scheduler(ctx=ctx)
 
 

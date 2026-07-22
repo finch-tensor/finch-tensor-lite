@@ -4,7 +4,7 @@ import numpy as np
 
 import finchlite as fl
 from finchlite.algebra import ffuncs
-from finchlite.autoschedule.tensor_stats import VPStatsFactory, DCStatsFactory
+from finchlite.autoschedule.tensor_stats import DCStatsFactory, VPStatsFactory
 from finchlite.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
     calculate_estimated_error,

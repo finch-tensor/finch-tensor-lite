@@ -80,11 +80,20 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
 
-    def construct(self, shape, **kwargs) -> "SparseByteMapLevel":
-        if kwargs:
-            raise TypeError("SparseByteMapLevelFType.construct does not accept kwargs")
-        lvl = self.lvl_t.construct(shape=shape[1:])
-        return SparseByteMapLevel(lvl, self.dimension_type(shape[0]))
+    def level_format_properties(self, n):
+        return self.lvl_t.level_format_properties(n + 1)
+
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseByteMapLevel":
+        dimension = self.dimension_type(shape[0])
+        child_pos = int(pos) * int(dimension)
+        lvl = self.lvl_t.construct(shape=shape[1:], pos=child_pos)
+        return SparseByteMapLevel(
+            lvl,
+            dimension,
+            self.ptr_type(int(pos) + 1),
+            self.tbl_type(child_pos),
+            self.srt_type(0),
+        )
 
     def __call__(self, val: Any) -> "SparseByteMapLevel":
         raise NotImplementedError(
@@ -139,11 +148,11 @@ class SparseByteMapLevel(Level):
 
     def __post_init__(self) -> None:
         if self.ptr is None:
-            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
+            self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.tbl is None:
-            self.tbl = self.lvl.buffer_factory(ftypes.bool_)(len=0)
+            self.tbl = self.lvl.buffer_factory(ftypes.bool_)(0)
         if self.srt is None:
-            self.srt = self.lvl.buffer_factory(self.lvl.position_type)(len=0)
+            self.srt = self.lvl.buffer_factory(self.lvl.position_type)(0)
 
     @property
     def shape(self) -> tuple:
