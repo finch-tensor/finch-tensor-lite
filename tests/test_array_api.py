@@ -112,7 +112,7 @@ def test_array_api():
         ],
         env={
             **os.environ,
-            "ARRAY_API_TESTS_MODULE": "finchlite",
+            "ARRAY_API_TESTS_MODULE": "finch",
             "PYTEST_ADDOPTS": "",
             "PYTHONUNBUFFERED": "1",
         },

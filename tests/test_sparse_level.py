@@ -4,8 +4,8 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite import (
+import finch as ft
+from finch import (
     DenseLevel,
     ElementLevel,
     FiberTensor,
@@ -17,7 +17,7 @@ from finchlite import (
     fiber_tensor,
     ftype,
 )
-from finchlite.symbolic.gensym import _sg
+from finch.symbolic.gensym import _sg
 
 from .conftest import reset_name_counts
 
@@ -50,25 +50,25 @@ def test_selected_ops(dtype):
         )
     )
     b_np = np.array([[10, 10, 10], [10, 10, 10], [10, 10, 10]], dtype=dtype)
-    b = fl.asarray(b_np, format=fmt)
+    b = ft.asarray(b_np, format=fmt)
 
-    la = fl.lazy(a)
-    lb = fl.lazy(b)
+    la = ft.lazy(a)
+    lb = ft.lazy(b)
 
-    plan = fl.sum(la, axis=0)
-    res = fl.compute(plan)
+    plan = ft.sum(la, axis=0)
+    res = ft.compute(plan)
     np.testing.assert_array_equal(res.to_numpy(), np.sum(a_np, axis=0))
 
-    plan = fl.sum(la, axis=1)
-    res = fl.compute(plan)
+    plan = ft.sum(la, axis=1)
+    res = ft.compute(plan)
     np.testing.assert_array_equal(res.to_numpy(), np.sum(a_np, axis=1))
 
-    plan = fl.multiply(la, lb)
-    res = fl.compute(plan)
+    plan = ft.multiply(la, lb)
+    res = ft.compute(plan)
     np.testing.assert_array_equal(res.to_numpy(), a_np * b_np)
 
-    plan = fl.add(la, lb)
-    res = fl.compute(plan)
+    plan = ft.add(la, lb)
+    res = ft.compute(plan)
     np.testing.assert_array_equal(res.to_numpy(), a_np + b_np)
 
 
@@ -85,7 +85,7 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
             SparseListLevel(
                 ElementLevel(
                     element(
-                        dtype(0), fl.ftype(dtype), fl.ftype(np.intp), NumpyBufferFType
+                        dtype(0), ft.ftype(dtype), ft.ftype(np.intp), NumpyBufferFType
                     ),
                     data,
                 ),
@@ -101,7 +101,7 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
             SparseListLevel(
                 ElementLevel(
                     element(
-                        dtype(0), fl.ftype(dtype), fl.ftype(np.intp), NumpyBufferFType
+                        dtype(0), ft.ftype(dtype), ft.ftype(np.intp), NumpyBufferFType
                     ),
                     data,
                 ),
@@ -112,8 +112,8 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
             np.intp(3),
         )
     )
-    la = fl.lazy(a)
-    lb = fl.lazy(b)
+    la = ft.lazy(a)
+    lb = ft.lazy(b)
 
     class DummyHandler(logging.Handler):
         def __init__(self, level):
@@ -124,13 +124,13 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
             self.records.append(record)
 
     handler = DummyHandler(logging.DEBUG)
-    log = logging.getLogger("finchlite.compile.lower")
+    log = logging.getLogger("finch.compile.lower")
     log.addHandler(handler)
     log.propagate = False
 
-    with caplog.at_level(logging.DEBUG, logger="finchlite.compile.lower"):
-        result = fl.multiply(la, lb)
-        _ = fl.compute(result)
+    with caplog.at_level(logging.DEBUG, logger="finch.compile.lower"):
+        result = ft.multiply(la, lb)
+        _ = ft.compute(result)
 
     log.propagate = True
 

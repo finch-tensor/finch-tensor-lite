@@ -7,20 +7,20 @@ import pytest
 
 import numpy as np
 
-import finchlite
-from finchlite.finch_fused import jit
-from finchlite.finch_fused import nodes as fzd
-from finchlite.finch_fused.cfg_builder import (
+import finch
+from finch.finch_fused import jit
+from finch.finch_fused import nodes as fzd
+from finch.finch_fused.cfg_builder import (
     fused_build_cfg,
     fused_desugar,
     number_statements,
 )
-from finchlite.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
-from finchlite.finch_fused.parser import (
+from finch.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
+from finch.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
 )
-from finchlite.interface import add, asarray, matmul, sum
+from finch.interface import add, asarray, matmul, sum
 from tests.conftest import finch_assert_allclose
 
 
@@ -340,11 +340,11 @@ def test_jit_straight_line_inserted_code(file_regression):
 
 def test_jit_eager_only_operation_warns_and_computes():
     def simple_fn(A):
-        return finchlite.linalg.inv(A)
+        return finch.linalg.inv(A)
 
     @jit
     def opt_fn(A):
-        return finchlite.linalg.inv(A)
+        return finch.linalg.inv(A)
 
     A = asarray(np.array([[1.0, 2.0], [3.0, 5.0]]))
 
@@ -550,7 +550,7 @@ def test_jit_module_function():
     def simple_fn(A, B, n):
         C = A
         while n > 0:
-            C = finchlite.interface.add(C, B)
+            C = finch.interface.add(C, B)
             n = n - 1
         return C
 
@@ -558,7 +558,7 @@ def test_jit_module_function():
     def opt_fn(A, B, n):
         C = A
         while n > 0:
-            C = finchlite.interface.add(C, B)
+            C = finch.interface.add(C, B)
             n = n - 1
         return C
 
@@ -573,7 +573,7 @@ def test_jit_module_function_inserted_code(file_regression):
     def opt_fn(A, B, n):
         C = A
         while n > 0:
-            C = finchlite.interface.add(C, B)
+            C = finch.interface.add(C, B)
             n = n - 1
         return C
 
@@ -583,7 +583,7 @@ def test_jit_module_function_inserted_code(file_regression):
 def test_jit_local_module_function():
     """A jit function with a function from a module."""
 
-    xp = finchlite.interface
+    xp = finch.interface
 
     def simple_fn(A, B, n):
         C = A
@@ -608,7 +608,7 @@ def test_jit_local_module_function():
 
 
 def test_jit_local_module_function_inserted_code(file_regression):
-    xp = finchlite.interface
+    xp = finch.interface
 
     def opt_fn(A, B, n):
         C = A

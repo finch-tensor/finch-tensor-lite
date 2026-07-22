@@ -3,10 +3,10 @@ import pytest
 import numpy  # noqa: F401, ICN001
 import numpy as np
 
-import finchlite  # noqa: F401
-import finchlite.finch_notation as ntn
-from finchlite import ffuncs
-from finchlite.finch_notation import (  # noqa: F401
+import finch  # noqa: F401
+import finch.finch_notation as ntn
+from finch import ffuncs
+from finch.finch_notation import (  # noqa: F401
     Access,
     Assign,
     Block,
@@ -45,30 +45,30 @@ from .conftest import finch_assert_equal
     ],
 )
 def test_matrix_multiplication(a, b):
-    i = ntn.Variable("i", finchlite.int64)
-    j = ntn.Variable("j", finchlite.int64)
-    k = ntn.Variable("k", finchlite.int64)
+    i = ntn.Variable("i", finch.int64)
+    j = ntn.Variable("j", finch.int64)
+    k = ntn.Variable("k", finch.int64)
 
-    a = finchlite.asarray(a)
-    A = ntn.Variable("A", finchlite.ftype(a))
-    B = ntn.Variable("B", finchlite.ftype(a))
-    C = ntn.Variable("C", finchlite.ftype(a))
-    A_ = ntn.Slot("A_", finchlite.ftype(a))
-    B_ = ntn.Slot("B_", finchlite.ftype(a))
-    C_ = ntn.Slot("C_", finchlite.ftype(a))
+    a = finch.asarray(a)
+    A = ntn.Variable("A", finch.ftype(a))
+    B = ntn.Variable("B", finch.ftype(a))
+    C = ntn.Variable("C", finch.ftype(a))
+    A_ = ntn.Slot("A_", finch.ftype(a))
+    B_ = ntn.Slot("B_", finch.ftype(a))
+    C_ = ntn.Slot("C_", finch.ftype(a))
 
-    a_ik = ntn.Variable("a_ik", finchlite.float64)
-    b_kj = ntn.Variable("b_kj", finchlite.float64)
-    c_ij = ntn.Variable("c_ij", finchlite.float64)
+    a_ik = ntn.Variable("a_ik", finch.float64)
+    b_kj = ntn.Variable("b_kj", finch.float64)
+    c_ij = ntn.Variable("c_ij", finch.float64)
 
-    m = ntn.Variable("m", finchlite.int64)
-    n = ntn.Variable("n", finchlite.int64)
-    p = ntn.Variable("p", finchlite.int64)
+    m = ntn.Variable("m", finch.int64)
+    n = ntn.Variable("n", finch.int64)
+    p = ntn.Variable("p", finch.int64)
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", finchlite.ftype(a)),
+                ntn.Variable("matmul", finch.ftype(a)),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -84,20 +84,20 @@ def test_matrix_multiplication(a, b):
                         ntn.Loop(
                             i,
                             ntn.Call(
-                                ntn.Literal(finchlite.compile.make_extent),
-                                (ntn.Literal(finchlite.int64(0)), m),
+                                ntn.Literal(finch.compile.make_extent),
+                                (ntn.Literal(finch.int64(0)), m),
                             ),
                             ntn.Loop(
                                 k,
                                 ntn.Call(
-                                    ntn.Literal(finchlite.compile.make_extent),
-                                    (ntn.Literal(finchlite.int64(0)), p),
+                                    ntn.Literal(finch.compile.make_extent),
+                                    (ntn.Literal(finch.int64(0)), p),
                                 ),
                                 ntn.Loop(
                                     j,
                                     ntn.Call(
-                                        ntn.Literal(finchlite.compile.make_extent),
-                                        (ntn.Literal(finchlite.int64(0)), n),
+                                        ntn.Literal(finch.compile.make_extent),
+                                        (ntn.Literal(finch.int64(0)), n),
                                     ),
                                     ntn.Block(
                                         (
@@ -146,7 +146,7 @@ def test_matrix_multiplication(a, b):
 
     c = np.zeros(dtype=np.float64, shape=(a.shape[0], b.shape[1]))
     result = mod.matmul(
-        finchlite.asarray(c), finchlite.asarray(a), finchlite.asarray(b)
+        finch.asarray(c), finch.asarray(a), finch.asarray(b)
     )
 
     expected = np.matmul(a, b)
@@ -158,9 +158,9 @@ def test_matrix_multiplication(a, b):
         repr(prgm),
         {
             **vars(ntn),
-            **vars(finchlite.codegen),
-            **vars(finchlite.compile),
-            **vars(finchlite.tensor),
+            **vars(finch.codegen),
+            **vars(finch.compile),
+            **vars(finch.tensor),
             **vars(ffuncs),
             **globals(),
         },
@@ -176,18 +176,18 @@ def test_matrix_multiplication(a, b):
     ],
 )
 def test_count_nonfill_vector(a):
-    a = finchlite.asarray(a)
-    A = ntn.Variable("A", finchlite.ftype(a))
-    A_ = ntn.Slot("A_", finchlite.ftype(a))
+    a = finch.asarray(a)
+    A = ntn.Variable("A", finch.ftype(a))
+    A_ = ntn.Slot("A_", finch.ftype(a))
 
-    d = ntn.Variable("d", finchlite.int64)
-    i = ntn.Variable("i", finchlite.int64)
-    m = ntn.Variable("m", finchlite.int64)
+    d = ntn.Variable("d", finch.int64)
+    i = ntn.Variable("i", finch.int64)
+    m = ntn.Variable("m", finch.int64)
 
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("count_nonfill_vector", finchlite.int64),
+                ntn.Variable("count_nonfill_vector", finch.int64),
                 (A,),
                 ntn.Block(
                     (
@@ -197,8 +197,8 @@ def test_count_nonfill_vector(a):
                         ntn.Loop(
                             i,
                             ntn.Call(
-                                ntn.Literal(finchlite.compile.make_extent),
-                                (ntn.Literal(finchlite.int64(0)), m),
+                                ntn.Literal(finch.compile.make_extent),
+                                (ntn.Literal(finch.int64(0)), m),
                             ),
                             ntn.Assign(
                                 d,

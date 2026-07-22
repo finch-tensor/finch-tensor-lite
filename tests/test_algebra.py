@@ -2,8 +2,8 @@ import math
 
 import numpy as np
 
-import finchlite
-from finchlite.algebra import (
+import finch
+from finch.algebra import (
     TupleFType,
     cansplitpush,
     ffuncs,
@@ -16,7 +16,7 @@ from finchlite.algebra import (
     promote_type,
     repeat_operator,
 )
-from finchlite.algebra.ftypes import FDType
+from finch.algebra.ftypes import FDType
 
 
 def test_algebra_selected():
@@ -57,13 +57,13 @@ def test_algebra_selected():
     assert is_associative(ffuncs.logical_xor)
     assert is_associative(ffuncs.logical_or)
     assert is_associative(ffuncs.logaddexp)
-    assert init_value(ffuncs.and_, finchlite.bool) is np.True_
-    assert init_value(ffuncs.or_, finchlite.bool) is np.False_
-    assert init_value(ffuncs.xor, finchlite.bool) is np.False_
-    assert init_value(ffuncs.logaddexp, finchlite.float64) == -math.inf
-    assert init_value(ffuncs.logical_and, finchlite.bool_) is True
-    assert init_value(ffuncs.logical_or, finchlite.bool_) is False
-    assert init_value(ffuncs.logical_xor, finchlite.bool_) is False
+    assert init_value(ffuncs.and_, finch.bool) is np.True_
+    assert init_value(ffuncs.or_, finch.bool) is np.False_
+    assert init_value(ffuncs.xor, finch.bool) is np.False_
+    assert init_value(ffuncs.logaddexp, finch.float64) == -math.inf
+    assert init_value(ffuncs.logical_and, finch.bool_) is True
+    assert init_value(ffuncs.logical_or, finch.bool_) is False
+    assert init_value(ffuncs.logical_xor, finch.bool_) is False
     assert is_idempotent(ffuncs.and_)
     assert is_idempotent(ffuncs.or_)
     assert is_idempotent(ffuncs.logical_and)
@@ -130,46 +130,46 @@ def test_algebra_selected():
 
 
 def test_python_scalar_promotion_uses_weak_bottom():
-    assert promote_type(finchlite.bool, finchlite.bool_) == finchlite.bool
-    assert promote_type(finchlite.bool_, finchlite.bool) == finchlite.bool
-    assert promote_type(finchlite.int8, finchlite.int_) == finchlite.int8
-    assert promote_type(finchlite.int_, finchlite.int8) == finchlite.int8
-    assert promote_type(finchlite.int32, finchlite.int_) == finchlite.int32
-    assert promote_type(finchlite.int_, finchlite.int32) == finchlite.int32
-    assert promote_type(finchlite.uint8, finchlite.int_) == finchlite.uint8
-    assert promote_type(finchlite.int_, finchlite.uint8) == finchlite.uint8
-    assert promote_type(finchlite.int64, finchlite.bool_) == finchlite.int64
-    assert promote_type(finchlite.bool_, finchlite.int64) == finchlite.int64
-    assert promote_type(finchlite.float32, finchlite.int_) == finchlite.float32
-    assert promote_type(finchlite.int_, finchlite.float32) == finchlite.float32
-    assert promote_type(finchlite.float32, finchlite.float_) == finchlite.float32
-    assert promote_type(finchlite.float_, finchlite.float32) == finchlite.float32
-    assert promote_type(finchlite.complex64, finchlite.float_) == finchlite.complex64
-    assert promote_type(finchlite.float_, finchlite.complex64) == finchlite.complex64
-    assert promote_type(finchlite.complex64, finchlite.complex_) == finchlite.complex64
-    assert promote_type(finchlite.complex_, finchlite.complex64) == finchlite.complex64
-    tuple_type = TupleFType.from_tuple((finchlite.int32, finchlite.float32))
-    promoted_tuple_type = TupleFType.from_tuple((finchlite.int64, finchlite.float32))
+    assert promote_type(finch.bool, finch.bool_) == finch.bool
+    assert promote_type(finch.bool_, finch.bool) == finch.bool
+    assert promote_type(finch.int8, finch.int_) == finch.int8
+    assert promote_type(finch.int_, finch.int8) == finch.int8
+    assert promote_type(finch.int32, finch.int_) == finch.int32
+    assert promote_type(finch.int_, finch.int32) == finch.int32
+    assert promote_type(finch.uint8, finch.int_) == finch.uint8
+    assert promote_type(finch.int_, finch.uint8) == finch.uint8
+    assert promote_type(finch.int64, finch.bool_) == finch.int64
+    assert promote_type(finch.bool_, finch.int64) == finch.int64
+    assert promote_type(finch.float32, finch.int_) == finch.float32
+    assert promote_type(finch.int_, finch.float32) == finch.float32
+    assert promote_type(finch.float32, finch.float_) == finch.float32
+    assert promote_type(finch.float_, finch.float32) == finch.float32
+    assert promote_type(finch.complex64, finch.float_) == finch.complex64
+    assert promote_type(finch.float_, finch.complex64) == finch.complex64
+    assert promote_type(finch.complex64, finch.complex_) == finch.complex64
+    assert promote_type(finch.complex_, finch.complex64) == finch.complex64
+    tuple_type = TupleFType.from_tuple((finch.int32, finch.float32))
+    promoted_tuple_type = TupleFType.from_tuple((finch.int64, finch.float32))
     assert isinstance(tuple_type, FDType)
     assert (
         promote_type(
             tuple_type,
-            TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+            TupleFType.from_tuple((finch.int64, finch.int_)),
         )
         == promoted_tuple_type
     )
     assert (
         ffuncs.where.return_type(
-            finchlite.bool,
+            finch.bool,
             tuple_type,
-            TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+            TupleFType.from_tuple((finch.int64, finch.int_)),
         )
         == promoted_tuple_type
     )
     assert (
         ffuncs.choose((0, 0)).return_type(
             tuple_type,
-            TupleFType.from_tuple((finchlite.int64, finchlite.int_)),
+            TupleFType.from_tuple((finch.int64, finch.int_)),
         )
         == promoted_tuple_type
     )
@@ -177,41 +177,41 @@ def test_python_scalar_promotion_uses_weak_bottom():
 
 def test_ftype_recognizes_numpy_dtype_aliases():
     int_long = (
-        finchlite.int32 if np.dtype(np.long) == np.dtype(np.int32) else finchlite.int64
+        finch.int32 if np.dtype(np.long) == np.dtype(np.int32) else finch.int64
     )
     uint_long = (
-        finchlite.uint32
+        finch.uint32
         if np.dtype(np.ulong) == np.dtype(np.uint32)
-        else finchlite.uint64
+        else finch.uint64
     )
-    uintp = finchlite.uint32 if np.uintp == np.uint32 else finchlite.uint64
+    uintp = finch.uint32 if np.uintp == np.uint32 else finch.uint64
     cases = [
         (np.long, int_long),
         (np.ulong, uint_long),
-        (np.intp, finchlite.intp),
+        (np.intp, finch.intp),
         (np.uintp, uintp),
-        (np.longlong, finchlite.int64),
-        (np.ulonglong, finchlite.uint64),
-        (np.float16, finchlite.float16),
+        (np.longlong, finch.int64),
+        (np.ulonglong, finch.uint64),
+        (np.float16, finch.float16),
     ]
 
     for np_type, finch_type in cases:
-        assert finchlite.ftype(np_type) == finch_type
-        assert finchlite.ftype(np_type(1)) == finch_type
-        assert finchlite.ftype(np.dtype(np_type)) == finch_type
+        assert finch.ftype(np_type) == finch_type
+        assert finch.ftype(np_type(1)) == finch_type
+        assert finch.ftype(np.dtype(np_type)) == finch_type
 
 
 def test_floor_divide_return_type_handles_all_integer_dtypes():
     dtypes = [
-        finchlite.bool,
-        finchlite.int8,
-        finchlite.int16,
-        finchlite.int32,
-        finchlite.int64,
-        finchlite.uint8,
-        finchlite.uint16,
-        finchlite.uint32,
-        finchlite.uint64,
+        finch.bool,
+        finch.int8,
+        finch.int16,
+        finch.int32,
+        finch.int64,
+        finch.uint8,
+        finch.uint16,
+        finch.uint32,
+        finch.uint64,
     ]
 
     for x1 in dtypes:
@@ -255,6 +255,6 @@ def test_samehash():
             return ("samehash", 1)
 
     assert ffuncs.samehash(1) == 1
-    assert ffuncs.samehash(np.float64(np.nan)) == ("nan", finchlite.float64)
-    assert ffuncs.samehash(np.float32(np.nan)) == ("nan", finchlite.float32)
+    assert ffuncs.samehash(np.float64(np.nan)) == ("nan", finch.float64)
+    assert ffuncs.samehash(np.float32(np.nan)) == ("nan", finch.float32)
     assert ffuncs.samehash(SameHash()) == ("samehash", 1)

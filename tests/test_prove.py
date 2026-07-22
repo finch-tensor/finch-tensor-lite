@@ -1,7 +1,7 @@
-from finchlite.algebra import ffuncs
-from finchlite.finch_notation.nodes import Call
-from finchlite.finch_notation.nodes import Literal as L
-from finchlite.finch_notation.proves import (
+from finch.algebra import ffuncs
+from finch.finch_notation.nodes import Call
+from finch.finch_notation.nodes import Literal as L
+from finch.finch_notation.proves import (
     rule_add_with_max,
     rule_add_with_min,
     rule_all_literals,

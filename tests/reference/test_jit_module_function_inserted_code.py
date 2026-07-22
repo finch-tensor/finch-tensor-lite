@@ -4,7 +4,7 @@ def opt_fn(A, B, n):
     B, C, n = compute((B, C, n))
     while n > 0:
         B, C, n = maybelazy((B, C, n))
-        C = getattr(getattr(finchlite, 'interface'), 'add')(C, B)
+        C = getattr(getattr(finch, 'interface'), 'add')(C, B)
         n = n - 1
         B, C, n = compute((B, C, n))
     C, = lazy((C,))

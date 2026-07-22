@@ -5,10 +5,10 @@ import pytest
 import numpy as np
 from numpy import array  # noqa: F401
 
-import finchlite as fl
-import finchlite.finch_logic as lgc
-from finchlite.algebra import ffuncs
-from finchlite.finch_logic import (
+import finch as ft
+import finch.finch_logic as lgc
+from finch.algebra import ffuncs
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -29,12 +29,12 @@ from .conftest import finch_assert_equal
     "a, b",
     [
         (
-            fl.asarray(np.array([[1, 2], [3, 4]])),
-            fl.asarray(np.array([[5, 6], [7, 8]])),
+            ft.asarray(np.array([[1, 2], [3, 4]])),
+            ft.asarray(np.array([[5, 6], [7, 8]])),
         ),
         (
-            fl.asarray(np.array([[2, 0], [1, 3]])),
-            fl.asarray(np.array([[4, 1], [2, 2]])),
+            ft.asarray(np.array([[2, 0], [1, 3]])),
+            ft.asarray(np.array([[4, 1], [2, 2]])),
         ),
     ],
 )
@@ -116,17 +116,17 @@ def test_materialize():
     i = Field("i")
     j = Field("j")
 
-    C = fl.asarray(np.array([[0, 0], [0, 0]]))
+    C = ft.asarray(np.array([[0, 0], [0, 0]]))
 
     p = Plan(
         (
             Query(
                 Alias("A"),
-                Table(Literal(fl.asarray(np.array([[1, 2], [3, 4]]))), (i, j)),
+                Table(Literal(ft.asarray(np.array([[1, 2], [3, 4]]))), (i, j)),
             ),
             Query(
                 Alias("B"),
-                Table(Literal(fl.asarray(np.array([[1, 1], [1, 1]]))), (i, j)),
+                Table(Literal(ft.asarray(np.array([[1, 1], [1, 1]]))), (i, j)),
             ),
             Query(
                 Alias("C"),
@@ -149,9 +149,9 @@ def test_materialize():
 
     result = LogicInterpreter()(p, {Alias("C"): C})[0]
 
-    expected = fl.asarray(
+    expected = ft.asarray(
         np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]])
     )
 
     assert (result.to_numpy() == expected.to_numpy()).all()
-    finch_assert_equal(C, fl.asarray(np.array([[1, 1], [1, 1]])))
+    finch_assert_equal(C, ft.asarray(np.array([[1, 1], [1, 1]])))
