@@ -3,17 +3,16 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    #if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Install dependencies
         run: pip install build toml
-      - uses: prefix-dev/setup-pixi@v0.9.4
+      - uses: prefix-dev/setup-pixi@v0.10.0
         with:
           pixi-version: v0.71.3
       - name: Get version
@@ -31,13 +30,10 @@ jobs:
         run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
       - name: Build and publish to Prefix.dev
         run: pixi publish --target-channel https://prefix.dev/${{ secrets.PREFIX_CHANNEL_NAME }}
-      - name: Create Release
-        uses: actions/create-release@v1
-        if: success()
+      - name: Create a Release
+        uses: elgohr/Github-Release-Action@v5
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.VERSION }}
-          release_name: Release ${{ env.VERSION }}
-          draft: false
-          prerelease: false
+          title: Release ${{ env.VERSION }}
+          tag: ${{ env.VERSION }}
