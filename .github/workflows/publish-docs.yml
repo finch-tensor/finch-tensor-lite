@@ -22,4 +22,4 @@ jobs:
           environments: >-
             docs
       - name: Deploy Docs
-        run: pixi run mkdocs gh-deploy --force
+        run: pixi run -e docs mkdocs gh-deploy --force
