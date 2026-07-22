@@ -12,7 +12,6 @@ from .bound_stats import (
 )
 from .dense_stat import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
-from .fd_stats import FDStats, FDStatsFactory
 from .stats_interpreter import StatsInterpreter
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 from .uniform_stats import UniformStats, UniformStatsFactory
@@ -32,8 +31,6 @@ __all__ = [
     "DenseStatsFactory",
     "DummyStats",
     "DummyStatsFactory",
-    "FDStats",
-    "FDStatsFactory",
     "LPStats",
     "LPStatsFactory",
     "StatsInterpreter",

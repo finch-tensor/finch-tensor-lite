@@ -7,10 +7,7 @@ import numpy as np
 
 import finchlite as fl
 from finchlite import ffuncs
-from finchlite.algebra import TensorFType, TupleFType, ftype
-from finchlite.autoschedule.capture import LogicCapture
 from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
-from finchlite.autoschedule.smart_formatter import FDFormatter, SmartFormatter
 from finchlite.autoschedule.tensor_stats import (
     DC,
     BaseTensorStats,
@@ -20,8 +17,6 @@ from finchlite.autoschedule.tensor_stats import (
     DCStatsFactory,
     DenseStatsFactory,
     DummyStatsFactory,
-    FDStats,
-    FDStatsFactory,
     LPStats,
     LPStatsFactory,
     UniformStatsFactory,
@@ -30,16 +25,11 @@ from finchlite.autoschedule.tensor_stats import (
 from finchlite.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finchlite.finch_logic import (
     Aggregate,
-    Alias,
     Field,
     Literal,
     MapJoin,
-    Plan,
-    Produces,
-    Query,
     Table,
 )
-from finchlite.tensor.traits import Dense as DenseProperty
 
 
 def _overwrite_def(stat, base: BaseTensorStats):
@@ -52,265 +42,6 @@ def _overwrite_def(stat, base: BaseTensorStats):
     stat.dim_sizes = base.dim_sizes
     stat.fill_value = base.fill_value
     return stat
-
-
-def test_fd_stats_constructor_maps_hierarchical_format_properties():
-    i, j = Field("i"), Field("j")
-    stats = FDStatsFactory()(fl.FillTensor((2, 3), 0), (i, j))
-
-    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
-
-    row, col = Field("row"), Field("col")
-    relabeled = FDStatsFactory().relabel(stats, (row, col))
-    assert relabeled.dense_props == {
-        frozenset({row}),
-        frozenset({row, col}),
-    }
-
-
-def test_fd_stats_constructor_maps_hierarchical_array_dense_properties():
-    i, j = Field("i"), Field("j")
-    tensor = fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32))
-    stats = FDStatsFactory()(tensor, (i, j))
-
-    assert stats.dense_props == {frozenset({i}), frozenset({i, j})}
-
-
-def test_fd_stats_mapjoin_union_preserves_property_maps():
-    i, j = Field("i"), Field("j")
-    factory = FDStatsFactory()
-    fill_stats = factory(fl.FillTensor((2, 3), 0), (i, j))
-    array_stats = factory(
-        fl.BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int32)),
-        (i, j),
-    )
-
-    stats = factory.mapjoin(ffuncs.add, fill_stats, array_stats)
-
-    assert stats.dense_props == {frozenset({i, j})}
-
-
-def test_fd_stats_aggregate_drops_reduced_indices_from_dense_properties():
-    i, j = Field("i"), Field("j")
-    factory = FDStatsFactory()
-    stats = factory(fl.FillTensor((2, 3), 0), (i, j))
-
-    stats = factory.aggregate(ffuncs.add, None, (i,), stats)
-
-    assert stats.dense_props == {frozenset({j})}
-
-
-def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
-    class RecordingSmartFormatter(SmartFormatter):
-        def __init__(self, loader):
-            super().__init__(loader)
-            self.output_stats = []
-
-        def get_tensor_ftype(self, fill_value, shape_type, stats) -> TensorFType:
-            self.output_stats.append(stats)
-            fill_ftype = ftype(
-                fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-            )
-            return fl.BufferizedNDArrayFType(
-                buffer_type=fl.NumpyBufferFType(fill_ftype),
-                ndim=len(shape_type),
-                dimension_type=TupleFType.from_tuple(shape_type),
-                fill_value=fill_value,
-            )
-
-    i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
-    tensor = fl.FillTensor((2, 3), 0)
-    stats_factory = FDStatsFactory()
-    stats = {A: stats_factory(tensor, (i, j))}
-    capture = LogicCapture()
-    formatter = RecordingSmartFormatter(capture)
-    prgm = Plan(
-        (
-            Query(
-                B,
-                MapJoin(
-                    Literal(ffuncs.add),
-                    (Table(A, (i, j)), Table(A, (i, j))),
-                ),
-            ),
-            Produces((B,)),
-        )
-    )
-
-    formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
-
-    assert formatter.output_stats[0].dense_props == {frozenset({i, j})}
-    assert capture.last_stats[B] is formatter.output_stats[0]
-
-
-def test_fd_formatter_uses_dense_levels_for_dense_properties():
-    i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
-    tensor = fl.FillTensor((2, 3), 0)
-    stats_factory = FDStatsFactory()
-    stats = {A: stats_factory(tensor, (i, j))}
-    capture = LogicCapture()
-    formatter = FDFormatter(capture)
-    prgm = Plan(
-        (
-            Query(
-                B,
-                MapJoin(
-                    Literal(ffuncs.add),
-                    (Table(A, (i, j)), Table(A, (i, j))),
-                ),
-            ),
-            Produces((B,)),
-        )
-    )
-
-    formatter.lower(prgm, {A: tensor.ftype}, stats, stats_factory)
-
-    ftype = capture.last_bindings[B]
-    assert isinstance(ftype, fl.FiberTensorFType)
-    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t, fl.DenseLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
-
-    constructed = ftype.construct((2, 3))
-    np.testing.assert_array_equal(constructed.to_numpy(), np.zeros((2, 3)))
-
-
-def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
-    i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
-    stats = FDStats(base, dense_props={frozenset({i})})
-
-    ftype = FDFormatter().get_tensor_ftype(
-        0,
-        (fl.ftype(np.intp), fl.ftype(np.intp)),
-        stats,
-    )
-
-    assert isinstance(ftype, fl.FiberTensorFType)
-    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
-
-
-def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
-    i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
-    stats = FDStats(
-        base,
-        dense_props={frozenset({i}), frozenset({j})},
-    )
-
-    ftype = FDFormatter().get_tensor_ftype(
-        0,
-        (fl.ftype(np.intp), fl.ftype(np.intp)),
-        stats,
-    )
-
-    assert isinstance(ftype, fl.FiberTensorFType)
-    assert isinstance(ftype.lvl_t, fl.DenseLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
-
-
-def _format_stats(levels, shape, fields):
-    lvl = fl.element(0, fl.int64, fl.intp, fl.NumpyBufferFType)
-    for level in reversed(levels):
-        match level:
-            case "dense":
-                lvl = fl.dense(lvl, fl.intp)
-            case "sparse":
-                lvl = fl.sparse_list(lvl, fl.intp)
-            case _:
-                raise ValueError(f"Unknown test level: {level}")
-    return FDStatsFactory()(fl.fiber_tensor(lvl).construct(shape), fields)
-
-
-def _fd_output_pattern(stats):
-    ftype = FDFormatter().get_tensor_ftype(
-        stats.fill_value,
-        tuple(fl.intp for _ in stats.index_order),
-        stats,
-    )
-    lvl = ftype.lvl_t
-    pattern = []
-    while not isinstance(lvl, fl.ElementLevelFType):
-        match lvl:
-            case fl.DenseLevelFType():
-                pattern.append("dense")
-            case fl.SparseHashLevelFType():
-                pattern.append("sparse")
-            case _:
-                raise AssertionError(f"Unexpected FD output level: {lvl}")
-        lvl = lvl.lvl_t
-    return tuple(pattern)
-
-
-def test_fd_formatter_csr_dcsr_format_algebra():
-    i, j, k = Field("i"), Field("j"), Field("k")
-    factory = FDStatsFactory()
-
-    csr_ij = _format_stats(("dense", "sparse"), (2, 3), (i, j))
-    csr_jk = _format_stats(("dense", "sparse"), (3, 4), (j, k))
-    dcsr_ij = _format_stats(("sparse", "sparse"), (2, 3), (i, j))
-    dcsr_jk = _format_stats(("sparse", "sparse"), (3, 4), (j, k))
-
-    csr_plus_csr = factory.mapjoin(ffuncs.add, csr_ij, csr_ij)
-    assert _fd_output_pattern(csr_plus_csr) == ("dense", "sparse")
-
-    csr_times_dcsr = factory.mapjoin(ffuncs.mul, csr_ij, dcsr_ij)
-    assert _fd_output_pattern(csr_times_dcsr) == ("sparse", "sparse")
-
-    dcsr_matmul_dcsr = factory.aggregate(
-        ffuncs.add,
-        0,
-        (j,),
-        factory.mapjoin(ffuncs.mul, dcsr_ij, dcsr_jk),
-    )
-    assert _fd_output_pattern(dcsr_matmul_dcsr) == ("sparse", "sparse")
-
-    csr_matmul_csr = factory.aggregate(
-        ffuncs.add,
-        0,
-        (j,),
-        factory.mapjoin(ffuncs.mul, csr_ij, csr_jk),
-    )
-    assert _fd_output_pattern(csr_matmul_csr) == ("sparse", "sparse")
-
-
-def test_fd_stats_join_dense_properties():
-    i, j = Field("i"), Field("j")
-    factory = FDStatsFactory()
-
-    dense = _format_stats(("dense", "dense"), (2, 3), (i, j))
-    csr = _format_stats(("dense", "sparse"), (2, 3), (i, j))
-    sparse = _format_stats(("sparse", "sparse"), (2, 3), (i, j))
-
-    assert factory.mapjoin(ffuncs.mul, dense, csr).dense_props == csr.dense_props
-    assert factory.mapjoin(ffuncs.mul, dense, dense, csr).dense_props == (
-        csr.dense_props
-    )
-    assert factory.mapjoin(ffuncs.mul, csr, sparse).dense_props == set()
-
-
-def test_fd_stats_records_dense_projections_without_chasing():
-    i, j = Field("i"), Field("j")
-
-    class TensorFType:
-        level_format_properties = [
-            DenseProperty((0, 1)),
-            DenseProperty((1,)),
-        ]
-
-    class Tensor:
-        shape = (2, 3)
-        fill_value = 0
-        ftype = TensorFType()
-
-    stats = FDStatsFactory()(Tensor(), (i, j))
-
-    assert stats.dense_props == {frozenset({i, j}), frozenset({j})}
 
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
