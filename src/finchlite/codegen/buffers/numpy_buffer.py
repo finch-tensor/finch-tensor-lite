@@ -1,5 +1,5 @@
 import ctypes
-from typing import NamedTuple, cast
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 
@@ -7,6 +7,12 @@ import numba
 
 from finchlite.algebra import FType, TupleFType, ftype, ftypes
 from finchlite.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type
+from finchlite.codegen.mlir_codegen import (
+    MLIRBufferFType,
+    MLIRContext,
+    mlir_ctype,
+    mlir_type,
+)
 from finchlite.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
 from finchlite.finch_assembly import Buffer
 from finchlite.finch_assembly.nodes import AssemblyExpression
@@ -22,6 +28,10 @@ class CBufferFields(NamedTuple):
     data: str
     length: str
     obj: str
+
+
+class MLIRBufferFields(NamedTuple):
+    buffer: str
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -88,7 +98,9 @@ class NumpyBuffer(Buffer):
         return f"NumpyBuffer({arr_repr})"
 
 
-class NumpyBufferFType(CBufferFType, NumbaBufferFType, CUnpackableFType):
+class NumpyBufferFType(
+    CBufferFType, NumbaBufferFType, MLIRBufferFType, CUnpackableFType
+):
     """
     A ftype for buffers that uses NumPy arrays. This is a concrete implementation
     of the BufferFType class.
@@ -285,3 +297,74 @@ class NumpyBufferFType(CBufferFType, NumbaBufferFType, CUnpackableFType):
         Construct a NumpyBuffer from a Numba-compatible object.
         """
         return NumpyBuffer(numba_buffer[0])
+
+    def mlir_type(self):
+        return f"memref<?x{mlir_type(self.element_type)}>"
+
+    def mlir_length(self, ctx: "MLIRContext", buf: MLIRBufferFields):
+        c0 = ctx.constant(0, "index")
+        res = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{res} = memref.dim {buf.buffer}, {c0} : {self.mlir_type()}"
+        )
+        return res
+
+    def _mlir_index(self, ctx: "MLIRContext", idx: "AssemblyExpression"):
+        i = ctx(idx)
+        t = mlir_type(idx.result_type)
+        if t == "index":
+            return i
+        cast_ = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{cast_} = arith.index_cast {i} : {t} to index")
+        return cast_
+
+    def mlir_load(
+        self, ctx: "MLIRContext", buf: MLIRBufferFields, idx: "AssemblyExpression"
+    ):
+        i = self._mlir_index(ctx, idx)
+        c0 = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{c0} = memref.load {buf.buffer}[{i}] : {self.mlir_type()}")
+        return c0
+
+    def mlir_store(
+        self,
+        ctx: "MLIRContext",
+        buf: Any,
+        idx: Any,
+        value: Any = None,
+    ):
+        new = ctx(value)
+        i = self._mlir_index(ctx, idx)
+        ctx.exec(
+            f"{ctx.feed}memref.store {new}, {buf.buffer}[{i}] : {self.mlir_type()}"
+        )
+        return
+
+    def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
+        return MLIRBufferFields(ctx(val))
+
+    def mlir_repack(self, ctx: "MLIRContext", lhs, obj):
+        pass
+
+    def serialize_to_mlir(self, obj):
+        from mlir.runtime import get_ranked_memref_descriptor
+
+        src = get_ranked_memref_descriptor(obj.arr)
+        desc = mlir_ctype(self.mlir_type())()
+        ctypes.memmove(ctypes.byref(desc), ctypes.byref(src), ctypes.sizeof(desc))
+        return desc
+
+    def deserialize_from_mlir(self, obj, mlir_buffer):
+        # NOTE: for now it's a no-op because
+        # MLIR never allocates or resizes buffers; it only reads and writes to them.
+        # Once we support MLIR reallocating buffers, this will need to be updated.
+        pass
+
+    def construct_from_mlir(self, mlir_buffer):
+        from mlir.runtime import ranked_memref_to_numpy
+
+        # TODO: avoid the copy when the descriptor aliases an unmodified
+        # argument buffer — MLIRKernel.__call__ would match the aligned
+        # pointer against argument buffers and return the owning NumpyBuffer
+        # directly.
+        return NumpyBuffer(ranked_memref_to_numpy(ctypes.pointer(mlir_buffer)).copy())

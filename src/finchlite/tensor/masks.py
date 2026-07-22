@@ -47,8 +47,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def lvl_t(self):
         return self.body.lvl_t
 
-    def construct(self, shape):
-        return LoTriMask(self.lvl_t.construct(shape=shape))
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "LoTriMask":
+        return LoTriMask(self.lvl_t.construct(shape=shape, pos=pos))
 
     def __call__(self, val: Any) -> "LoTriMask":
         """
