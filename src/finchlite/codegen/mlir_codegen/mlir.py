@@ -856,6 +856,9 @@ class MLIRContext(Context):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
                 return mlir_getattr(obj_t, self, self(base), attrs)
 
+            # case asm.SetAttr(_, _, _):
+            #     ...
+
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 if val.result_type != var_t:
                     raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
@@ -910,6 +913,40 @@ class MLIRContext(Context):
                     f"{feed}}}"
                 )
                 return None
+
+            case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
+                buf_t = buffer.result_type
+                buf = self.resolve(buffer)
+                length = buf_t.mlir_length(self, buf)
+
+                zero = self.constant(0, "index")
+                step = self.constant(1, "index")
+
+                iv = self.new_ssa()
+                ctx_2 = self.subblock()
+
+                idx_name = ctx_2.freshen(".buffer_index")
+                ctx_2.bindings[idx_name] = (iv, "index")
+
+                elem = buf_t.mlir_load(ctx_2, buf, asm.Variable(idx_name, algebra.intp))
+                ctx_2.bindings[var_n] = (elem, mlir_type(var_t))
+                ctx_2(body)
+
+                self.exec(
+                    f"{feed}scf.for {iv} = {zero} to {length} step {step} {{\n"
+                    f"{ctx_2.emit()}\n"
+                    f"{feed}}}"
+                )
+                return None
+
+            # case asm.If(cond, body):
+            #     ...
+
+            # case asm.IfElse(cond, body, else_body):
+            #     ...
+
+            # case asm.WhileLoop(cond, body):
+            #     ...
 
             case asm.Function(asm.Variable(func_name, return_t), args, body):
                 ctx_2 = self.subblock()
@@ -970,6 +1007,9 @@ class MLIRContext(Context):
                         )
                     self(func)
                 return None
+
+            case asm.Break():
+                raise NotImplementedError("MLIR backend does not yet support Break")
 
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
