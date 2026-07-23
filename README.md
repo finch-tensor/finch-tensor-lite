@@ -1,6 +1,6 @@
 # finch-tensor
 
-The pure-Python rewrite of [Finch.jl](https://github.com/finch-tensor/Finch.jl), designed to soon replace [finch-tensor](https://pypi.org/project/finch-tensor/).
+Sparse array programming backed by [Finch.jl](https://github.com/finch-tensor/Finch.jl).
 
 ## Source
 The source code for `finch-tensor` is available on GitHub at [https://github.com/finch-tensor/finch-tensor](https://github.com/FinchTensor/finch-tensor)
