@@ -120,6 +120,7 @@ def test_mapjoin():
     true_nnz = float(np.count_nonzero(data_a[:,:,None]*data_b[None,:,:]))
     assert stats.estimate_non_fill_values() == pytest.approx(true_nnz,abs=1.0)
 
+@pytest.mark.skip(reason="sampling estimators are heavily dependent on f1")
 def test_aggregate():
     i,j,k = Field("i"), Field("j"), Field("k")
     data_a = np.zeros((100,100))

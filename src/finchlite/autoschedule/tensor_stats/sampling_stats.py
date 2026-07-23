@@ -282,7 +282,7 @@ def _outer_multiply(a:np.ndarray,a_order:list,b:np.ndarray,b_order:list)->tuple[
 
     return a_exp*b_exp, combined_order
     
-def _expand_sketch_to(sketch:np.ndarray,current_order:list,target_order:list,new_def:TensorDef)->np.ndarray:
+def _expand_sketch_to(sketch:np.ndarray,current_order:list,target_order:list,new_def:BaseTensorStats)->np.ndarray:
     result = sketch
     current = list(current_order)
     for i,f in enumerate(target_order):
