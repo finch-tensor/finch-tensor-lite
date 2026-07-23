@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import scipy.fft as scipy_fft
 import scipy.linalg as scipy_linalg
+import scipy.sparse as scipy_sparse
 import scipy.sparse.linalg as scipy_sparse_linalg
 
 from finch.algebra import FinchOperator, to_numpy, to_scipy
@@ -502,7 +503,7 @@ def det(x, /):
     # https://stackoverflow.com/questions/19107617/how-to-compute-scipy-sparse-matrix-determinant-without-turning-it-to-dense
     x = _warn_compute(x, "det")
     try:
-        x_sp = to_scipy(lazy.asarray(x))
+        x_sp = x if scipy_sparse.issparse(x) else to_scipy(lazy.asarray(x))
         lu = scipy_sparse_linalg.splu(x_sp.tocsc())
         diag_u = lu.U.diagonal()
         swap_sign = (-1) ** (_min_perm_swaps(lu.perm_r) + _min_perm_swaps(lu.perm_c))
@@ -516,7 +517,8 @@ def det(x, /):
 def lu(x, /, *, permute_l=False, p_indices=False):
     x = _warn_compute(x, "lu")
     try:
-        return scipy_sparse_linalg.splu(to_scipy(lazy.asarray(x)).tocsc())
+        x_sp = x if scipy_sparse.issparse(x) else to_scipy(lazy.asarray(x))
+        return scipy_sparse_linalg.splu(x_sp.tocsc())
     except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))

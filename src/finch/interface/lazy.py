@@ -10,6 +10,7 @@ from itertools import accumulate, zip_longest
 from typing import Any, cast, overload
 
 import numpy as np
+import scipy.sparse as scipy_sparse
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from finch import finch_einsum as ein
@@ -52,6 +53,7 @@ from finch.symbolic import gensym
 from finch.tensor import (
     BufferizedNDArray,
     EyeTensor,
+    FiberTensorFType,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -395,6 +397,28 @@ def asarray(
             if copy is True:
                 obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj, device=device)
+        if scipy_sparse.issparse(obj):
+            match obj.format:
+                case "csr":
+                    pass
+                case "coo":
+                    raise NotImplementedError("SciPy COO format is not supported.")
+                case "csc":
+                    raise NotImplementedError("SciPy CSC format is not supported.")
+                case format_name:
+                    raise NotImplementedError(
+                        f"SciPy sparse format {format_name!r} is not supported."
+                    )
+
+            if dtype is not None:
+                if copy is False:
+                    obj = obj.astype(dtype, copy=False)
+                else:
+                    obj = obj.astype(dtype, copy=True)
+            elif copy is True:
+                obj = obj.copy()
+
+            return FiberTensorFType.from_scipy(obj, device)
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
