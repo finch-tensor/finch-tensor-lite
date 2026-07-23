@@ -155,7 +155,7 @@ You can download it here: [vscode-finch-assembly](https://github.com/finch-tenso
 
 ### Compiler Passes
 - In general, each compiler pass should be implemented as a separate callable class,
-  inheriting from some subclass of `finchlite.symbolic.Stage`.
+  inheriting from some subclass of `finch.symbolic.Stage`.
 - Each pass should have a clear, single, documented responsibility.
 - Try to separate passes that do different things into different classes, rather than
   building an all-in-one monolithic pass.
@@ -168,13 +168,13 @@ You can download it here: [vscode-finch-assembly](https://github.com/finch-tenso
 Finch uses Python's standard `logging` module for debug output. To enable verbose
 logging and inspect internal compiler stages (e.g., Logic IR before/after optimization,
 Assembly IR, generated code), configure a logger handler using the helpers in
-`finchlite.util.logging`.
+`finch.util.logging`.
 
 #### Quick start
 
 ```python
 import logging
-from finchlite.util.logging import get_logger_handler, FORMAT
+from finch.util.logging import get_logger_handler, FORMAT
 
 # Show all Finch debug output
 handler = get_logger_handler("root")
@@ -204,7 +204,7 @@ Example — show only the Logic IR after optimization and Numba-generated code:
 
 ```python
 import logging
-from finchlite.util.logging import get_logger_handler, FORMAT
+from finch.util.logging import get_logger_handler, FORMAT
 
 handler = get_logger_handler("r.l.post,r.c.nb")
 logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)

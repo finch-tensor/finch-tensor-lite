@@ -1,6 +1,6 @@
 """
-JIT ASV benchmark: time ``fl.jit`` on a 5-matrix matmul chain.
-Also measures standalone ``fl.jit`` compile time.
+JIT ASV benchmark: time ``ft.jit`` on a 5-matrix matmul chain.
+Also measures standalone ``ft.jit`` compile time.
 
 Run: ``pixi run benchmark``
 """
@@ -9,8 +9,8 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite import matmul
+import finch as ft
+from finch import matmul
 
 
 def mat_chain(dims: list[int]):
@@ -28,15 +28,15 @@ def _f1_jit(A, B, C, D, E):
 def test_f1_jit(scheduler, benchmark):
     args = mat_chain([1, 20, 30, 40, 50, 60])
     # Warmup
-    fl.jit(_f1_jit)(*args)
+    ft.jit(_f1_jit)(*args)
 
     # Benchmark
-    benchmark(fl.jit(_f1_jit), *args)
+    benchmark(ft.jit(_f1_jit), *args)
 
 
 def test_jit_creation(scheduler, benchmark):
     # Warmup
-    fl.jit(_f1_jit)
+    ft.jit(_f1_jit)
 
     # Benchmark
-    benchmark(fl.jit, _f1_jit)
+    benchmark(ft.jit, _f1_jit)

@@ -6,21 +6,21 @@ repos:
       exclude: |
         (?x)(
             ^tests/reference/|
-            ^src/finchlite/codegen/stc/
+            ^src/finch/codegen/stc/
         )
 
     - id: trailing-whitespace
       exclude: |
         (?x)(
             ^tests/reference/|
-            ^src/finchlite/codegen/stc/
+            ^src/finch/codegen/stc/
         )
 
     - id: mixed-line-ending
       exclude: |
         (?x)(
             ^tests/reference/|
-            ^src/finchlite/codegen/stc/
+            ^src/finch/codegen/stc/
         )
 
     - id: name-tests-test
@@ -29,13 +29,13 @@ repos:
         (?x)(
             ^tests/reference/|
             ^tests/scripts/|
-            ^src/finchlite/codegen/stc/
+            ^src/finch/codegen/stc/
         )
 
     - id: no-commit-to-branch
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.21
+  rev: v0.15.22
   hooks:
     - id: ruff-check
       args: [--fix, --config=pyproject.toml]

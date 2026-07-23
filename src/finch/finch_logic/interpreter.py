@@ -1,0 +1,228 @@
+import logging
+from itertools import product
+
+import numpy as np
+
+import finch
+from finch.algebra import fisinstance, fixpoint_type, ftype, return_type
+from finch.algebra.tensor import TensorFType
+from finch.codegen.numba_codegen import to_numpy_type
+from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finch.symbolic import UnvalidatedForm
+from finch.util.logging import LOG_LOGIC_PRE_OPT
+
+from . import nodes as lgc
+from .nodes import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Relabel,
+    Reorder,
+    Table,
+    TableValue,
+    Value,
+)
+from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .tensor_stats import StatsFactory, TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
+
+
+def make_tensor(shape, fill_value, *, dtype=None):
+    dtype = ftype(fill_value) if dtype is None else ftype(dtype)
+    arr = np.empty(shape, dtype=np.dtype(to_numpy_type(dtype)))
+    arr[...] = fill_value
+    return finch.asarray(arr)
+
+
+class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
+    def __init__(self, *, make_tensor=make_tensor):
+        self.make_tensor = make_tensor  # Added make_tensor argument
+
+    def lower(self, node, bindings=None):
+        if bindings is None:
+            bindings = {}
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
+        return machine(node)
+
+
+class LogicMachine:
+    def __init__(self, *, make_tensor=np.full, bindings=None):
+        if bindings is None:
+            bindings = {}
+        self.bindings = bindings
+        self.make_tensor = make_tensor
+
+    def __call__(self, node):
+        logger.debug("Evaluating: %s", node)
+        match node:
+            case Literal(val):
+                return val
+            case Value(_):
+                raise ValueError(
+                    "The interpreter cannot evaluate a lazy node. Instead, you can "
+                    "use a compiler to generate code for it"
+                )
+            case Field(_):
+                raise ValueError("Fields cannot be used in expressions")
+            case Table(Alias() as var, idxs):
+                val = self.bindings.get(var, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return TableValue(val, idxs)
+            case Table(Literal(val), idxs):
+                return TableValue(val, idxs)
+            case Alias() as var:
+                val = self.bindings.get(var, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return val
+            case MapJoin(Literal(op), args):
+                args = tuple(self(a) for a in args)
+                dims = {}
+                idxs = []
+                for arg in args:
+                    for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
+                        if idx in dims:
+                            if dims[idx] != dim:
+                                raise ValueError("Dimensions mismatched in map")
+                        else:
+                            idxs.append(idx)
+                            dims[idx] = dim
+                fill_val = op(*[arg.tns.fill_value for arg in args])
+                dtype = return_type(op, *[arg.tns.element_type for arg in args])
+                result = self.make_tensor(
+                    tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
+                )
+                for crds in product(*[range(dims[idx]) for idx in idxs]):
+                    idx_crds = dict(zip(idxs, crds, strict=True))
+                    vals = [
+                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]].item()
+                        for arg in args
+                    ]
+                    result[*crds] = op(*vals)
+                return TableValue(result, tuple(idxs))
+            case Aggregate(Literal(op), Literal(init), arg, idxs):
+                arg = self(arg)
+                dtype = fixpoint_type(op, init, arg.tns.element_type)
+                new_shape = tuple(
+                    dim
+                    for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
+                    if idx not in node.idxs
+                )
+                result = self.make_tensor(new_shape, init, dtype=dtype)
+                for crds in product(*[range(dim) for dim in arg.tns.shape]):
+                    out_crds = [
+                        crd
+                        for (crd, idx) in zip(crds, arg.idxs, strict=True)
+                        if idx not in node.idxs
+                    ]
+                    result[*out_crds] = op(
+                        result[*out_crds].item(), arg.tns[*crds].item()
+                    )
+                return TableValue(
+                    result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
+                )
+            case Relabel(arg, idxs):
+                arg = self(arg)
+                if len(arg.idxs) != len(idxs):
+                    raise ValueError("The number of indices in the relabel must match")
+                return TableValue(arg.tns, idxs)
+            case Reorder(arg, idxs):
+                arg = self(arg)
+                for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
+                    if idx not in idxs and dim != 1:
+                        raise ValueError(
+                            f"Trying to drop a dimension that is not 1 : idx "
+                            f"{idx} indices {idxs} shape {arg.tns.shape}"
+                        )
+                arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
+                dims = [arg_dims.get(idx, 1) for idx in idxs]
+                result = self.make_tensor(
+                    dims, arg.tns.fill_value, dtype=arg.tns.element_type
+                )
+                for crds in product(*[range(dim) for dim in dims]):
+                    node_crds = dict(zip(idxs, crds, strict=True))
+                    in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
+                    result[*crds] = arg.tns[*in_crds].item()
+                return TableValue(result, idxs)
+            case Query(lhs, rhs):
+                rhs = self(rhs)
+                if lhs not in self.bindings:
+                    tns = self.make_tensor(
+                        rhs.tns.shape,
+                        rhs.tns.fill_value,
+                        dtype=rhs.tns.element_type,
+                    )
+                    self.bindings[lhs] = tns
+                lhs = self(lhs)
+                for crds in product(*[range(dim) for dim in rhs.tns.shape]):
+                    lhs[*crds] = rhs.tns[*crds].item()
+                return (rhs,)
+            case Plan(bodies):
+                res = ()
+                for body in bodies:
+                    res = self(body)
+                return res
+            case Produces(args):
+                return tuple(self(arg) for arg in args)
+            case _:
+                raise ValueError(f"Unknown expression type: {type(node)}")
+
+
+class MockLogicKernel(AssemblyKernel):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __call__(self, *args):
+        if len(args) != len(self.bindings):
+            raise ValueError(
+                f"Wrong number of arguments passed to kernel, "
+                f"have {len(args)}, expected {len(self.bindings)}"
+            )
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = LogicInterpreter()
+        res = ctx(self.prgm, bindings)
+        if isinstance(res, tuple):
+            return tuple(tbl.tns for tbl in res)
+        return res.tns
+
+
+class MockLogicLibrary(AssemblyLibrary):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __getattr__(self, name):
+        if name == "main":
+            return MockLogicKernel(self.prgm, self.bindings)
+        if name == "prgm":
+            return self.prgm
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+
+class MockLogicLoader(UnvalidatedForm, LogicLoader):
+    def __init__(self):
+        pass
+
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[
+        MockLogicLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+    ]:
+        shape_vars = compute_shape_vars(prgm, bindings)
+        return MockLogicLibrary(prgm, bindings), bindings, shape_vars

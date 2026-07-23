@@ -1,4 +1,5 @@
 import ctypes
+import logging
 import re
 import subprocess
 import sys
@@ -9,31 +10,33 @@ import pytest
 
 import numpy as np
 
-import finchlite
-import finchlite.finch_assembly as asm
-from finchlite import dense, element, ffuncs, fiber_tensor, ftype
-from finchlite.algebra import ftypes
-from finchlite.codegen import (
+import finch
+import finch.finch_assembly as asm
+from finch import dense, element, ffuncs, fiber_tensor, ftype
+from finch.algebra import ftypes
+from finch.codegen import (
     CCompiler,
     CGenerator,
+    MLIRCompiler,
+    MLIRGenerator,
     NumbaCompiler,
     NumbaGenerator,
     NumpyBuffer,
     NumpyBufferFType,
     SafeBuffer,
 )
-from finchlite.codegen.buffers import MallocBuffer
-from finchlite.codegen.c_codegen import (
+from finch.codegen.buffers import MallocBuffer
+from finch.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
     serialize_to_c,
 )
-from finchlite.codegen.numba_codegen import (
+from finch.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finchlite.tensor import BufferizedNDArrayFType
+from finch.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 
@@ -53,7 +56,7 @@ def test_add_function():
         return a + b;
     }
     """
-    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).add
+    f = finch.codegen.c_codegen.load_shared_lib(c_code).add
     result = f(3, 4)
     assert result == 7, f"Expected 7, got {result}"
 
@@ -99,9 +102,9 @@ def test_buffer_function():
     """
     a = np.array([1, 2, 3], dtype=np.float64)
     b = NumpyBuffer(a)
-    f = finchlite.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
-    k = finchlite.codegen.c_codegen.CKernel(
-        f, finchlite.none_, [NumpyBufferFType(ftypes.float64)]
+    f = finch.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
+    k = finch.codegen.c_codegen.CKernel(
+        f, finch.none_, [NumpyBufferFType(ftypes.float64)]
     )
     k(b)
     result = b.arr
@@ -121,13 +124,13 @@ def test_codegen(compiler, buffer):
     buf = buffer(a)
 
     a_var = asm.Variable("a", buf.ftype)
-    i_var = asm.Variable("i", finchlite.intp)
-    length_var = asm.Variable("l", finchlite.intp)
+    i_var = asm.Variable("i", finch.intp)
+    length_var = asm.Variable("l", finch.intp)
     a_slt = asm.Slot("a_", buf.ftype)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("test_function", finchlite.intp),
+                asm.Variable("test_function", finch.intp),
                 (a_var,),
                 asm.Block(
                     (
@@ -185,8 +188,8 @@ def test_dot_product_malloc(compiler, buffer):
     ab = buffer(len(a), ftypes.float64, a)
     bb = buffer(len(b), ftypes.float64, b)
 
-    c = asm.Variable("c", finchlite.float64)
-    i = asm.Variable("i", finchlite.int64)
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
@@ -195,7 +198,7 @@ def test_dot_product_malloc(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finchlite.float64),
+                asm.Variable("dot_product", finch.float64),
                 (
                     ab_v,
                     bb_v,
@@ -266,12 +269,12 @@ def test_malloc_resize(compiler, new_size):
 
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("b_", ab.ftype)
-    size = asm.Variable("size", finchlite.intp)
+    size = asm.Variable("size", finch.intp)
 
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("length", finchlite.intp),
+                asm.Variable("length", finch.intp),
                 (ab_v,),
                 asm.Block(
                     (
@@ -309,8 +312,8 @@ def test_dot_product(compiler, buffer):
     ab = buffer(a)
     bb = buffer(b)
 
-    c = asm.Variable("c", finchlite.float64)
-    i = asm.Variable("i", finchlite.int64)
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
     ab_v = asm.Variable("a", ab.ftype)
     ab_slt = asm.Slot("a_", ab.ftype)
     bb_v = asm.Variable("b", bb.ftype)
@@ -318,7 +321,7 @@ def test_dot_product(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finchlite.float64),
+                asm.Variable("dot_product", finch.float64),
                 (
                     ab_v,
                     bb_v,
@@ -384,8 +387,8 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", finchlite.float64)
-    i = asm.Variable("i", finchlite.int64)
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
     ab = buffer(len(a), ftypes.float64, a)
     bb = buffer(len(b), ftypes.float64, b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -395,7 +398,7 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finchlite.float64),
+                asm.Variable("dot_product", finch.float64),
                 (
                     ab_v,
                     bb_v,
@@ -453,8 +456,8 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     a = np.array([1, 2, 3], dtype=np.float64)
     b = np.array([4, 5, 6], dtype=np.float64)
 
-    c = asm.Variable("c", finchlite.float64)
-    i = asm.Variable("i", finchlite.int64)
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
     ab = buffer(a)
     bb = buffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -464,7 +467,7 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finchlite.float64),
+                asm.Variable("dot_product", finch.float64),
                 (
                     ab_v,
                     bb_v,
@@ -520,11 +523,11 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     ],
 )
 def test_if_statement(compiler):
-    var = asm.Variable("a", finchlite.int64)
+    var = asm.Variable("a", finch.int64)
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", finchlite.int64),
+                asm.Variable("if_else", finch.int64),
                 (),
                 asm.Block(
                     (
@@ -606,12 +609,12 @@ def test_simple_struct(compiler):
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", finchlite.float64)
+    res_var = asm.Variable("res", finch.float64)
     mod = compiler(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", finchlite.float64),
+                    asm.Variable("simple_struct", finch.float64),
                     (p_var, x_var),
                     asm.Block(
                         (
@@ -962,14 +965,14 @@ def test_e2e_numba(fmt_fn, dtype):
     b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
 
     fmt = fmt_fn(dtype)
-    aa = finchlite.asarray(a, format=fmt)
-    bb = finchlite.asarray(b, format=fmt)
+    aa = finch.asarray(a, format=fmt)
+    bb = finch.asarray(b, format=fmt)
 
-    wa = finchlite.lazy(aa)
-    wb = finchlite.lazy(bb)
+    wa = finch.lazy(aa)
+    wb = finch.lazy(bb)
 
-    plan = finchlite.matmul(wa, wb)
-    result = finchlite.compute(plan)
+    plan = finch.matmul(wa, wb)
+    result = finch.compute(plan)
 
     finch_assert_equal(result, a @ b)
 
@@ -996,6 +999,215 @@ def test_e2e_transpose_numba(a, dtype):
     ``test_notation_compiler.test_if_in_loop_is_lowered``.
     """
     a = a.astype(dtype)
-    wa = finchlite.lazy(finchlite.asarray(a))
-    result = finchlite.compute(finchlite.permute_dims(wa, axes=(1, 0)))
+    wa = finch.lazy(finch.asarray(a))
+    result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
     finch_assert_equal(result, a.T)
+
+
+@pytest.mark.parametrize(
+    "fmt_fn",
+    [
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(ftype(dtype)),
+            ndim=2,
+            dimension_type=(ftypes.intp, ftypes.intp),
+        ),
+        lambda dtype: fiber_tensor(
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
+        ),
+    ],
+)
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fmt_fn(dtype)
+    wa = finch.lazy(finch.asarray(a, format=fmt))
+    wb = finch.lazy(finch.asarray(b, format=fmt))
+
+    plan = finch.matmul(wa, wb)
+    result = finch.compute(plan)
+    finch_assert_equal(result, a @ b)
+
+
+@pytest.mark.mlir_backend
+def test_matmul_mlir_regression(file_regression):
+    m, k, n = 2, 3, 4
+    ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
+    bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
+    cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
+
+    i = asm.Variable("i", ftypes.intp)
+    j = asm.Variable("j", ftypes.intp)
+    p = asm.Variable("p", ftypes.intp)
+
+    a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+    b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
+    c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
+
+    c_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
+    a_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(k))),
+            ),
+            p,
+        ),
+    )
+
+    b_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (p, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
+    body = asm.Store(
+        c_slt,
+        c_idx,
+        asm.Call(
+            asm.Literal(ffuncs.add),
+            (
+                asm.Load(c_slt, c_idx),
+                asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (
+                        asm.Load(a_slt, a_idx),
+                        asm.Load(b_slt, b_idx),
+                    ),
+                ),
+            ),
+        ),
+    )
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("matmul", ftypes.none_),
+                (a_v, b_v, c_v),
+                asm.Block(
+                    (
+                        asm.Unpack(a_slt, a_v),
+                        asm.Unpack(b_slt, b_v),
+                        asm.Unpack(c_slt, c_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.intp(0)),
+                            asm.Literal(np.intp(m)),
+                            asm.Block(
+                                (
+                                    asm.ForLoop(
+                                        j,
+                                        asm.Literal(np.intp(0)),
+                                        asm.Literal(np.intp(n)),
+                                        asm.Block(
+                                            (
+                                                asm.ForLoop(
+                                                    p,
+                                                    asm.Literal(np.intp(0)),
+                                                    asm.Literal(np.intp(k)),
+                                                    asm.Block((body,)),
+                                                ),
+                                            )
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(a_slt),
+                        asm.Repack(b_slt),
+                        asm.Repack(c_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+
+
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_dense_matmul_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+        result = finch.compute(
+            finch.matmul(
+                finch.lazy(finch.asarray(a, format=fmt)),
+                finch.lazy(finch.asarray(b, format=fmt)),
+            )
+        )
+
+    finch_assert_equal(result, a @ b)
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finch.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    )
+    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+    file_regression.check(mlir_code, extension=".mlir")
+
+
+@pytest.mark.mlir_backend
+def test_mlir_resize_not_supported():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("grow", ftypes.none_),
+                (b_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.Resize(b_slt, asm.Literal(np.intp(6))),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    with pytest.raises(NotImplementedError, match="Resize"):
+        MLIRCompiler()(prgm)

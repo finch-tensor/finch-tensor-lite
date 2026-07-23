@@ -1,7 +1,7 @@
 from collections import Counter
 
-from finchlite.finch_logic import Field, Literal, MapJoin, Plan, Produces, Table
-from finchlite.symbolic import PostOrderDFS, PreOrderDFS, intree, isdescendant
+from finch.finch_logic import Field, Literal, MapJoin, Plan, Produces, Table
+from finch.symbolic import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 
 def test_preorder_dfs():

@@ -9,23 +9,23 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
+import finch as ft
 
 
 @pytest.fixture
 def integer_arrays():
     rng = np.random.default_rng(42)
-    a = fl.asarray(rng.integers(0, 10, (32, 32)))
-    b = fl.asarray(rng.integers(0, 10, (32, 32)))
+    a = ft.asarray(rng.integers(0, 10, (32, 32)))
+    b = ft.asarray(rng.integers(0, 10, (32, 32)))
     return a, b
 
 
 @pytest.mark.parametrize(
     "op",
     [
-        pytest.param(fl.matmul, id="matmul"),
-        pytest.param(fl.add, id="add"),
-        pytest.param(fl.multiply, id="multiply"),
+        pytest.param(ft.matmul, id="matmul"),
+        pytest.param(ft.add, id="add"),
+        pytest.param(ft.multiply, id="multiply"),
     ],
 )
 def test_ops_binary(integer_arrays, scheduler, benchmark, op):
@@ -40,7 +40,7 @@ def test_ops_binary(integer_arrays, scheduler, benchmark, op):
 @pytest.mark.parametrize(
     "op",
     [
-        pytest.param(fl.sum, id="sum"),
+        pytest.param(ft.sum, id="sum"),
     ],
 )
 def test_ops_reduction(integer_arrays, scheduler, benchmark, op):

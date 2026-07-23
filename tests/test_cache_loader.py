@@ -2,16 +2,16 @@ import logging
 
 import numpy as np
 
-import finchlite as fl
-from finchlite.algebra import ffuncs
-from finchlite.autoschedule.cache import (
+import finch as ft
+from finch.algebra import ffuncs
+from finch.autoschedule.cache import (
     LogicCacheLRU_Embeddings_Norms,
 )
-from finchlite.autoschedule.executor import LogicExecutor
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory, UniformStatsFactory
-from finchlite.autoschedule.tensor_stats.blocked_stats import BlockedStatsFactory
-from finchlite.autoschedule.tensor_stats.bound_stats import DCStatsFactory
-from finchlite.finch_logic import (
+from finch.autoschedule.executor import LogicExecutor
+from finch.autoschedule.tensor_stats import DenseStatsFactory, UniformStatsFactory
+from finch.autoschedule.tensor_stats.blocked_stats import BlockedStatsFactory
+from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
+from finch.finch_logic import (
     Alias,
     Field,
     Literal,
@@ -21,8 +21,8 @@ from finchlite.finch_logic import (
     Query,
     Table,
 )
-from finchlite.finch_logic.interpreter import MockLogicLoader
-from finchlite.util.logging import LOG_LOGIC_POST_OPT
+from finch.finch_logic.interpreter import MockLogicLoader
+from finch.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -47,9 +47,9 @@ def test_logic_cache_embeddings_norms_linf():
 
     i, j = Field("i"), Field("j")
 
-    data_1 = fl.asarray(np.ones((10, 10)))
-    data_2 = fl.asarray(np.eye(10))
-    data_3 = fl.asarray(np.zeros((10, 10)))
+    data_1 = ft.asarray(np.ones((10, 10)))
+    data_2 = ft.asarray(np.eye(10))
+    data_3 = ft.asarray(np.zeros((10, 10)))
     data_3.to_numpy()[0, 0] = 1.0
 
     # ------------------------ Simple plan ---------------------------------
@@ -131,9 +131,9 @@ def test_logic_cache_embeddings_norms_l1():
 
     i, j = Field("i"), Field("j")
 
-    data_1 = fl.asarray(np.ones((10, 10)))
-    data_2 = fl.asarray(np.eye(10))
-    data_3 = fl.asarray(np.zeros((10, 10)))
+    data_1 = ft.asarray(np.ones((10, 10)))
+    data_2 = ft.asarray(np.eye(10))
+    data_3 = ft.asarray(np.zeros((10, 10)))
     data_3.to_numpy()[0, 0] = 1.0
 
     # --------------- Simple plan -------------------------
@@ -215,9 +215,9 @@ def test_logic_cache_embeddings_norms_l2():
 
     i, j = Field("i"), Field("j")
 
-    data_1 = fl.asarray(np.ones((10, 10)))
-    data_2 = fl.asarray(np.eye(10))
-    data_3 = fl.asarray(np.zeros((10, 10)))
+    data_1 = ft.asarray(np.ones((10, 10)))
+    data_2 = ft.asarray(np.eye(10))
+    data_3 = ft.asarray(np.zeros((10, 10)))
     data_3.to_numpy()[0, 0] = 1.0
 
     # ---------- Simple plan ---------------
@@ -295,7 +295,7 @@ def test_blocked_vector_embedding():
         cache=False,
     )
 
-    data_1 = fl.asarray(np.ones((10, 10)))
+    data_1 = ft.asarray(np.ones((10, 10)))
 
     plan_1_d = Plan(
         (

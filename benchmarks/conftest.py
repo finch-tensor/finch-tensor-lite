@@ -1,7 +1,7 @@
 import pytest
 
-import finchlite as fl
-from finchlite.autoschedule import COMPILE_NUMBA, COMPILE_NUMBA_GALLEY
+import finch as ft
+from finch.autoschedule import COMPILE_NUMBA, COMPILE_NUMBA_GALLEY
 
 
 @pytest.fixture(
@@ -11,7 +11,7 @@ from finchlite.autoschedule import COMPILE_NUMBA, COMPILE_NUMBA_GALLEY
     ]
 )
 def scheduler(request):
-    old = fl.get_default_scheduler()
-    fl.set_default_scheduler(ctx=request.param)
+    old = ft.get_default_scheduler()
+    ft.set_default_scheduler(ctx=request.param)
     yield
-    fl.set_default_scheduler(ctx=old)
+    ft.set_default_scheduler(ctx=old)
