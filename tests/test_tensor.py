@@ -604,14 +604,17 @@ def test_fiber_tensor_to_scipy():
     data = np.array([1.0, 2.0, 3.0])
     indices = np.array([0, 2, 1], dtype=np.int32)
     indptr = np.array([0, 2, 3], dtype=np.int32)
-    element_t = element(
-        fill_value=np.float64(0),
-        position_type=int32,
-    )
+
     tensor = FiberTensor(
         DenseLevel(
             SparseListLevel(
-                ElementLevel(element_t, NumpyBuffer(data)),
+                ElementLevel(
+                    element(
+                        fill_value=np.float64(0),
+                        position_type=int32,
+                    ),
+                    NumpyBuffer(data),
+                ),
                 np.int32(3),
                 NumpyBuffer(indptr),
                 NumpyBuffer(indices),
