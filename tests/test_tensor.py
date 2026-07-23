@@ -11,11 +11,15 @@ from finch import (
     dense,
     element,
     fiber_tensor,
+    int32,
     sparse_list,
 )
 from finch.tensor import (
     BufferizedNDArray,
+    DenseLevel,
+    ElementLevel,
     EyeTensor,
+    FiberTensor,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -30,6 +34,7 @@ from finch.tensor import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SparseListLevel,
     UpperTriangleTensor,
 )
 from finch.tensor.traits import (
@@ -551,3 +556,61 @@ def test_lazy_array_api_matrix_functions():
         finch.compute(finch.diag(x, k=1)).to_numpy(), np.diag(arr, k=1)
     )
     assert finch.compute(finch.trace(x, offset=1)).item() == np.trace(arr, offset=1)
+
+
+@pytest.mark.parametrize("csr_type", [scipy.sparse.csr_matrix, scipy.sparse.csr_array])
+def test_asarray_scipy_sparse(csr_type):
+    csr = csr_type(
+        (
+            np.array([1.0, 2.0, 3.0]),
+            np.array([0, 2, 1], dtype=np.int32),
+            np.array([0, 2, 3], dtype=np.int32),
+        ),
+        shape=(2, 3),
+    )
+
+    tensor = asarray(csr)
+
+    assert isinstance(tensor, FiberTensor)
+    assert isinstance(tensor.lvl, DenseLevel)
+    assert isinstance(tensor.lvl.lvl, SparseListLevel)
+    assert isinstance(tensor.lvl.lvl.lvl, ElementLevel)
+
+    scipy_tensor = tensor.to_scipy()
+    np.testing.assert_array_equal(scipy_tensor.data, csr.data)
+    np.testing.assert_array_equal(scipy_tensor.indices, csr.indices)
+    np.testing.assert_array_equal(scipy_tensor.indptr, csr.indptr)
+
+
+def test_fiber_tensor_to_scipy():
+    data = np.array([1.0, 2.0, 3.0])
+    indices = np.array([0, 2, 1], dtype=np.int32)
+    indptr = np.array([0, 2, 3], dtype=np.int32)
+
+    tensor = FiberTensor(
+        DenseLevel(
+            SparseListLevel(
+                ElementLevel(
+                    element(
+                        fill_value=np.float64(0),
+                        position_type=int32,
+                    ),
+                    NumpyBuffer(data),
+                ),
+                np.int32(3),
+                NumpyBuffer(indptr),
+                NumpyBuffer(indices),
+            ),
+            np.int32(2),
+        )
+    )
+
+    scipy_tensor = tensor.to_scipy()
+
+    assert isinstance(scipy_tensor, scipy.sparse.csr_array)
+    np.testing.assert_array_equal(scipy_tensor.data, data)
+    np.testing.assert_array_equal(scipy_tensor.indices, indices)
+    np.testing.assert_array_equal(scipy_tensor.indptr, indptr)
+    assert np.shares_memory(scipy_tensor.data, data)
+    assert np.shares_memory(scipy_tensor.indices, indices)
+    assert np.shares_memory(scipy_tensor.indptr, indptr)
