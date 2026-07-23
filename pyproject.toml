@@ -1,7 +1,7 @@
 [project]
-name = "finch-tensor-lite"
+name = "finch-tensor"
 description = ""
-version = "0.5.2"
+version = "0.6.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<4'
@@ -49,7 +49,7 @@ requires = ["uv_build>=0.11.25"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "finchlite"
+module-name = "finch"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -63,7 +63,7 @@ platforms = [
 preview = ["pixi-build"]
 requires-pixi = ">=0.71.0"
 
-# finch-tensor-lite package definition
+# finch-tensor package definition
 
 [tool.pixi.package.build.backend]
 name = "pixi-build-python"
@@ -92,37 +92,37 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # default feature definition
 
 [tool.pixi.dependencies]
-finch-tensor-lite.path = "."
+finch-tensor.path = "."
 
 [tool.pixi.dev]
-finch-tensor-lite.path = "."
+finch-tensor.path = "."
 
 [tool.pixi.tasks]
-compile = "python -c 'import finchlite'"
+compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
 cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
-depends-on = ["compile"]
+depends-on = [{task = "compile", environment = "test"}]
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
 cmd = "python -m pytest -m c_backend"
-depends-on = ["compile"]
+depends-on = [{task = "compile", environment = "test-c"}]
 default-environment = "test-c"
 
 [tool.pixi.feature.test.tasks.test-mlir]
 cmd = "python -m pytest -m mlir_backend"
-depends-on = ["compile"]
+depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
 [tool.pixi.feature.julia.tasks.test-julia]
 cmd = "python -m pytest tests/test_julia_backend.py"
-depends-on = ["compile"]
+depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
 [tool.pixi.feature.benchmark.tasks.benchmark]
 cmd = "pytest --codspeed benchmarks/"
-depends-on = ["compile"]
+depends-on = [{task = "compile", environment = "benchmark"}]
 default-environment = "benchmark"
 
 [tool.pixi.feature.test.tasks.type-check]

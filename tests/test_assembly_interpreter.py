@@ -5,12 +5,12 @@ import pytest
 import numpy  # noqa: F401, ICN001
 import numpy as np
 
-import finchlite  # noqa: F401, ICN001
-from finchlite import ffuncs
-from finchlite import finch_assembly as asm
-from finchlite.algebra import ftype
-from finchlite.codegen import NumpyBuffer
-from finchlite.finch_assembly import (  # noqa: F401
+import finch  # noqa: F401, ICN001
+from finch import ffuncs
+from finch import finch_assembly as asm
+from finch.algebra import ftype
+from finch.codegen import NumpyBuffer
+from finch.finch_assembly import (  # noqa: F401
     AssemblyInterpreter,
     Assign,
     Block,
@@ -40,8 +40,8 @@ from .conftest import finch_assert_allclose
 )
 def test_dot_product(a, b):
     # Simple dot product using numpy for expected result
-    c = asm.Variable("c", finchlite.float64)
-    i = asm.Variable("i", finchlite.int64)
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
     ab = NumpyBuffer(a)
     bb = NumpyBuffer(b)
     ab_v = asm.Variable("a", ab.ftype)
@@ -53,7 +53,7 @@ def test_dot_product(a, b):
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("dot_product", finchlite.float64),
+                    asm.Variable("dot_product", finch.float64),
                     (
                         ab_v,
                         bb_v,
@@ -104,11 +104,11 @@ def test_dot_product(a, b):
 
 
 def test_if_statement():
-    var = asm.Variable("a", finchlite.int64)
+    var = asm.Variable("a", finch.int64)
     root = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", finchlite.int64),
+                asm.Variable("if_else", finch.int64),
                 (),
                 asm.Block(
                     (
@@ -180,12 +180,12 @@ def test_simple_struct():
 
     p_var = asm.Variable("p", ftype(p))
     x_var = asm.Variable("x", ftype(x))
-    res_var = asm.Variable("res", finchlite.float64)
+    res_var = asm.Variable("res", finch.float64)
     mod = AssemblyInterpreter()(
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", finchlite.float64),
+                    asm.Variable("simple_struct", finch.float64),
                     (p_var, x_var),
                     asm.Block(
                         (

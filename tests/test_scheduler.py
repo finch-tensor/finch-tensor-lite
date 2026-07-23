@@ -1,17 +1,17 @@
 import numpy as np
 
-import finchlite
-from finchlite.algebra import ffuncs
-from finchlite.algebra.ftypes import ftype
-from finchlite.autoschedule import (
+import finch
+from finch.algebra import ffuncs
+from finch.algebra.ftypes import ftype
+from finch.autoschedule import (
     DefaultLogicOptimizer,
     DefaultLoopOrderer,
     LogicCapture,
     normalize_names,
 )
-from finchlite.autoschedule.formatter import DefaultLogicFormatter
-from finchlite.autoschedule.loop_ordering import concordize, set_loop_order
-from finchlite.autoschedule.optimize import (
+from finch.autoschedule.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_ordering import concordize, set_loop_order
+from finch.autoschedule.optimize import (
     isolate_aggregates,
     lift_fields,
     optimize,
@@ -20,9 +20,9 @@ from finchlite.autoschedule.optimize import (
     propagate_map_queries_backward,
     propagate_transpose_queries,
 )
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory
-from finchlite.autoschedule.util import flatten_plans, push_fields
-from finchlite.finch_logic import (
+from finch.autoschedule.tensor_stats import DenseStatsFactory
+from finch.autoschedule.util import flatten_plans, push_fields
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -35,7 +35,7 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.symbolic.gensym import _sg
+from finch.symbolic.gensym import _sg
 
 from .conftest import reset_name_counts
 
@@ -657,8 +657,8 @@ def test_scheduler_e2e_matmul(file_regression):
     plan_opt, bindings = optimize(
         plan,
         {
-            Alias("A"): ftype(finchlite.asarray(a)),
-            Alias("B"): ftype(finchlite.asarray(b)),
+            Alias("A"): ftype(finch.asarray(a)),
+            Alias("B"): ftype(finch.asarray(b)),
         },
     )
 
@@ -706,9 +706,9 @@ def test_scheduler_e2e_sddmm(file_regression):
         DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
     bindings = {
-        Alias("S"): finchlite.asarray(s),
-        Alias("A"): finchlite.asarray(a),
-        Alias("B"): finchlite.asarray(b),
+        Alias("S"): finch.asarray(s),
+        Alias("A"): finch.asarray(a),
+        Alias("B"): finch.asarray(b),
     }
     binding_ftypes = {var: val.ftype for var, val in bindings.items()}
     stats_factory = DenseStatsFactory()
@@ -784,9 +784,9 @@ def test_scheduler_inplace(file_regression):
     )
 
     bindings = {
-        Alias(name="A0"): finchlite.asarray(np.array([[1, 2], [3, 4]])),
-        Alias(name="A1"): finchlite.asarray(np.array([[5, 6], [7, 8]])),
-        Alias(name="A2"): finchlite.asarray(np.array([[1, 1], [1, 1]])),
+        Alias(name="A0"): finch.asarray(np.array([[1, 2], [3, 4]])),
+        Alias(name="A1"): finch.asarray(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): finch.asarray(np.array([[1, 1], [1, 1]])),
     }
 
     binding_ftypes = {var: val.ftype for var, val in bindings.items()}

@@ -1,11 +1,11 @@
 site_name: Finch Tensor
 theme:
   name: material
-repo_url: https://github.com/finch-tensor/finch-tensor-lite
+repo_url: https://github.com/finch-tensor/finch-tensor
 edit_uri: blob/main/docs/
 nav:
   - Introduction: 'index.md'
-  - 'Issue Tracker': 'https://github.com/finch-tensor/finch-tensor-lite/issues'
+  - 'Issue Tracker': 'https://github.com/finch-tensor/finch-tensor/issues'
 plugins:
   - mkdocs-autoapi:
       autoapi_dir: ./src

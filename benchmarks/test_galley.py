@@ -13,21 +13,21 @@ import pytest
 
 import numpy as np
 
-import finchlite.interface as fl_interface
-from finchlite.autoschedule import (
+import finch.interface as fl_interface
+from finch.autoschedule import (
     DefaultLogicFormatter,
     DefaultLoopOrderer,
     LogicExecutor,
     LogicNormalizer,
 )
-from finchlite.autoschedule.compiler import LogicCompiler
-from finchlite.autoschedule.galley_optimize import GalleyLogicalOptimizer
-from finchlite.autoschedule.tensor_stats import UniformStatsFactory
-from finchlite.codegen.numba_codegen.numba import NumbaCompiler
-from finchlite.compile.lower import NotationCompiler
-from finchlite.finch_assembly import AssemblySimplify, LowerPackedStructSlots
-from finchlite.finch_logic import Alias, Field, Plan, Produces, Query, Table
-from finchlite.symbolic import gensym
+from finch.autoschedule.compiler import LogicCompiler
+from finch.autoschedule.galley_optimize import GalleyLogicalOptimizer
+from finch.autoschedule.tensor_stats import UniformStatsFactory
+from finch.codegen.numba_codegen.numba import NumbaCompiler
+from finch.compile.lower import NotationCompiler
+from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
+from finch.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finch.symbolic import gensym
 
 from .utils import patch_benchmark
 
@@ -42,7 +42,7 @@ CASES = {
 
 def _plan_from_lazy(expr):
     """
-    Build the same `Plan` as `finchlite.interface.fuse.compute`.
+    Build the same `Plan` as `finch.interface.fuse.compute`.
     """
     args = (expr,)
     vars_ = tuple(Alias(gensym("A")) for _ in args)
@@ -100,7 +100,7 @@ def _make_pipeline():
 def test_galley_matmul_chain(
     benchmark, monkeypatch, empty_last: bool, metric: Literal["optimize", "downstream"]
 ) -> None:
-    import finchlite.autoschedule.galley_optimize as galley
+    import finch.autoschedule.galley_optimize as galley
 
     # Warmup
     pipeline = _make_pipeline()

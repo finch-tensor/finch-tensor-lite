@@ -1,7 +1,7 @@
 import numpy as np
 
-from finchlite import ffuncs
-from finchlite.finch_assembly import (
+from finch import ffuncs
+from finch.finch_assembly import (
     Assign,
     Block,
     Call,
