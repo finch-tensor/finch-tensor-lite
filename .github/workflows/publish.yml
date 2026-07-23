@@ -26,10 +26,11 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+          skip-existing: true
       - name: Authenticate with Prefix.dev
         run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
       - name: Build and publish to Prefix.dev
-        run: pixi publish --target-channel https://prefix.dev/${{ secrets.PREFIX_CHANNEL_NAME }}
+        run: pixi publish --target-channel https://prefix.dev/finch-tensor
       - name: Create a Release
         uses: softprops/action-gh-release@v3
         env:
