@@ -1,4 +1,4 @@
-from finchlite.finch_notation import NotationCFGBuilder
+from finch.finch_notation import NotationCFGBuilder
 
 from .scripts.nodes import create_ntn_simple_node
 

@@ -6,9 +6,9 @@ matmul_2: #succs=[matmul_4, matmul_5]
     A_: BufferizedNDArray = unpack(A)
     B_: BufferizedNDArray = unpack(B)
     C_: BufferizedNDArray = unpack(C)
-    m: finchlite.int64 = A_.shape[0]
-    n: finchlite.int64 = B_.shape[1]
-    p: finchlite.int64 = A_.shape[1]
+    m: finch.int64 = A_.shape[0]
+    n: finch.int64 = B_.shape[1]
+    p: finch.int64 = A_.shape[1]
     declare(C_, 0.0, add, ['m', 'n'])
     make_extent(0, m)
 
@@ -28,9 +28,9 @@ matmul_6: #succs=[matmul_8, matmul_9]
 matmul_7: #succs=[matmul_4, matmul_5]
 
 matmul_8: #succs=[matmul_8, matmul_9]
-    a_ik: finchlite.float64 = unwrap(read(A_, ['i', 'k']))
-    b_kj: finchlite.float64 = unwrap(read(B_, ['k', 'j']))
-    c_ij: finchlite.float64 = mul(a_ik, b_kj)
+    a_ik: finch.float64 = unwrap(read(A_, ['i', 'k']))
+    b_kj: finch.float64 = unwrap(read(B_, ['k', 'j']))
+    c_ij: finch.float64 = mul(a_ik, b_kj)
     increment(update(C_, ['i', 'j'], add), c_ij)
 
 matmul_9: #succs=[matmul_6, matmul_7]

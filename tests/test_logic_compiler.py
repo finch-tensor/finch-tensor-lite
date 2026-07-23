@@ -1,9 +1,9 @@
 import numpy as np
 
-import finchlite.finch_logic as logic
-from finchlite import ffuncs, ftype
-from finchlite.autoschedule import INTERPRET_NOTATION, NotationGenerator
-from finchlite.finch_logic import (
+import finch.finch_logic as logic
+from finch import ffuncs, ftype
+from finch.autoschedule import INTERPRET_NOTATION, NotationGenerator
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -15,7 +15,7 @@ from finchlite.finch_logic import (
     Reorder,
     Table,
 )
-from finchlite.tensor.bufferized_ndarray import (
+from finch.tensor.bufferized_ndarray import (
     BufferizedNDArray,
 )
 
