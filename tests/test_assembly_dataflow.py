@@ -1,4 +1,4 @@
-from finchlite.finch_assembly import (
+from finch.finch_assembly import (
     AssemblyCopyPropagation,
     assembly_copy_propagation,
     assembly_dataflow_analyze,

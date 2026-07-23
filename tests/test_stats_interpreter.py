@@ -2,14 +2,14 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite.algebra import ffuncs
-from finchlite.autoschedule.tensor_stats import DCStatsFactory, VPStatsFactory
-from finchlite.autoschedule.tensor_stats.stats_interpreter import (
+import finch as ft
+from finch.algebra import ffuncs
+from finch.autoschedule.tensor_stats import DCStatsFactory, VPStatsFactory
+from finch.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
     calculate_estimated_error,
 )
-from finchlite.finch_logic import (
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -31,8 +31,8 @@ from finchlite.finch_logic import (
     ],
 )
 def test_stats_matrix_multiplication(shape_a, shape_b):
-    a = fl.asarray(np.ones(shape_a))
-    b = fl.asarray(np.ones(shape_b))
+    a = ft.asarray(np.ones(shape_a))
+    b = ft.asarray(np.ones(shape_b))
 
     i = Field("i")
     j = Field("j")
@@ -77,8 +77,8 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
 
 
 def test_stats_matmul_error():
-    a_val = fl.asarray(np.ones((20, 30)))
-    b_val = fl.asarray(np.ones((30, 20)))
+    a_val = ft.asarray(np.ones((20, 30)))
+    b_val = ft.asarray(np.ones((30, 20)))
 
     i = Field("i")
     j = Field("j")
@@ -129,8 +129,8 @@ def test_stats_matmul_error():
     ],
 )
 def test_vp_stats_matrix_multiplication(shape_a, shape_b):
-    a = fl.asarray(np.ones(shape_a))
-    b = fl.asarray(np.ones(shape_b))
+    a = ft.asarray(np.ones(shape_a))
+    b = ft.asarray(np.ones(shape_b))
 
     i = Field("i")
     j = Field("j")
@@ -175,8 +175,8 @@ def test_vp_stats_matrix_multiplication(shape_a, shape_b):
 
 
 def test_vp_stats_matmul_error():
-    a_val = fl.asarray(np.ones((20, 30)))
-    b_val = fl.asarray(np.ones((30, 20)))
+    a_val = ft.asarray(np.ones((20, 30)))
+    b_val = ft.asarray(np.ones((30, 20)))
 
     i = Field("i")
     j = Field("j")

@@ -6,16 +6,16 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite.algebra import ffuncs
-from finchlite.autoschedule.galley.logical_optimizer import AnnotatedQuery
-from finchlite.autoschedule.galley.logical_optimizer.branch_and_bound import (
+import finch as ft
+from finch.algebra import ffuncs
+from finch.autoschedule.galley.logical_optimizer import AnnotatedQuery
+from finch.autoschedule.galley.logical_optimizer.branch_and_bound import (
     branch_and_bound,
     branch_and_bound_dfs,
     pruned_query_to_plan,
 )
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory
-from finchlite.finch_logic import (
+from finch.autoschedule.tensor_stats import DenseStatsFactory
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -35,9 +35,9 @@ def _make_aq_four_index_chain():
     Chain with 4 indices. Dims: A 3x10, B 10x5, C 5x2.
     Exact search can find a cheaper order than greedy.
     """
-    A = fl.asarray(np.ones((3, 10)))
-    B = fl.asarray(np.ones((10, 5)))
-    C = fl.asarray(np.ones((5, 2)))
+    A = ft.asarray(np.ones((3, 10)))
+    B = ft.asarray(np.ones((10, 5)))
+    C = ft.asarray(np.ones((5, 2)))
     q = Query(
         Alias("out"),
         Aggregate(
@@ -59,8 +59,8 @@ def _make_aq_four_index_chain():
 
 def _make_aq_three_index_chain():
     """sum_{i,j,k} A[i,j]*B[j,k] — smaller chain."""
-    A = fl.asarray(np.ones((4, 8)))
-    B = fl.asarray(np.ones((8, 6)))
+    A = ft.asarray(np.ones((4, 8)))
+    B = ft.asarray(np.ones((8, 6)))
     q = Query(
         Alias("out"),
         Aggregate(
@@ -87,7 +87,7 @@ def test_layered_bnb_exact_matches_dfs_bnb_exact_on_matmul_chain():
     rng = np.random.default_rng(42)
     shapes = ((3, 10), (10, 5), (5, 2))
     mats = [
-        fl.asarray(rng.standard_normal((r, c)).astype(np.float64)) for r, c in shapes
+        ft.asarray(rng.standard_normal((r, c)).astype(np.float64)) for r, c in shapes
     ]
     q = Query(
         Alias("out"),
@@ -168,7 +168,7 @@ def _make_aq_passthrough_alias():
     case that previously caused ``pruned_query_to_plan`` to return an empty
     list because ``get_remaining_query`` short-circuited on ``Table(Alias, _)``.
     """
-    A = fl.asarray(np.ones((3, 4)))
+    A = ft.asarray(np.ones((3, 4)))
     a_alias = Alias("A_in")
     bindings = OrderedDict()
     bindings[a_alias] = _DENSE_STATS_FACTORY(A, (Field("a_in_i_0"), Field("a_in_i_1")))

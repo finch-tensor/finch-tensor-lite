@@ -4,15 +4,15 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite import ffuncs
-from finchlite.autoschedule.galley.logical_optimizer import (
+import finch as ft
+from finch import ffuncs
+from finch.autoschedule.galley.logical_optimizer import (
     AnnotatedQuery,
     greedy_query,
     insert_statistics,
 )
-from finchlite.autoschedule.tensor_stats import DenseStatsFactory
-from finchlite.finch_logic import (
+from finch.autoschedule.tensor_stats import DenseStatsFactory
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -22,11 +22,11 @@ from finchlite.finch_logic import (
     Table,
 )
 
-A = fl.asarray(np.ones((2,)))
-A_mat = fl.asarray(np.ones((5, 5)))
-B = fl.asarray(np.ones((3,)))
-C_mat = fl.asarray(np.ones((2, 4)))
-D = fl.asarray(np.ones((4,)))
+A = ft.asarray(np.ones((2,)))
+A_mat = ft.asarray(np.ones((5, 5)))
+B = ft.asarray(np.ones((3,)))
+C_mat = ft.asarray(np.ones((2, 4)))
+D = ft.asarray(np.ones((4,)))
 
 
 # ─────────────────────────────── Annotated_Query tests ─────────────────────────────

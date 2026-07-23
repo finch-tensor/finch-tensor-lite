@@ -4,8 +4,8 @@ Galley optimizer pipeline tests.
 
 import numpy as np
 
-import finchlite.interface as fl_interface
-from finchlite.autoschedule import INTERPRET_NOTATION_GALLEY
+import finch.interface as fl_interface
+from finch.autoschedule import INTERPRET_NOTATION_GALLEY
 
 
 # --- TEST 1: out = a * b via frontend ---

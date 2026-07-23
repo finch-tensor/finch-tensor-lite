@@ -11,13 +11,13 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: pip install build toml
+        run: pip install build
       - uses: prefix-dev/setup-pixi@v0.10.0
         with:
           pixi-version: v0.71.3
       - name: Get version
         run: |
-            VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["project"]["version"])')
+            VERSION=$(python -c 'import tomllib; print("v" + tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
             if [ $? -ne 0 ]; then exit 1; fi
             echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: Build PyPI package
@@ -26,10 +26,11 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+          skip-existing: true
       - name: Authenticate with Prefix.dev
         run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
       - name: Build and publish to Prefix.dev
-        run: pixi publish --target-channel https://prefix.dev/${{ secrets.PREFIX_CHANNEL_NAME }}
+        run: pixi publish --target-channel https://prefix.dev/finch-tensor
       - name: Create a Release
         uses: softprops/action-gh-release@v3
         env:

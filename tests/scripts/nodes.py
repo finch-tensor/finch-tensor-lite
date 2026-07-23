@@ -1,19 +1,19 @@
 import numpy as np
 
-import finchlite
-import finchlite.finch_assembly as asm
-import finchlite.finch_logic as log
-import finchlite.finch_notation as ntn
-from finchlite import ffuncs
-from finchlite.codegen.buffers import NumpyBuffer
+import finch
+import finch.finch_assembly as asm
+import finch.finch_logic as log
+import finch.finch_notation as ntn
+from finch import ffuncs
+from finch.codegen.buffers import NumpyBuffer
 
 
 def create_ntn_simple_node():
-    i = ntn.Variable("i", finchlite.int64)
-    j = ntn.Variable("j", finchlite.int64)
-    k = ntn.Variable("k", finchlite.int64)
+    i = ntn.Variable("i", finch.int64)
+    j = ntn.Variable("j", finch.int64)
+    k = ntn.Variable("k", finch.int64)
 
-    T = finchlite.ftype(finchlite.asarray(np.zeros((1, 1))))
+    T = finch.ftype(finch.asarray(np.zeros((1, 1))))
 
     A = ntn.Variable("A", T)
     B = ntn.Variable("B", T)
@@ -22,13 +22,13 @@ def create_ntn_simple_node():
     B_ = ntn.Slot("B_", T)
     C_ = ntn.Slot("C_", T)
 
-    a_ik = ntn.Variable("a_ik", finchlite.float64)
-    b_kj = ntn.Variable("b_kj", finchlite.float64)
-    c_ij = ntn.Variable("c_ij", finchlite.float64)
+    a_ik = ntn.Variable("a_ik", finch.float64)
+    b_kj = ntn.Variable("b_kj", finch.float64)
+    c_ij = ntn.Variable("c_ij", finch.float64)
 
-    m = ntn.Variable("m", finchlite.int64)
-    n = ntn.Variable("n", finchlite.int64)
-    p = ntn.Variable("p", finchlite.int64)
+    m = ntn.Variable("m", finch.int64)
+    n = ntn.Variable("n", finch.int64)
+    p = ntn.Variable("p", finch.int64)
 
     return ntn.Module(
         (
@@ -49,20 +49,20 @@ def create_ntn_simple_node():
                         ntn.Loop(
                             i,
                             ntn.Call(
-                                ntn.Literal(finchlite.compile.make_extent),
-                                (ntn.Literal(finchlite.int64(0)), m),
+                                ntn.Literal(finch.compile.make_extent),
+                                (ntn.Literal(finch.int64(0)), m),
                             ),
                             ntn.Loop(
                                 k,
                                 ntn.Call(
-                                    ntn.Literal(finchlite.compile.make_extent),
-                                    (ntn.Literal(finchlite.int64(0)), p),
+                                    ntn.Literal(finch.compile.make_extent),
+                                    (ntn.Literal(finch.int64(0)), p),
                                 ),
                                 ntn.Loop(
                                     j,
                                     ntn.Call(
-                                        ntn.Literal(finchlite.compile.make_extent),
-                                        (ntn.Literal(finchlite.int64(0)), n),
+                                        ntn.Literal(finch.compile.make_extent),
+                                        (ntn.Literal(finch.int64(0)), n),
                                     ),
                                     ntn.Block(
                                         (
@@ -141,11 +141,11 @@ def create_log_simple_node():
 
 
 def create_asm_if_node():
-    var = asm.Variable("a", finchlite.int64)
+    var = asm.Variable("a", finch.int64)
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", finchlite.int64),
+                asm.Variable("if_else", finch.int64),
                 (),
                 asm.Block(
                     (
@@ -204,8 +204,8 @@ def create_asm_if_node():
 
 
 def create_asm_dot_node():
-    c = asm.Variable("c", finchlite.float64)
-    i = asm.Variable("i", finchlite.int64)
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
     ab = NumpyBuffer(np.array([1, 2, 3], dtype=np.float64))
     bb = NumpyBuffer(np.array([4, 5, 6], dtype=np.float64))
     ab_v = asm.Variable("a", ab.ftype)
@@ -216,7 +216,7 @@ def create_asm_dot_node():
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finchlite.float64),
+                asm.Variable("dot_product", finch.float64),
                 (
                     ab_v,
                     bb_v,
@@ -262,26 +262,26 @@ def create_asm_dot_node():
 
 
 def create_asm_comprehensive_node():
-    a = asm.Variable("a", finchlite.int64)
-    b = asm.Variable("b", finchlite.int64)
-    c = asm.Variable("c", finchlite.int64)
-    d = asm.Variable("d", finchlite.int64)
-    result = asm.Variable("result", finchlite.int64)
-    i = asm.Variable("i", finchlite.int64)
-    j = asm.Variable("j", finchlite.int64)
-    temp = asm.Variable("temp", finchlite.int64)
+    a = asm.Variable("a", finch.int64)
+    b = asm.Variable("b", finch.int64)
+    c = asm.Variable("c", finch.int64)
+    d = asm.Variable("d", finch.int64)
+    result = asm.Variable("result", finch.int64)
+    i = asm.Variable("i", finch.int64)
+    j = asm.Variable("j", finch.int64)
+    temp = asm.Variable("temp", finch.int64)
 
     helper_func = asm.Function(
-        asm.Variable("compute", finchlite.int64),
-        (asm.Variable("x", finchlite.int64), asm.Variable("y", finchlite.int64)),
+        asm.Variable("compute", finch.int64),
+        (asm.Variable("x", finch.int64), asm.Variable("y", finch.int64)),
         asm.Block(
             (
-                asm.Assign(temp, asm.Variable("x", finchlite.int64)),
+                asm.Assign(temp, asm.Variable("x", finch.int64)),
                 asm.Assign(
                     temp,
                     asm.Call(
                         asm.Literal(ffuncs.add),
-                        (temp, asm.Variable("y", finchlite.int64)),
+                        (temp, asm.Variable("y", finch.int64)),
                     ),
                 ),
                 asm.Return(temp),
@@ -290,7 +290,7 @@ def create_asm_comprehensive_node():
     )
 
     main_func = asm.Function(
-        asm.Variable("main", finchlite.int64),
+        asm.Variable("main", finch.int64),
         (),
         asm.Block(
             (

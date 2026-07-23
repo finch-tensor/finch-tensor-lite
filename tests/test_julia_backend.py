@@ -4,8 +4,8 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite import (
+import finch as ft
+from finch import (
     DenseLevel,
     ElementLevel,
     FiberTensor,
@@ -18,7 +18,7 @@ from finchlite import (
     element,
     ftype,
 )
-from finchlite.autoschedule import (
+from finch.autoschedule import (
     DefaultLogicOptimizer,
     DefaultLoopOrderer,
     FDFormatter,
@@ -27,7 +27,7 @@ from finchlite.autoschedule import (
     LogicNormalizer,
     with_default_scheduler,
 )
-from finchlite.autoschedule.tensor_stats import FDStatsFactory
+from finch.autoschedule.tensor_stats import FDStatsFactory
 
 DTYPE = np.int64
 ROWS = np.intp(3)
@@ -49,11 +49,11 @@ def _requires_julia_backend():
 
 def test_julia_element_ftype_can_customize_vector_lowering():
     _requires_julia_backend()
-    from finchlite.compile_jl import JuliaElementFType
-    from finchlite.compile_jl import dtypes as jl_dtypes
-    from finchlite.compile_jl.julia import jl
+    from finch.compile_jl import JuliaElementFType
+    from finch.compile_jl import dtypes as jl_dtypes
+    from finch.compile_jl.julia import jl
 
-    class PairFType(fl.FType, JuliaElementFType):
+    class PairFType(ft.FType, JuliaElementFType):
         def __eq__(self, other):
             return isinstance(other, PairFType)
 
@@ -156,28 +156,28 @@ class RecordingFDFormatter(FDFormatter):
 
 
 def _assert_output_pattern(ftype, expected):
-    assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype, ft.FiberTensorFType)
     lvl = ftype.lvl_t
     for level in expected:
         match level:
             case "dense":
-                assert isinstance(lvl, fl.DenseLevelFType)
+                assert isinstance(lvl, ft.DenseLevelFType)
             case "sparse":
-                assert isinstance(lvl, fl.SparseHashLevelFType)
+                assert isinstance(lvl, ft.SparseHashLevelFType)
             case _:
                 raise ValueError(f"Unknown expected output level: {level}")
         lvl = lvl.lvl_t
-    assert isinstance(lvl, fl.ElementLevelFType)
+    assert isinstance(lvl, ft.ElementLevelFType)
 
 
 def _compute_sparse_axis_sum(level):
-    from finchlite.compile_jl import COMPILE_JULIA
+    from finch.compile_jl import COMPILE_JULIA
 
     arg = FiberTensor(DenseLevel(level, ROWS))
-    expr = fl.sum(fl.lazy(arg), axis=1)
+    expr = ft.sum(ft.lazy(arg), axis=1)
 
     with with_default_scheduler(COMPILE_JULIA):
-        return fl.compute(expr)
+        return ft.compute(expr)
 
 
 def _compile_julia_fd(formatter):
@@ -267,24 +267,24 @@ def test_compile_julia_sums_sparse_hash_level():
 
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
-    from finchlite.compile_jl.compiler import FinchJLCompiler
+    from finch.compile_jl.compiler import FinchJLCompiler
 
     formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
-    arg = fl.asarray(data)
-    expr = fl.lazy(arg) + fl.lazy(arg)
+    arg = ft.asarray(data)
+    expr = ft.lazy(arg) + ft.lazy(arg)
 
     with with_default_scheduler(scheduler):
-        result = fl.compute(expr)
+        result = ft.compute(expr)
 
     np.testing.assert_array_equal(result.to_numpy(), data + data)
     assert formatter.output_ftypes
     output_ftype = formatter.output_ftypes[-1]
-    assert isinstance(output_ftype, fl.FiberTensorFType)
-    assert isinstance(output_ftype.lvl_t, fl.DenseLevelFType)
-    assert isinstance(output_ftype.lvl_t.lvl_t, fl.DenseLevelFType)
-    assert isinstance(output_ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
+    assert isinstance(output_ftype, ft.FiberTensorFType)
+    assert isinstance(output_ftype.lvl_t, ft.DenseLevelFType)
+    assert isinstance(output_ftype.lvl_t.lvl_t, ft.DenseLevelFType)
+    assert isinstance(output_ftype.lvl_t.lvl_t.lvl_t, ft.ElementLevelFType)
 
 
 @pytest.mark.parametrize(
@@ -304,7 +304,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
     output_pattern,
 ):
     _requires_julia_backend()
-    from finchlite.compile_jl.compiler import FinchJLCompiler
+    from finch.compile_jl.compiler import FinchJLCompiler
 
     formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
     scheduler = _compile_julia_fd(formatter)
@@ -315,16 +315,16 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
 
     match op_name:
         case "add":
-            expr = fl.lazy(left) + fl.lazy(right)
+            expr = ft.lazy(left) + ft.lazy(right)
         case "multiply":
-            expr = fl.lazy(left) * fl.lazy(right)
+            expr = ft.lazy(left) * ft.lazy(right)
         case "matmul":
-            expr = fl.matmul(fl.lazy(left), fl.lazy(right))
+            expr = ft.matmul(ft.lazy(left), ft.lazy(right))
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
     with with_default_scheduler(scheduler):
-        result = fl.compute(expr)
+        result = ft.compute(expr)
 
     np.testing.assert_array_equal(result.to_numpy(), expected)
     assert formatter.output_ftypes
