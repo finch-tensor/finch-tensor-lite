@@ -940,10 +940,12 @@ class MLIRContext(Context):
                 return None
 
             # case asm.If(cond, body):
-            #     ...
+            #     iv = self.new_ssa()
+            #     self.exec(f"{iv} = ")
+            #     return None
 
             # case asm.IfElse(cond, body, else_body):
-            #     ...
+            #     return None
 
             # case asm.WhileLoop(cond, body):
             #     ...
