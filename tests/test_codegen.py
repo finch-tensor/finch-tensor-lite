@@ -1004,210 +1004,217 @@ def test_e2e_transpose_numba(a, dtype):
     finch_assert_equal(result, a.T)
 
 
-@pytest.mark.parametrize(
-    "fmt_fn",
-    [
-        lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(dtype)),
-            ndim=2,
-            dimension_type=(ftypes.intp, ftypes.intp),
-        ),
-        lambda dtype: fiber_tensor(
-            dense(
-                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
-            )
-        ),
-    ],
-)
-@pytest.mark.mlir_backend
-@pytest.mark.usefixtures("mlir_compiler")
-@pytest.mark.parametrize("dtype", [np.float64, np.int64])
-def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
-    a = np.array(
-        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
-        dtype=dtype,
-    )
-
-    b = np.array(
-        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
-        dtype=dtype,
-    )
-
-    fmt = fmt_fn(dtype)
-    wa = finch.lazy(finch.asarray(a, format=fmt))
-    wb = finch.lazy(finch.asarray(b, format=fmt))
-
-    plan = finch.matmul(wa, wb)
-    result = finch.compute(plan)
-    finch_assert_equal(result, a @ b)
+def require_mlir():
+    _ = pytest.importorskip("mlir")
 
 
-@pytest.mark.mlir_backend
-def test_matmul_mlir_regression(file_regression):
-    m, k, n = 2, 3, 4
-    ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
-    bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
-    cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
+class TestMLIR:
+    require_mlir()
 
-    i = asm.Variable("i", ftypes.intp)
-    j = asm.Variable("j", ftypes.intp)
-    p = asm.Variable("p", ftypes.intp)
-
-    a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
-    b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
-    c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
-
-    c_idx = asm.Call(
-        asm.Literal(ffuncs.add),
-        (
-            asm.Call(
-                asm.Literal(ffuncs.mul),
-                (i, asm.Literal(np.intp(n))),
+    @pytest.mark.parametrize(
+        "fmt_fn",
+        [
+            lambda dtype: BufferizedNDArrayFType(
+                buffer_type=NumpyBufferFType(ftype(dtype)),
+                ndim=2,
+                dimension_type=(ftypes.intp, ftypes.intp),
             ),
-            j,
-        ),
-    )
-
-    a_idx = asm.Call(
-        asm.Literal(ffuncs.add),
-        (
-            asm.Call(
-                asm.Literal(ffuncs.mul),
-                (i, asm.Literal(np.intp(k))),
+            lambda dtype: fiber_tensor(
+                dense(
+                    dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+                )
             ),
-            p,
-        ),
+        ],
     )
+    @pytest.mark.mlir_backend
+    @pytest.mark.usefixtures("mlir_compiler")
+    @pytest.mark.parametrize("dtype", [np.float64, np.int64])
+    def test_e2e_mlir_dense_matmul(self, fmt_fn, dtype):
+        a = np.array(
+            [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+            dtype=dtype,
+        )
 
-    b_idx = asm.Call(
-        asm.Literal(ffuncs.add),
-        (
-            asm.Call(
-                asm.Literal(ffuncs.mul),
-                (p, asm.Literal(np.intp(n))),
-            ),
-            j,
-        ),
-    )
+        b = np.array(
+            [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+            dtype=dtype,
+        )
 
-    body = asm.Store(
-        c_slt,
-        c_idx,
-        asm.Call(
+        fmt = fmt_fn(dtype)
+        wa = finch.lazy(finch.asarray(a, format=fmt))
+        wb = finch.lazy(finch.asarray(b, format=fmt))
+
+        plan = finch.matmul(wa, wb)
+        result = finch.compute(plan)
+        finch_assert_equal(result, a @ b)
+
+
+    @pytest.mark.mlir_backend
+    def test_matmul_mlir_regression(self, file_regression):
+        m, k, n = 2, 3, 4
+        ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
+        bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
+        cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
+
+        i = asm.Variable("i", ftypes.intp)
+        j = asm.Variable("j", ftypes.intp)
+        p = asm.Variable("p", ftypes.intp)
+
+        a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+        b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
+        c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
+
+        c_idx = asm.Call(
             asm.Literal(ffuncs.add),
             (
-                asm.Load(c_slt, c_idx),
                 asm.Call(
                     asm.Literal(ffuncs.mul),
-                    (
-                        asm.Load(a_slt, a_idx),
-                        asm.Load(b_slt, b_idx),
+                    (i, asm.Literal(np.intp(n))),
+                ),
+                j,
+            ),
+        )
+
+        a_idx = asm.Call(
+            asm.Literal(ffuncs.add),
+            (
+                asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (i, asm.Literal(np.intp(k))),
+                ),
+                p,
+            ),
+        )
+
+        b_idx = asm.Call(
+            asm.Literal(ffuncs.add),
+            (
+                asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (p, asm.Literal(np.intp(n))),
+                ),
+                j,
+            ),
+        )
+
+        body = asm.Store(
+            c_slt,
+            c_idx,
+            asm.Call(
+                asm.Literal(ffuncs.add),
+                (
+                    asm.Load(c_slt, c_idx),
+                    asm.Call(
+                        asm.Literal(ffuncs.mul),
+                        (
+                            asm.Load(a_slt, a_idx),
+                            asm.Load(b_slt, b_idx),
+                        ),
                     ),
                 ),
             ),
-        ),
-    )
-    prgm = asm.Module(
-        (
-            asm.Function(
-                asm.Variable("matmul", ftypes.none_),
-                (a_v, b_v, c_v),
-                asm.Block(
-                    (
-                        asm.Unpack(a_slt, a_v),
-                        asm.Unpack(b_slt, b_v),
-                        asm.Unpack(c_slt, c_v),
-                        asm.ForLoop(
-                            i,
-                            asm.Literal(np.intp(0)),
-                            asm.Literal(np.intp(m)),
-                            asm.Block(
-                                (
-                                    asm.ForLoop(
-                                        j,
-                                        asm.Literal(np.intp(0)),
-                                        asm.Literal(np.intp(n)),
-                                        asm.Block(
-                                            (
-                                                asm.ForLoop(
-                                                    p,
-                                                    asm.Literal(np.intp(0)),
-                                                    asm.Literal(np.intp(k)),
-                                                    asm.Block((body,)),
-                                                ),
-                                            )
-                                        ),
-                                    ),
-                                )
-                            ),
-                        ),
-                        asm.Repack(a_slt),
-                        asm.Repack(b_slt),
-                        asm.Repack(c_slt),
-                        asm.Return(asm.Literal(None)),
-                    )
-                ),
-            ),
         )
-    )
-    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
-
-
-@pytest.mark.mlir_backend
-@pytest.mark.usefixtures("mlir_compiler")
-def test_dense_matmul_mlir_regression(file_regression, caplog):
-    dtype = np.float64
-    a = np.array(
-        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
-        dtype=dtype,
-    )
-    b = np.array(
-        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
-        dtype=dtype,
-    )
-
-    fmt = fiber_tensor(
-        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
-    )
-
-    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
-        result = finch.compute(
-            finch.matmul(
-                finch.lazy(finch.asarray(a, format=fmt)),
-                finch.lazy(finch.asarray(b, format=fmt)),
+        prgm = asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("matmul", ftypes.none_),
+                    (a_v, b_v, c_v),
+                    asm.Block(
+                        (
+                            asm.Unpack(a_slt, a_v),
+                            asm.Unpack(b_slt, b_v),
+                            asm.Unpack(c_slt, c_v),
+                            asm.ForLoop(
+                                i,
+                                asm.Literal(np.intp(0)),
+                                asm.Literal(np.intp(m)),
+                                asm.Block(
+                                    (
+                                        asm.ForLoop(
+                                            j,
+                                            asm.Literal(np.intp(0)),
+                                            asm.Literal(np.intp(n)),
+                                            asm.Block(
+                                                (
+                                                    asm.ForLoop(
+                                                        p,
+                                                        asm.Literal(np.intp(0)),
+                                                        asm.Literal(np.intp(k)),
+                                                        asm.Block((body,)),
+                                                    ),
+                                                )
+                                            ),
+                                        ),
+                                    )
+                                ),
+                            ),
+                            asm.Repack(a_slt),
+                            asm.Repack(b_slt),
+                            asm.Repack(c_slt),
+                            asm.Return(asm.Literal(None)),
+                        )
+                    ),
+                ),
             )
         )
-
-    finch_assert_equal(result, a @ b)
-    mlir_code = next(
-        record.message
-        for record in caplog.records
-        if record.name == "finch.codegen.mlir_codegen.mlir"
-        and record.message.startswith("Compiling MLIR code:\n")
-    )
-    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
-    file_regression.check(mlir_code, extension=".mlir")
+        file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
 
 
-@pytest.mark.mlir_backend
-def test_mlir_resize_not_supported():
-    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
-    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
-    prgm = asm.Module(
-        (
-            asm.Function(
-                asm.Variable("grow", ftypes.none_),
-                (b_v,),
-                asm.Block(
-                    (
-                        asm.Unpack(b_slt, b_v),
-                        asm.Resize(b_slt, asm.Literal(np.intp(6))),
-                        asm.Repack(b_slt),
-                        asm.Return(asm.Literal(None)),
-                    )
-                ),
-            ),
+    @pytest.mark.mlir_backend
+    @pytest.mark.usefixtures("mlir_compiler")
+    def test_dense_matmul_mlir_regression(self, file_regression, caplog):
+        dtype = np.float64
+        a = np.array(
+            [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+            dtype=dtype,
         )
-    )
-    with pytest.raises(NotImplementedError, match="Resize"):
-        MLIRCompiler()(prgm)
+        b = np.array(
+            [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+            dtype=dtype,
+        )
+
+        fmt = fiber_tensor(
+            dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+        )
+
+        with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+            result = finch.compute(
+                finch.matmul(
+                    finch.lazy(finch.asarray(a, format=fmt)),
+                    finch.lazy(finch.asarray(b, format=fmt)),
+                )
+            )
+
+        finch_assert_equal(result, a @ b)
+        mlir_code = next(
+            record.message
+            for record in caplog.records
+            if record.name == "finch.codegen.mlir_codegen.mlir"
+            and record.message.startswith("Compiling MLIR code:\n")
+        )
+        mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+        file_regression.check(mlir_code, extension=".mlir")
+
+
+    @pytest.mark.mlir_backend
+    def test_mlir_resize_not_supported(self):
+        buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+        b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+        prgm = asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("grow", ftypes.none_),
+                    (b_v,),
+                    asm.Block(
+                        (
+                            asm.Unpack(b_slt, b_v),
+                            asm.Resize(b_slt, asm.Literal(np.intp(6))),
+                            asm.Repack(b_slt),
+                            asm.Return(asm.Literal(None)),
+                        )
+                    ),
+                ),
+            )
+        )
+        with pytest.raises(NotImplementedError, match="Resize"):
+            MLIRCompiler()(prgm)
