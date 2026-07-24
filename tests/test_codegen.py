@@ -1021,7 +1021,11 @@ class TestMLIR:
             ),
             lambda dtype: fiber_tensor(
                 dense(
-                    dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+                    dense(
+                        element(
+                            dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType
+                        )
+                    )
                 )
             ),
         ],
@@ -1047,7 +1051,6 @@ class TestMLIR:
         plan = finch.matmul(wa, wb)
         result = finch.compute(plan)
         finch_assert_equal(result, a @ b)
-
 
     @pytest.mark.mlir_backend
     def test_matmul_mlir_regression(self, file_regression):
@@ -1159,7 +1162,6 @@ class TestMLIR:
         )
         file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
 
-
     @pytest.mark.mlir_backend
     @pytest.mark.usefixtures("mlir_compiler")
     def test_dense_matmul_mlir_regression(self, file_regression, caplog):
@@ -1174,7 +1176,9 @@ class TestMLIR:
         )
 
         fmt = fiber_tensor(
-            dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
         )
 
         with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
@@ -1194,7 +1198,6 @@ class TestMLIR:
         )
         mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
         file_regression.check(mlir_code, extension=".mlir")
-
 
     @pytest.mark.mlir_backend
     def test_mlir_resize_not_supported(self):
