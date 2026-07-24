@@ -24,10 +24,12 @@ from finch.autoschedule.tensor_stats import (
     FDStatsFactory,
     LPStats,
     LPStatsFactory,
+    SamplingStatsFactory,
     UniformStatsFactory,
     VPStatsFactory,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.sampling_stats import _duj1
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -40,6 +42,252 @@ from finch.finch_logic import (
     Table,
 )
 from finch.tensor.traits import Dense as DenseProperty
+
+
+# ------------------- SamplingStats tests ---------------------------
+def test_sampling_from_tensor():
+    i, j = Field("i"), Field("j")
+    data = np.eye(20)
+    arr = ft.asarray(data)
+    node = Table(Literal(arr), (i, j))
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.sketch.shape == (20, 20)
+    assert stats.remainder_dims == set()
+    assert stats.remainder_dim_sizes == {}
+    assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
+
+
+def test_sampling_mapjoin_join():
+    i, k, j = Field("i"), Field("j"), Field("k")
+    data_a = np.eye(20)
+    data_b = np.eye(20)
+
+    ta = Table(Literal(ft.asarray(data_a)), (i, k))
+    tb = Table(Literal(ft.asarray(data_b)), (k, j))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=node_mul,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
+
+
+def test_sampling_mapjoin_elementwise():
+    i, j = Field("i"), Field("j")
+    data_a = np.zeros((20, 20))
+    data_a[:15, :] = 1.0
+    data_b = np.zeros((20, 20))
+    data_b[10:, :] = 1.0
+    ta = Table(Literal(ft.asarray(data_a)), (i, j))
+    tb = Table(Literal(ft.asarray(data_b)), (i, j))
+    cache = {}
+    insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    node_mapjoin_elem = MapJoin(Literal(ffuncs.add), (ta, tb))
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        node=node_mapjoin_elem,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        float(np.count_nonzero(data_a + data_b)), abs=1.0
+    )
+
+
+def test_sampling_mapjoin_broadcast():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    data_a = np.zeros((4, 5))
+    data_a[0, 0] = 1.0
+    data_a[1, 1] = 1.0
+
+    data_b = np.zeros((5, 3))
+    data_b[0, 0] = 1.0
+    data_b[1, 1] = 1.0
+
+    ta = Table(Literal(ft.asarray(data_a)), (i, k))
+    tb = Table(Literal(ft.asarray(data_b)), (k, j))
+
+    cache = {}
+    insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=node_mul,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    true_nnz = float(np.count_nonzero(data_a[:, :, None] * data_b[None, :, :]))
+    assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)
+
+
+def test_sampling_aggregate():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    data_a = np.eye(20)
+    data_b = np.eye(20)
+    ta = Table(Literal(ft.asarray(data_a)), (i, k))
+    tb = Table(Literal(ft.asarray(data_b)), (k, j))
+
+    node = Aggregate(
+        op=Literal(ffuncs.add),
+        init=None,
+        arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
+        idxs=(k,),
+    )
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+
+    assert stats.index_order == (i, j)
+    assert k in stats.remainder_dims
+    assert stats.remainder_dim_sizes[k] == 20.0
+    assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
+
+
+def test_sampling_relabel():
+    i, j = Field("i"), Field("j")
+    data = np.eye(5)
+    node = Table(Literal(ft.asarray(data)), (i, j))
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    relabled = SamplingStatsFactory(sample_prob=1.0).relabel(
+        stats, (Field("row"), Field("col"))
+    )
+
+    assert relabled.index_order == (Field("row"), Field("col"))
+    assert relabled.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values(), abs=1.0
+    )
+
+
+def test_sampling_reorder():
+    i, j = Field("i"), Field("j")
+    data = np.eye(5)
+    node = Table(Literal(ft.asarray(data)), (i, j))
+    stats = insert_statistics(
+        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    reordered = SamplingStatsFactory(sample_prob=1.0).reorder(stats, (j, i))
+    assert reordered.index_order == (j, i)
+    assert reordered.estimate_non_fill_values() == pytest.approx(
+        stats.estimate_non_fill_values(), abs=1.0
+    )
+
+
+def test_stats_estimator_isolated():
+    # more generalised example ?
+
+    # A = np.eye(100)
+    A = np.zeros((10, 10))
+    A[0, :] = 1.0
+    A[2, :3] = 1.0
+    A[4, 5] = 1.0
+    A[6, :7] = 1.0
+    A[8, ::2] = 1.0
+    rows, cols = np.nonzero(A)
+    true_D = len(np.unique(rows))
+    N = len(rows)  # [0,0,0...10times,2,2,2,....] = total nnz overall
+
+    print(f"Non-zero rows : {np.unique(rows)}")
+    print(f"True D :{true_D}")
+    print(f"Total nnz N : {N}")
+
+    # sampling
+    rng = np.random.default_rng(42)
+    q = 0.5
+    n_trials = 10000
+    estimates = []
+
+    for _ in range(n_trials):
+        mask = rng.random(N) < q
+        sample = rows[mask]
+
+        if len(sample) == 0:
+            continue
+
+        # frequencies
+        _, counts = np.unique(sample, return_counts=True)
+        d_n = float(len(counts))  # how many rows contribute
+        f_1 = float(
+            np.sum(counts == 1)
+        )  # how many rows have only one contributing element
+        n = float(len(sample))  # how many total nnz -> sum of frequencies
+
+        estimates.append(_duj1(d_n, f_1, q, n))
+
+    mean_est = np.mean(estimates)
+    error = abs(mean_est - true_D) / true_D * 100
+
+    print(f"True D:{true_D}")
+    print(f"Estimated D:{mean_est}")
+    print(f"Error:{error:.1f}%")
 
 
 def _overwrite_def(stat, base: BaseTensorStats):
@@ -1085,6 +1333,8 @@ def test_vp_reorder():
 
 
 # ─────────────────────────────── Test Embeddings ───────────────────────────────
+
+
 def test_embeddings():
     data = np.zeros((20, 20))
     data[0:10, 0:10] = 1.0
