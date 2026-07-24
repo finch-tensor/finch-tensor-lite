@@ -29,7 +29,8 @@ repos:
         (?x)(
             ^tests/reference/|
             ^tests/scripts/|
-            ^src/finch/codegen/stc/
+            ^tests/utils.py|
+            ^src/finch/codegen/src/
         )
 
     - id: no-commit-to-branch
