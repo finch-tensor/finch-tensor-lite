@@ -39,8 +39,8 @@ from finch.codegen.numba_codegen import (
 from finch.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
-
 from .utils import mlir_backend
+
 
 @pytest.mark.c_backend
 def test_add_function():
