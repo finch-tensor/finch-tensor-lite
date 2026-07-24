@@ -856,6 +856,9 @@ class MLIRContext(Context):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
                 return mlir_getattr(obj_t, self, self(base), attrs)
 
+            # case asm.SetAttr(_, _, _):
+            #     ...
+
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 if val.result_type != var_t:
                     raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
@@ -910,6 +913,175 @@ class MLIRContext(Context):
                     f"{feed}}}"
                 )
                 return None
+
+            case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                buf = self.resolve(buffer)
+                length = buf_t.mlir_length(self, buf)
+
+                zero = self.constant(0, "index")
+                step = self.constant(1, "index")
+
+                iv = self.new_ssa()
+                ctx_2 = self.subblock()
+
+                idx_name = ctx_2.freshen(".buffer_index")
+                ctx_2.bindings[idx_name] = (iv, "index")
+
+                elem = buf_t.mlir_load(ctx_2, buf, asm.Variable(idx_name, algebra.intp))
+                ctx_2.bindings[var_n] = (elem, mlir_type(var_t))
+                ctx_2(body)
+
+                self.exec(
+                    f"{feed}scf.for {iv} = {zero} to {length} step {step} {{\n"
+                    f"{ctx_2.emit()}\n"
+                    f"{feed}}}"
+                )
+                return None
+
+            case asm.If(condition, body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+
+                after = new_ctx.bindings.bindings
+                changed = {
+                    name: after[name]
+                    for name, old_binding in before.items()
+                    if not name.startswith(".") and after.get(name) != old_binding
+                }
+
+                if not changed:
+                    self.exec(f"{feed}scf.if {cond} {{\n{new_ctx.emit()}\n{feed}}}")
+                else:
+                    names = list(changed)
+                    new_result = [self.new_ssa() for _ in names]
+
+                    new_vals = [changed[i][0] for i in names]
+                    new_type = [changed[i][1] for i in names]
+                    old_vals = [before[i][0] for i in names]
+
+                    result = ", ".join(new_result)
+                    result_types = ", ".join(new_type)
+                    changed_result = ", ".join(new_vals)
+                    old_result = ", ".join(old_vals)
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield {changed_result} : {result_types}"
+                    )
+
+                    self.exec(
+                        f"{feed}{result} = scf.if {cond} -> ({result_types}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{new_ctx.feed}scf.yield {old_result} : {result_types}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        names,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.IfElse(condition, body, else_body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+
+                else_ctx = self.subblock()
+                else_ctx.bindings = ScopedDict(before.copy())
+                else_ctx(else_body)
+
+                after = new_ctx.bindings.bindings
+                else_after = else_ctx.bindings.bindings
+
+                names = sorted(
+                    i
+                    for i in set(after) | set(else_after)
+                    if not i.startswith(".")
+                    and (
+                        after.get(i) != before.get(i)
+                        or else_after.get(i) != before.get(i)
+                    )
+                )
+
+                if not names:
+                    self.exec(
+                        f"{feed}scf.if {cond} {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+                else:
+                    new_result = [self.new_ssa() for _ in names]
+
+                    new_vals = [after[i][0] for i in names]
+                    else_vals = [else_after[i][0] for i in names]
+                    new_type = [after[i][1] for i in names]
+
+                    result = ", ".join(new_result)
+                    result_types = ", ".join(new_type)
+                    changed_result = ", ".join(new_vals)
+                    else_result = ", ".join(else_vals)
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield {changed_result} : {result_types}"
+                    )
+                    else_ctx.exec(
+                        f"{else_ctx.feed}scf.yield {else_result} : {result_types}"
+                    )
+
+                    self.exec(
+                        f"{feed}{result} = "
+                        f"scf.if {cond} -> ({result_types}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        names,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            # case asm.WhileLoop(cond, body):
+            #     ...
 
             case asm.Function(asm.Variable(func_name, return_t), args, body):
                 ctx_2 = self.subblock()
@@ -970,6 +1142,9 @@ class MLIRContext(Context):
                         )
                     self(func)
                 return None
+
+            case asm.Break():
+                raise NotImplementedError("MLIR backend does not yet support Break")
 
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
