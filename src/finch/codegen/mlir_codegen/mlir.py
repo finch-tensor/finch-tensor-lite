@@ -939,13 +939,144 @@ class MLIRContext(Context):
                 )
                 return None
 
-            # case asm.If(cond, body):
-            #     iv = self.new_ssa()
-            #     self.exec(f"{iv} = ")
-            #     return None
+            case asm.If(condition, body):
+                cond = self(condition)
 
-            # case asm.IfElse(cond, body, else_body):
-            #     return None
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+
+                after = new_ctx.bindings.bindings
+                changed = {
+                    name: after[name]
+                    for name, old_binding in before.items()
+                    if not name.startswith(".") and after.get(name) != old_binding
+                }
+
+                if not changed:
+                    self.exec(f"{feed}scf.if {cond} {{\n{new_ctx.emit()}\n{feed}}}")
+                else:
+                    name = list(changed)
+                    new_result = [self.new_ssa() for _ in name]
+
+                    new_vals = [changed[i][0] for i in name]
+                    new_type = [changed[i][1] for i in name]
+                    old_vals = [before[i][0] for i in name]
+
+                    result = ", ".join(new_result)
+                    result_types = ", ".join(new_type)
+                    changed_result = ", ".join(new_vals)
+                    old_result = ", ".join(old_vals)
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield {changed_result} : {result_types}"
+                    )
+
+                    self.exec(
+                        f"{feed}{result} = scf.if {cond} -> ({result_types}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{new_ctx.feed}scf.yield {old_result} : {result_types}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        name,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.IfElse(condition, body, else_body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+
+                else_ctx = self.subblock()
+                else_ctx.bindings = ScopedDict(before.copy())
+                else_ctx(else_body)
+
+                after = new_ctx.bindings.bindings
+                else_after = else_ctx.bindings.bindings
+
+                name = sorted(
+                    i
+                    for i in set(after) | set(else_after)
+                    if not i.startswith(".")
+                    and (
+                        after.get(i) != before.get(i)
+                        or else_after.get(i) != before.get(i)
+                    )
+                )
+
+                if not name:
+                    self.exec(
+                        f"{feed}scf.if {cond} {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+                else:
+                    new_result = [self.new_ssa() for _ in name]
+
+                    new_vals = [after[i][0] for i in name]
+                    else_vals = [else_after[i][0] for i in name]
+                    new_type = [after[i][1] for i in name]
+
+                    result = ", ".join(new_result)
+                    result_types = ", ".join(new_type)
+                    changed_result = ", ".join(new_vals)
+                    else_result = ", ".join(else_vals)
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield {changed_result} : {result_types}"
+                    )
+                    else_ctx.exec(
+                        f"{else_ctx.feed}scf.yield {else_result} : {result_types}"
+                    )
+
+                    self.exec(
+                        f"{feed}{result} = "
+                        f"scf.if {cond} -> ({result_types}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        name,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
 
             # case asm.WhileLoop(cond, body):
             #     ...
