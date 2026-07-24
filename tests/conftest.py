@@ -10,8 +10,6 @@ from finch import get_default_scheduler, set_default_scheduler
 from finch.autoschedule import COMPILE_MLIR, COMPILE_NUMBA, INTERPRET_LOGIC
 from finch.finch_logic import Field
 
-from .utils import skip_mlir
-
 
 @pytest.fixture(scope="session")
 def lazy_datadir() -> Path:
