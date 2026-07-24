@@ -40,6 +40,7 @@ from finch.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 
+from .utils import mlir_backend
 
 @pytest.mark.c_backend
 def test_add_function():
@@ -1019,7 +1020,7 @@ def test_e2e_transpose_numba(a, dtype):
         ),
     ],
 )
-@pytest.mark.mlir_backend
+@mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
@@ -1042,7 +1043,7 @@ def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
     finch_assert_equal(result, a @ b)
 
 
-@pytest.mark.mlir_backend
+@mlir_backend
 def test_matmul_mlir_regression(file_regression):
     m, k, n = 2, 3, 4
     ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
@@ -1153,7 +1154,7 @@ def test_matmul_mlir_regression(file_regression):
     file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
 
 
-@pytest.mark.mlir_backend
+@mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 def test_dense_matmul_mlir_regression(file_regression, caplog):
     dtype = np.float64
@@ -1189,7 +1190,7 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
     file_regression.check(mlir_code, extension=".mlir")
 
 
-@pytest.mark.mlir_backend
+@mlir_backend
 def test_mlir_resize_not_supported():
     buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
     b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
