@@ -56,7 +56,7 @@ def numba_compiler():
     set_default_scheduler(ctx=ctx)
 
 
-@skip_mlir
+@pytest.fixture
 def mlir_compiler():
     ctx = get_default_scheduler()
     yield set_default_scheduler(ctx=COMPILE_MLIR)
