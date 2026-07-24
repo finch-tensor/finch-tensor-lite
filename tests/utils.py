@@ -1,14 +1,12 @@
+from functools import wraps
+
 import pytest
-
-try:
-    import mlir  # noqa: F401
-except ImportError:
-    mlir = None
-
-skip_mlir = pytest.mark.skipif(
-    mlir is None, reason="MLIR Python bindings not installed."
-)
 
 
 def mlir_backend(func):
-    return pytest.mark.mlir_backend(skip_mlir(func))
+    @wraps(func)
+    def func_wrapper(*args, **kwargs):
+        _ = pytest.importorskip("mlir", reason="MLIR Python bindings not installed.")
+        return func(*args, **kwargs)
+
+    return pytest.mark.mlir_backend(func_wrapper)
