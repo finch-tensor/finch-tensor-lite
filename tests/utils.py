@@ -2,13 +2,11 @@ import pytest
 
 try:
     import mlir  # noqa: F401
-
-    MLIR_AVAILABLE = True
 except ImportError:
-    MLIR_AVAILABLE = False
+    mlir = None
 
 skip_mlir = pytest.mark.skipif(
-    not MLIR_AVAILABLE, reason="MLIR Python bindings not installed."
+    mlir is None, reason="MLIR Python bindings not installed."
 )
 
 
