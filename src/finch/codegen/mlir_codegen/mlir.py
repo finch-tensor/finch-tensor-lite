@@ -916,6 +916,8 @@ class MLIRContext(Context):
 
             case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
                 buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
                 buf = self.resolve(buffer)
                 length = buf_t.mlir_length(self, buf)
 
@@ -965,12 +967,12 @@ class MLIRContext(Context):
                 if not changed:
                     self.exec(f"{feed}scf.if {cond} {{\n{new_ctx.emit()}\n{feed}}}")
                 else:
-                    name = list(changed)
-                    new_result = [self.new_ssa() for _ in name]
+                    names = list(changed)
+                    new_result = [self.new_ssa() for _ in names]
 
-                    new_vals = [changed[i][0] for i in name]
-                    new_type = [changed[i][1] for i in name]
-                    old_vals = [before[i][0] for i in name]
+                    new_vals = [changed[i][0] for i in names]
+                    new_type = [changed[i][1] for i in names]
+                    old_vals = [before[i][0] for i in names]
 
                     result = ", ".join(new_result)
                     result_types = ", ".join(new_type)
@@ -990,7 +992,7 @@ class MLIRContext(Context):
                     )
 
                     for i, j, k in zip(
-                        name,
+                        names,
                         new_result,
                         new_type,
                         strict=True,
@@ -1022,7 +1024,7 @@ class MLIRContext(Context):
                 after = new_ctx.bindings.bindings
                 else_after = else_ctx.bindings.bindings
 
-                name = sorted(
+                names = sorted(
                     i
                     for i in set(after) | set(else_after)
                     if not i.startswith(".")
@@ -1032,7 +1034,7 @@ class MLIRContext(Context):
                     )
                 )
 
-                if not name:
+                if not names:
                     self.exec(
                         f"{feed}scf.if {cond} {{\n"
                         f"{new_ctx.emit()}\n"
@@ -1041,11 +1043,11 @@ class MLIRContext(Context):
                         f"{feed}}}"
                     )
                 else:
-                    new_result = [self.new_ssa() for _ in name]
+                    new_result = [self.new_ssa() for _ in names]
 
-                    new_vals = [after[i][0] for i in name]
-                    else_vals = [else_after[i][0] for i in name]
-                    new_type = [after[i][1] for i in name]
+                    new_vals = [after[i][0] for i in names]
+                    else_vals = [else_after[i][0] for i in names]
+                    new_type = [after[i][1] for i in names]
 
                     result = ", ".join(new_result)
                     result_types = ", ".join(new_type)
@@ -1069,7 +1071,7 @@ class MLIRContext(Context):
                     )
 
                     for i, j, k in zip(
-                        name,
+                        names,
                         new_result,
                         new_type,
                         strict=True,
